@@ -1,0 +1,47 @@
+# ════════════════════════════════════════════════════════════
+# 演示环境（demo）——本文件【入库】，是仓库里唯一的环境配置
+#
+# 用途：clone 下来不配任何东西，起 docker 中间件 + 灌 schema.sql 就能跑，
+#       用于毕设演示与答辩，也便于他人复现。
+# 约束：这里的账号密码必须与 docker/docker-compose.yml 中的演示中间件一致，
+#       且只能是「演示值」——任何真实凭据都不允许写进本文件。
+#
+# 启动：默认 profile 就是 demo，直接跑启动类即可
+# ════════════════════════════════════════════════════════════
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/campus_market?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: Campus@2026
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: Campus@2026
+      database: 0
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: campus-market-producer
+
+minio:
+  enabled: false          # 演示默认不启对象存储，图片走本地占位；需要时改 true
+  endpoint: http://127.0.0.1:9000
+  access-key: campus
+  secret-key: Campus@2026
+  bucket: item-image
+
+campus:
+  captcha:
+    enabled: false        # 演示关闭验证码，登录只需账号密码
+
+logging:
+  level:
+    root: info
+    com.campus: debug

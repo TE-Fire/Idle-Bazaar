@@ -97,9 +97,16 @@ project.private.config.json
 *.keystore
 *.jks
 secrets.yml
-application-prod.yml
 application-secret.yml
 application-prod.properties
+
+# 环境配置只入库「基础 + 演示」两份：
+#   application.yml       基础（无凭据）
+#   application-demo.yml  演示（localhost + 演示凭据，供他人复现）
+# dev / prod 含个人与真实凭据，一律忽略
+application-dev.yml
+application-prod.yml
+!application-demo.yml
 
 # ── 项目本地产物与运行时数据 ───────────────────────────────
 uploads/

@@ -47,7 +47,28 @@ mysql -h127.0.0.1 -uroot -p campus_market < ../db/schema.sql
 `schema.sql` 内含 24 张表 + 全部种子数据（12 学院 / 8 分类 / 成色 / 6 个面交点 / 4 角色 / 16 权限点 / 减碳系数 / 敏感词）。
 **种子里没有管理员密码**——演示账号由应用首次启动时自动生成（见下）。
 
-## 四、启动应用
+## 四、环境配置（profile）
+
+配置分四份，位于 `campus-admin-api/src/main/resources/`：
+
+| 文件 | 是否入库 | 用途 | 说明 |
+|---|---|---|---|
+| `application.yml` | ✅ 入库 | 基础配置 | 与环境无关的公共项，不含任何凭据 |
+| `application-demo.yml` | ✅ 入库 | 演示 | localhost + 演示凭据，clone 下来就能跑 |
+| `application-dev.yml` | ❌ 已忽略 | 本地开发 | 可随意改端口/日志/连本机中间件 |
+| `application-prod.yml` | ❌ 已忽略 | 生产 | 取值全部来自环境变量，无明文凭据 |
+
+默认激活 `demo`，所以**不指定 profile 也能直接启动**。切换方式：
+
+```bash
+java -jar campus-admin-api/target/campus-admin-api-1.0.0-SNAPSHOT.jar --spring.profiles.active=dev
+# 或 IDE 里加 VM options：-Dspring.profiles.active=dev
+```
+
+> `dev` / `prod` 不入库（`.gitignore` 已列），首次用 dev 请从 `application-demo.yml` 复制后修改。
+> 生产环境注入：`DB_URL` / `DB_USER` / `DB_PASSWORD` / `REDIS_HOST` / `REDIS_PASSWORD` / `MQ_NAME_SERVER` / `MINIO_*`。
+
+## 五、启动应用
 
 ```bash
 cd backend
@@ -68,7 +89,7 @@ java -jar campus-admin-api/target/campus-admin-api-1.0.0-SNAPSHOT.jar
 - 接口文档：<http://127.0.0.1:8080/doc.html>
 - 健康检查：<http://127.0.0.1:8080/api/health>
 
-## 五、验证权限隔离（毕设演示要点）
+## 六、验证权限隔离（毕设演示要点）
 
 ```bash
 # 1. 用审核员登录，拿到 token
@@ -84,7 +105,7 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 这一条就是「审核员能审核商品、不能封禁用户」在后端真正生效的证据——
 前端按钮置灰只是体验层，这里的 `@SaCheckPermission` 才是安全边界。
 
-## 六、已知待办
+## 七、已知待办
 
 - [ ] 图形验证码下发接口（登录校验逻辑已就绪，`campus.captcha.enabled` 打开后需要配套接口）
 - [ ] `@OpLog` 注解与 AOP（操作日志落 `sys_operation_log`，见 `tech/01` 5.4）
