@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.experimental.Accessors;
 
 /**
  * 角色 × 权限点，行式存储（一个权限点一行）。
@@ -12,6 +13,7 @@ import lombok.Data;
  * 行式可直接查；且 idx_perm 支持「哪些角色有 user.ban」这类反查。
  */
 @Data
+@Accessors(chain = true)
 @TableName("admin_role_perm")
 public class AdminRolePerm {
 

@@ -33,34 +33,34 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<?> handleValid(MethodArgumentNotValidException e) {
         FieldError fe = e.getBindingResult().getFieldError();
-        String msg = fe == null ? ErrorCode.PARAM_ERROR.getMsg() : fe.getField() + " " + fe.getDefaultMessage();
-        return Result.fail(ErrorCode.PARAM_ERROR.getCode(), msg).trace();
+        String msg = fe == null ? CommonErrorCode.PARAM_ERROR.getMsg() : fe.getField() + " " + fe.getDefaultMessage();
+        return Result.fail(CommonErrorCode.PARAM_ERROR.getCode(), msg).trace();
     }
 
     @ExceptionHandler(BindException.class)
     public Result<?> handleBind(BindException e) {
         List<FieldError> errors = e.getBindingResult().getFieldErrors();
-        String msg = errors.isEmpty() ? ErrorCode.PARAM_ERROR.getMsg()
+        String msg = errors.isEmpty() ? CommonErrorCode.PARAM_ERROR.getMsg()
                 : errors.get(0).getField() + " " + errors.get(0).getDefaultMessage();
-        return Result.fail(ErrorCode.PARAM_ERROR.getCode(), msg).trace();
+        return Result.fail(CommonErrorCode.PARAM_ERROR.getCode(), msg).trace();
     }
 
     /** Sa-Token 未登录 / 无权限 / 角色不足 */
     @ExceptionHandler(NotLoginException.class)
     public Result<?> handleNotLogin(NotLoginException e) {
-        return Result.fail(ErrorCode.UNAUTHORIZED.getCode(), ErrorCode.UNAUTHORIZED.getMsg()).trace();
+        return Result.fail(CommonErrorCode.UNAUTHORIZED.getCode(), CommonErrorCode.UNAUTHORIZED.getMsg()).trace();
     }
 
     @ExceptionHandler({NotPermissionException.class, NotRoleException.class})
     public Result<?> handleNotPermission(Exception e) {
         log.warn("[perm] {}", e.getMessage());
-        return Result.fail(ErrorCode.FORBIDDEN.getCode(), ErrorCode.FORBIDDEN.getMsg()).trace();
+        return Result.fail(CommonErrorCode.FORBIDDEN.getCode(), CommonErrorCode.FORBIDDEN.getMsg()).trace();
     }
 
     /** 兜底：未知异常统一 5000，返回 traceId 供排查，不暴露堆栈 */
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception e) {
         log.error("[sys] traceId={} uri_error", MDC.get("traceId"), e);
-        return Result.fail(ErrorCode.SYSTEM_ERROR.getCode(), ErrorCode.SYSTEM_ERROR.getMsg()).trace();
+        return Result.fail(CommonErrorCode.SYSTEM_ERROR.getCode(), CommonErrorCode.SYSTEM_ERROR.getMsg()).trace();
     }
 }

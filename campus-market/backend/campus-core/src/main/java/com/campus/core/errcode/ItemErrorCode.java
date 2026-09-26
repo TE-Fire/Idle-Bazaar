@@ -1,0 +1,34 @@
+package com.campus.core.errcode;
+
+import com.campus.common.exception.IErrorCode;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
+/**
+ * 商品模块错误码（段位 11xx，登记于 tech/01 5.5）。
+ * 归商品模块自己维护；实现 IErrorCode 后可直接进 BizException / Result / BizAssert。
+ */
+@Getter
+@AllArgsConstructor
+public enum ItemErrorCode implements IErrorCode {
+
+    ITEM_NOT_FOUND(1101, "商品不存在"),
+    ITEM_NOT_ON_SALE(1102, "商品已售出或已下架"),
+    ITEM_SOLD_OUT(1103, "手慢了，商品已被他人买走"),
+    ITEM_PENDING_REVIEW(1104, "商品正在审核中"),
+    ITEM_CATEGORY_MISMATCH(1105, "仅支持对比同一分类下的商品"),
+    ;
+
+    @Override
+    public int getCode() {
+        return code;
+    }
+
+    @Override
+    public String getMsg() {
+        return msg;
+    }
+
+    private final int code;
+    private final String msg;
+}

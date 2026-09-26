@@ -1,5 +1,6 @@
 package com.campus.common.result;
 
+import com.campus.common.exception.IErrorCode;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 import org.slf4j.MDC;
@@ -18,7 +19,7 @@ public class Result<T> implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    /** 0 表示成功，非 0 见 {@link com.campus.common.exception.ErrorCode} */
+    /** 0 表示成功，非 0 见各模块错误码枚举（实现 {@link IErrorCode} 契约） */
     private int code;
 
     private String msg;
@@ -46,6 +47,16 @@ public class Result<T> implements Serializable {
         r.setMsg(msg);
         r.setTraceId(MDC.get("traceId"));
         return r;
+    }
+
+    /** 失败入参直接吃错误码契约，与 BizException / BizAssert 同源 */
+    public static <T> Result<T> fail(IErrorCode ec) {
+        return fail(ec.getCode(), ec.getMsg());
+    }
+
+    /** 失败并覆盖提示文案（保留原错误码），如 1000 + 「验证码已失效，请刷新」 */
+    public static <T> Result<T> fail(IErrorCode ec, String detail) {
+        return fail(ec.getCode(), detail);
     }
 
     /** 失败时把当前 traceId 补上，便于用户截图反馈后直接查日志 */
