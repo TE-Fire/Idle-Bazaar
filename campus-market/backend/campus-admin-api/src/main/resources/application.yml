@@ -1,0 +1,81 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: campus-market
+  threads:
+    virtual:
+      enabled: false      # JDK 21 虚拟线程：评估后不启用，见 tech/01 2.1
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/campus_market?useUnicode=true&characterEncoding=utf8mb4&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+    username: root
+    password: Campus@2026
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: Campus@2026
+      database: 0
+  jackson:
+    default-property-inclusion: non_null
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 20MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  # 不启用 MP 的 logic-delete：本项目的 deleted 是删除时间戳而非 0/1，
+  # 唯一索引带 deleted，查询统一显式带 deleted = 0
+  mapper-locations: classpath*:/mapper/**/*.xml
+
+# Sa-Token 全局配置（两个 StpLogic 的差异化配置在 SaTokenConfig 里单独 set）
+# 会话持久层由 sa-token-redis-jackson 自动接管，重启不掉登录，且支持封禁后即时踢下线
+sa-token:
+  token-name: satoken
+  token-style: uuid
+  is-read-body: false
+  is-read-header: true
+  is-read-cookie: false
+
+knife4j:
+  enable: true
+  production: false
+  setting:
+    language: zh_cn
+springdoc:
+  group-configs:
+    - group: '学生端'
+      paths-to-match: '/api/**'
+    - group: '管理端'
+      paths-to-match: '/admin/**'
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: campus-market-producer
+
+minio:
+  enabled: false          # 骨架阶段不连 MinIO，实现已就绪，需要时改成 true
+  endpoint: http://127.0.0.1:9000
+  access-key: campus
+  secret-key: Campus@2026
+  bucket: item-image
+
+campus:
+  captcha:
+    enabled: false        # A1 联调时打开，需配套验证码下发接口
+
+logging:
+  level:
+    root: info
+    com.campus: debug
+  pattern:
+    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n'

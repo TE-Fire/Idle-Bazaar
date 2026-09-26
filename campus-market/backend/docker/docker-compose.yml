@@ -1,0 +1,120 @@
+# 校园二手交易平台 · 本地中间件
+# 用法：在本文件所在目录执行
+#   docker compose up -d
+#   docker compose ps          # 看健康状态
+#   docker compose down -v     # 连数据一起清掉重来
+#
+# 注意：本机的 MySQL 8.0.43 服务如果占用了 3306，先停掉它，或把下面的端口改成 3307:3306
+
+services:
+  # ── MySQL 8 ─────────────────────────────────────────────
+  # 关键点：ngram_token_size=2 必须在启动时传给 mysqld，否则
+  # FULLTEXT(title, description) WITH PARSER ngram 建不出来（schema.sql 会报错）
+  mysql:
+    image: mysql:8.0
+    container_name: cm-mysql
+    command:
+      - --ngram_token_size=2
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_general_ci
+      - --default-time-zone=+08:00
+      - --lower_case_table_names=1
+    environment:
+      MYSQL_ROOT_PASSWORD: "Campus@2026"
+      MYSQL_DATABASE: campus_market
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - cm-mysql-data:/var/lib/mysql
+      - ./initdb:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pCampus@2026"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  # ── Redis 7 ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cm-redis
+    command: redis-server --requirepass "Campus@2026" --appendonly yes
+    environment:
+      TZ: Asia/Shanghai
+    ports:
+      - "6379:6379"
+    volumes:
+      - cm-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "Campus@2026", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # ── RocketMQ 5.x ────────────────────────────────────────
+  rmq-namesrv:
+    image: apache/rocketmq:5.3.1
+    container_name: cm-rmq-namesrv
+    command: sh mqnamesrv
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m"
+      TZ: Asia/Shanghai
+    ports:
+      - "9876:9876"
+
+  rmq-broker:
+    image: apache/rocketmq:5.3.1
+    container_name: cm-rmq-broker
+    # -c 指向挂载进容器的 broker.conf：里面开了 autoCreateTopicEnable
+    # 并把 brokerIP1 写成 127.0.0.1，这样宿主机的应用能直接连 127.0.0.1:10911
+    command: sh mqbroker -n cm-rmq-namesrv:9876 -c /opt/rocketmq/conf/broker.conf
+    environment:
+      JAVA_OPT_EXT: "-Xms512m -Xmx512m"
+      TZ: Asia/Shanghai
+    volumes:
+      - ./broker.conf:/opt/rocketmq/conf/broker.conf
+      - cm-rmq-broker-store:/home/rocketmq/store
+    depends_on:
+      - rmq-namesrv
+    ports:
+      - "10909:10909"
+      - "10911:10911"
+      - "10912:10912"
+
+  # 控制台（可选，用来看 topic、延迟消息是否投递成功；不需要可注释掉）
+  rmq-dashboard:
+    image: apache/rocketmq-dashboard:latest
+    container_name: cm-rmq-dashboard
+    environment:
+      JAVA_OPTS: "-Drocketmq.namesrv.addr=cm-rmq-namesrv:9876 -Dserver.port=8089"
+    depends_on:
+      - rmq-namesrv
+    ports:
+      - "8089:8089"
+
+  # ── MinIO ───────────────────────────────────────────────
+  # 官方镜像已从 Docker Hub 迁到 quay.io，拉不动时把 image 换成 bitnami/minio:latest
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: cm-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: campus
+      MINIO_ROOT_PASSWORD: "Campus@2026"
+      TZ: Asia/Shanghai
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - cm-minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  cm-mysql-data:
+  cm-redis-data:
+  cm-rmq-broker-store:
+  cm-minio-data:

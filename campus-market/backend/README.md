@@ -1,0 +1,93 @@
+# 校园二手交易平台 · 后端
+
+单体应用 + Maven 多模块，单 jar 部署。技术依据见 `campus-market/tech/01`，开发工序见 `tech/03`。
+
+## 一、模块结构
+
+```
+backend/
+├─ campus-common      统一响应 / 错误码 / 异常 / traceId / Jackson 四条规则 / 权限点常量
+├─ campus-core        Entity · Mapper · Service · Sa-Token 权限加载 · 演示账号初始化
+├─ campus-support     可替换能力：对象存储（MinIO，接口隔离）
+├─ campus-user-api    学生端 Controller（/api/**）
+└─ campus-admin-api   管理端 Controller（/admin/**）+ 唯一启动类
+```
+
+两个 api 模块最终打进同一个 jar，靠路径前缀分流（`tech/01` 3.2 已定：单 jar + 前缀）。
+将来若学院要求接口分离，给 `campus-user-api` 加个启动类即可，业务代码不动。
+
+## 二、启动中间件
+
+```bash
+cd docker
+docker compose up -d
+docker compose ps        # 全部 healthy 再往下走
+```
+
+| 服务 | 地址 | 账号 |
+|---|---|---|
+| MySQL 8 | 127.0.0.1:3306 | root / Campus@2026 |
+| Redis 7 | 127.0.0.1:6379 | 密码 Campus@2026 |
+| RocketMQ | 127.0.0.1:9876（控制台 8089） | — |
+| MinIO | 127.0.0.1:9000（控制台 9001） | campus / Campus@2026 |
+
+> MySQL 的 `ngram_token_size=2` 是通过容器启动参数传入的，**不需要改本机 my.ini，也不需要 root 密码**。
+> 如果本机 MySQL 服务已占用 3306，先停掉它，或把 compose 里的端口改成 `3307:3306`。
+
+## 三、建库
+
+```bash
+# 方式一：容器里执行
+docker exec -i cm-mysql mysql -uroot -pCampus@2026 < ../db/schema.sql
+
+# 方式二：本机 mysql 客户端
+mysql -h127.0.0.1 -uroot -p campus_market < ../db/schema.sql
+```
+
+`schema.sql` 内含 24 张表 + 全部种子数据（12 学院 / 8 分类 / 成色 / 6 个面交点 / 4 角色 / 16 权限点 / 减碳系数 / 敏感词）。
+**种子里没有管理员密码**——演示账号由应用首次启动时自动生成（见下）。
+
+## 四、启动应用
+
+```bash
+cd backend
+# 注意：你的 M2_HOME 目前指向了 bin 目录，用完整路径调用
+"D:/program files/apache-maven-3.9.11/bin/mvn.cmd" -q clean package -DskipTests
+java -jar campus-admin-api/target/campus-admin-api-1.0.0-SNAPSHOT.jar
+```
+
+首次启动会自动创建 4 个演示管理员（仅当 `admin_user` 表为空时执行，可重复运行）：
+
+| 账号 | 角色 | 密码 |
+|---|---|---|
+| super | 超级管理员 | Campus@2026 |
+| reviewer | 审核员 | Campus@2026 |
+| operator | 运营 | Campus@2026 |
+| readonly | 只读 | Campus@2026 |
+
+- 接口文档：<http://127.0.0.1:8080/doc.html>
+- 健康检查：<http://127.0.0.1:8080/api/health>
+
+## 五、验证权限隔离（毕设演示要点）
+
+```bash
+# 1. 用审核员登录，拿到 token
+curl -X POST http://127.0.0.1:8080/admin/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"reviewer","password":"Campus@2026"}'
+
+# 2. 分别访问两个演示接口（把 TOKEN 换成登录返回的 tokenValue）
+curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/review   # 通过：持有 review.judge
+curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"code":1002,"msg":"无权限执行该操作"}
+```
+
+这一条就是「审核员能审核商品、不能封禁用户」在后端真正生效的证据——
+前端按钮置灰只是体验层，这里的 `@SaCheckPermission` 才是安全边界。
+
+## 六、已知待办
+
+- [ ] 图形验证码下发接口（登录校验逻辑已就绪，`campus.captcha.enabled` 打开后需要配套接口）
+- [ ] `@OpLog` 注解与 AOP（操作日志落 `sys_operation_log`，见 `tech/01` 5.4）
+- [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3）
+- [ ] MinIO 真正接入（实现类已就绪，改 `minio.enabled=true`）
+- [ ] 业务模块：item / order / review / user / message / dict / stats
