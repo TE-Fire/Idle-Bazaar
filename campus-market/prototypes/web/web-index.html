@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 用户 Web 端原型目录</title>
+<style>
+:root{
+  --c-brand:#FFD100; --c-brand-dark:#E8BC00; --c-price:#FF5000;
+  --c-bg:#F5F5F6; --c-surface:#FFFFFF; --c-border:#E8E8EC; --c-border-strong:#DCDCE2;
+  --t-1:#1F1F26; --t-2:#5E5E68; --t-3:#9A9AA4; --c-ok:#0FA968;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;
+     color:var(--t-1);background:var(--c-bg);padding:32px 20px 60px;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:940px;margin:0 auto;}
+h1{font-size:24px;font-weight:800;letter-spacing:-.01em;}
+.sub{color:var(--t-2);font-size:13px;margin-top:6px;}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.meta span{font-size:12px;color:var(--t-2);background:var(--c-surface);border:1px solid var(--c-border);border-radius:6px;padding:3px 10px;}
+h2{font-size:16px;font-weight:700;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--c-border);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;}
+a.card{display:block;background:var(--c-surface);border:1px solid var(--c-border);border-radius:10px;
+       padding:14px 16px;text-decoration:none;color:inherit;transition:transform .18s ease-out,box-shadow .18s ease-out;}
+a.card:hover{transform:translateY(-3px);box-shadow:0 4px 14px rgba(20,20,30,.10);border-color:var(--c-border-strong);}
+a.card .hd{display:flex;align-items:center;gap:8px;}
+a.card .no{font-size:11px;font-weight:800;color:var(--t-1);background:var(--c-brand);border-radius:4px;padding:2px 7px;}
+a.card .nm{font-size:15px;font-weight:600;}
+a.card .pp{font-size:12px;color:var(--t-3);margin-top:4px;}
+a.card .ds{font-size:12px;color:var(--t-2);margin-top:8px;line-height:1.7;}
+a.card .go{font-size:12px;color:#8A6D00;font-weight:600;margin-top:10px;}
+table{width:100%;border-collapse:collapse;background:var(--c-surface);border:1px solid var(--c-border);border-radius:10px;overflow:hidden;}
+th,td{text-align:left;padding:10px 14px;font-size:13px;border-bottom:1px solid var(--c-border);vertical-align:top;}
+th{background:#FAFAFB;font-weight:600;color:var(--t-2);font-size:12px;}
+tr:last-child td{border-bottom:none;}
+td b{font-weight:600;}
+code{background:#F2F3F5;border-radius:4px;padding:1px 5px;font-size:11px;}
+.foot{margin-top:36px;font-size:12px;color:var(--t-3);line-height:1.9;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>跳蚤校园 · 用户 Web 端原型</h1>
+  <div class="sub">方向 W1 大屏网格电商型（闲鱼网页版 / eBay）· 桌面 = 发布与比价端</div>
+  <div class="meta">
+    <span>主色：黄 #FFD100（配黑字）</span>
+    <span>内容区锁 1280px</span>
+    <span>桌面 4 列 · 一屏 12 件</span>
+    <span>纯 HTML + CSS，无 JS</span>
+    <span>v1.0 · 2026-09-26</span>
+  </div>
+
+  <h2>页面原型</h2>
+  <div class="grid">
+    <a class="card" href="web-home.html">
+      <div class="hd"><span class="no">P1</span><span class="nm">首页 / 列表</span></div>
+      <div class="pp">/ 、/list?cat=</div>
+      <div class="ds">分类条 + 常驻左筛选 240px + 已选 chips + 网格/列表双视图 + 底部对比条。桌面一屏 12 件。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-detail.html">
+      <div class="hd"><span class="no">P2</span><span class="nm">商品详情</span></div>
+      <div class="pp">/item/:id</div>
+      <div class="ds">左图 480px（大图 + 5 缩略图 + 描述）、右信息（价格盒 / 参数 / 卖家卡 / 面交点 / 须知）。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-publish.html">
+      <div class="hd"><span class="no">P3</span><span class="nm">发布闲置</span></div>
+      <div class="pp">/publish</div>
+      <div class="ds">拖拽多图 + 缩略图排序 + 右侧实时预览卡 + 发布检查 + Ctrl+Enter 提交。<b>桌面独占，本端最大价值页</b>。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-compare.html">
+      <div class="hd"><span class="no">P4</span><span class="nm">商品对比</span></div>
+      <div class="pp">/compare?ids=</div>
+      <div class="ds">2–4 件参数横评表，差异项高亮；只允许同类目对比，空槽位提示可继续添加。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-search.html">
+      <div class="hd"><span class="no">P5</span><span class="nm">搜索结果</span></div>
+      <div class="pp">/search?q=</div>
+      <div class="ds">复用 P1 骨架，顶部多「搜索词 + 相关搜索词」区；筛选、排序、分页组件完全一致。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-chat.html">
+      <div class="hd"><span class="no">P6</span><span class="nm">消息</span></div>
+      <div class="pp">/chat</div>
+      <div class="ds">桌面双栏：左会话列表（三分区）+ 右对话；快捷短语 + 面交约定卡 + 大输入框。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-me.html">
+      <div class="hd"><span class="no">P7</span><span class="nm">我的</span></div>
+      <div class="pp">/me</div>
+      <div class="ds">待办区前置 + 信用等级 + 我发布的（编辑/下架/删除，<b>无置顶</b>）+ 审核未过可修改重提。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-order.html">
+      <div class="hd"><span class="no">P8</span><span class="nm">订单详情</span></div>
+      <div class="pp">/order/:id</div>
+      <div class="ds">横向状态步骤条 + 面交信息 + 金额 + 右状态卡；说明扫码核销需在小程序完成。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="web-user.html">
+      <div class="hd"><span class="no">P9</span><span class="nm">个人主页</span></div>
+      <div class="pp">/user/:id</div>
+      <div class="ds">认证 / 学院 / 成交 / 好评 / 信用前置 + 在售网格 + 买家评价 + 右侧信任信息卡。</div>
+      <div class="go">打开 →</div>
+    </a>
+  </div>
+
+  <h2>本次拍板的三项决策</h2>
+  <table>
+    <tr><th style="width:22%;">未决问题</th><th style="width:16%;">决策</th><th>落地方式</th></tr>
+    <tr>
+      <td>议价是否作为独立业务</td>
+      <td><b>不作为</b></td>
+      <td>「可议价」降级为<b>商品展示标签</b>（卖家勾选），买家在聊天里口头问价即可。平台不做报价/还价流程，<b>订单金额一律按标价成交</b>；对比维度与筛选条件均不出现议价。聊天中的议价卡改为普通文本消息。</td>
+    </tr>
+    <tr>
+      <td>是否需要预定机制</td>
+      <td><b>不需要</b></td>
+      <td>取消商品「已预定」状态。拍下生成待付款订单（30 分钟超时取消），<b>付款前商品不锁定，先付款先得</b>；付款成功后商品转「已售出」，其余待付款订单自动取消并通知。以付款为唯一占位判据，避免一物多卖的复杂状态。</td>
+    </tr>
+    <tr>
+      <td>是否开放置顶 / 推广</td>
+      <td><b>不做</b></td>
+      <td>商品管理只保留编辑 / 下架 / 删除；管理端同样没有置顶操作。排序靠学区、成色、时间与信用权重，不引入商业化曝光位。</td>
+    </tr>
+  </table>
+
+  <h2>说明</h2>
+  <div class="foot">
+    · 样式集中在 <code>web.css</code>（Token 唯一出处，来自 <code>design/01-Web用户端-UI设计规范.md</code>），新页面只写结构，不写死色值。<br>
+    · <code>web-home.html</code> 与 <code>web-detail.html</code> 为早期版本，样式内联，视觉与 <code>web.css</code> 一致；后续可迁移到共用表。<br>
+    · 交互为纯 CSS（hover 上浮、图片切换、对比条），无 JS，可直接静态托管演示。<br>
+    · 业务流程依据 <code>business/01-Web用户端-业务与流程.md</code>；状态机以 <code>business/03-管理端</code> 为准。<br>
+    · 图片均为本地 CSS 占位块，无外网依赖。
+  </div>
+
+</div>
+</body>
+</html>

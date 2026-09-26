@@ -1,0 +1,36 @@
+# 统一换行符：仓库内一律 LF，检出到 Windows 时脚本类转换回 CRLF
+# 目的：避免 mvnw / RocketMQ 的 .sh 脚本在 Docker 里因 CRLF 报 "bad interpreter"
+
+* text=auto eol=lf
+
+*.sh        text eol=lf
+mvnw        text eol=lf
+*.cmd       text eol=crlf
+*.bat       text eol=crlf
+*.ps1       text eol=crlf
+
+*.java      text
+*.xml       text
+*.yml       text
+*.yaml      text
+*.json      text
+*.md        text
+*.vue       text
+*.ts        text
+*.tsx       text
+*.html      text
+*.css       text
+*.scss      text
+*.sql       text
+
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.webp      binary
+*.woff      binary
+*.woff2     binary
+*.ttf       binary
+*.jar       binary
+*.zip       binary

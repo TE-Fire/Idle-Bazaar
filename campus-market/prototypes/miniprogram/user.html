@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M9 个人主页</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M9 个人主页</span>
+    买家决策前最后一步是「看卖家是谁」。这里把<b>认证状态、学院、成交数、信用等级、好评</b>四项前置到首屏，让半熟人信任可验证。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="back"></span>
+      <span class="title">个人主页</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <!-- 头部 -->
+      <div style="background:var(--c-surface);padding:var(--s-4) var(--s-3);display:flex;align-items:center;gap:var(--s-3);">
+        <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#FF8A33,#FF6A00);display:grid;place-items:center;color:#fff;font-size:var(--f-md);">刘</div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:var(--f-md);font-weight:600;">阿刘</span>
+            <span class="verified">学号已认证</span>
+          </div>
+          <div class="mini" style="margin-top:2px;">计算机学院 · 大三 · 西区 · 3 天前活跃</div>
+        </div>
+      </div>
+
+      <!-- 数据条 -->
+      <div style="background:var(--c-surface);border-top:1px solid var(--c-border);display:flex;padding:var(--s-3) 0;">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:var(--f-md);font-weight:600;">27</div>
+          <div class="mini">成交笔数</div>
+        </div>
+        <div style="flex:1;text-align:center;border-left:1px solid var(--c-border);border-right:1px solid var(--c-border);">
+          <div style="font-size:var(--f-md);font-weight:600;">98%</div>
+          <div class="mini">好评率</div>
+        </div>
+        <div style="flex:1;text-align:center;">
+          <div class="credit" style="justify-content:center;"><span class="lv high">信用高</span></div>
+          <div class="mini" style="margin-top:2px;">按时面交 27 次</div>
+        </div>
+      </div>
+
+      <!-- 评价 -->
+      <div class="card" style="margin-top:8px;">
+        <div class="sec-t" style="padding-bottom:4px;">买家评价<span>20 条</span></div>
+        <div style="padding:0 var(--s-3) var(--s-3);">
+          <div style="padding:var(--s-3) 0;border-top:1px solid var(--c-border);">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="avatar">陈</span><span style="font-size:var(--f-sm);color:var(--t-2);">陈同学</span>
+              <span class="mini" style="margin-left:auto;">09-24</span>
+            </div>
+            <div style="font-size:var(--f-sm);color:var(--t-1);margin-top:4px;line-height:1.6;">机器和描述一致，当面验机很爽快，还送了壳，靠谱。</div>
+          </div>
+          <div style="padding:var(--s-3) 0;border-top:1px solid var(--c-border);">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="avatar">周</span><span style="font-size:var(--f-sm);color:var(--t-2);">Zhou</span>
+              <span class="mini" style="margin-left:auto;">09-20</span>
+            </div>
+            <div style="font-size:var(--f-sm);color:var(--t-1);margin-top:4px;line-height:1.6;">沟通很耐心，面交地点找得很清楚，全程没废话。</div>
+          </div>
+          <div style="padding:var(--s-3) 0;border-top:1px solid var(--c-border);">
+            <div style="display:flex;align-items:center;gap:6px;">
+              <span class="avatar">王</span><span style="font-size:var(--f-sm);color:var(--t-2);">骑车的小王</span>
+              <span class="mini" style="margin-left:auto;">09-15</span>
+            </div>
+            <div style="font-size:var(--f-sm);color:var(--t-1);margin-top:4px;line-height:1.6;">价格小刀了 30，东西没问题，推荐。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 在售 -->
+      <div class="sec-t" style="padding-top:var(--s-4);">TA 的在售<span>5 件</span></div>
+      <div class="wf" style="padding-top:0;">
+        <div class="col">
+          <div class="wcard">
+            <div class="wimg wide"><div class="ph p2">iPad</div></div>
+            <div class="body">
+              <div class="wtitle">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+              <div class="prow"><span class="pnow">¥1,580</span><span class="pold">¥2,499</span></div>
+              <div class="metarow"><span class="cond b">B 几乎全新</span>西区</div>
+            </div>
+          </div>
+          <div class="wcard">
+            <div class="wimg tall"><div class="ph p6">键盘</div></div>
+            <div class="body">
+              <div class="wtitle">机械键盘 87 键 红轴 带包装</div>
+              <div class="prow"><span class="pnow">¥180</span><span class="pold">¥429</span></div>
+              <div class="metarow"><span class="cond a">A 全新未拆</span>西区</div>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="wcard">
+            <div class="wimg tall"><div class="ph p8">耳机</div></div>
+            <div class="body">
+              <div class="wtitle">AirPods Pro 2 代 在保修内</div>
+              <div class="prow"><span class="pnow">¥790</span><span class="pold">¥1,899</span></div>
+              <div class="metarow"><span class="cond b">B 几乎全新</span>西区</div>
+            </div>
+          </div>
+          <div class="wcard">
+            <div class="wimg wide"><div class="ph p4">教材</div></div>
+            <div class="body">
+              <div class="wtitle">算法导论 第三版 中文 几乎没写过</div>
+              <div class="prow"><span class="pnow">¥45</span><span class="pold">¥128</span></div>
+              <div class="metarow"><span class="cond a">A 全新未拆</span>西区</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mini" style="padding:0 12px 24px;text-align:center;">— 显示全部 5 件 —</div>
+    </div>
+
+    <div class="actionbar">
+      <div class="iconbtn">关注</div>
+      <div class="grow"><div class="btn pri">聊一聊</div></div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    ①信用<b>只显示等级不显示分数</b>（高/中/低 + 三格条）；②评价按时间倒序，默认展示 3 条；③在售列表沿用首页瀑布卡模板，不另做一套。
+  </div>
+
+</div>
+</body>
+</html>

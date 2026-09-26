@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M10 学号认证</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M10 认证</span>
+    认证是<b>可选但强激励</b>：未认证可发布，但搜索权重降权且卡片无标识。学号<b>不对外展示</b>，只对外呈现「已认证」+ 学院；一个学号只能绑定一个账号。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="back"></span>
+      <span class="title">学号认证</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <!-- 当前状态 -->
+      <div style="padding:var(--s-3);">
+        <div class="vstate wait">
+          <span style="width:16px;height:16px;border-radius:50%;background:var(--c-warn);color:#fff;font-size:10px;display:grid;place-items:center;">!</span>
+          审核中 · 09-25 14:20 提交，预计 2 小时内完成
+        </div>
+      </div>
+
+      <!-- 表单 -->
+      <div class="field">
+        <div class="frow"><span class="lb">姓名</span><span class="val"><input class="input" value="林小满"></span></div>
+        <div class="frow"><span class="lb">学号</span><span class="val"><input class="input" value="2023****18"></span></div>
+        <div class="frow"><span class="lb">学院</span><span class="val">计算机学院</span><span class="arrow"></span></div>
+        <div class="frow"><span class="lb">入学年份</span><span class="val">2023 级</span><span class="arrow"></span></div>
+        <div class="frow"><span class="lb">校园邮箱</span><span class="val"><input class="input" placeholder="name@stu.xxx.edu.cn"></span></div>
+      </div>
+
+      <!-- 凭证 -->
+      <div class="card" style="margin-top:8px;">
+        <div class="sec-t" style="padding-bottom:4px;">凭证上传<span>一卡通 / 学信页 / 校园邮箱验证</span></div>
+        <div class="upgrid">
+          <div class="cell"><div class="ph p3" style="width:100%;height:100%;font-size:10px;">一卡通</div><span class="del">×</span></div>
+          <div class="cell add">＋</div>
+        </div>
+        <div class="hint">凭证仅用于人工核对，审核通过后<b>不会在任何页面公开</b>，也不会展示给其他同学。</div>
+      </div>
+
+      <div class="notice">
+        <span class="fl">!</span>
+        <div>认证通过后：① 商品卡与个人主页显示「已认证」标识；② 搜索权重提升；③ 可参与「同院优先」频道。</div>
+      </div>
+
+      <div class="notice gray">
+        <span class="fl">?</span>
+        <div><b>审核未通过常见原因：</b>姓名与学号不匹配、凭证模糊、一个学号绑定多个账号。可在下方修改后重新提交，每人最多重提 3 次/天。</div>
+      </div>
+
+      <div class="mini" style="padding:0 12px 24px;">
+        状态机：未认证 → 审核中 → 已认证 / 未通过（可重提）。异常（一学号多账号）转人工，标记异常账号。
+      </div>
+    </div>
+
+    <div class="actionbar">
+      <div class="grow"><div class="btn pri">重新提交认证</div></div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    认证审核是<b>低频但高责任</b>的动作，误通过会破坏整个校园信任机制，因此管理端不做批量通过；前端不做自动填充的"猜学院"，由用户选择。
+  </div>
+
+</div>
+</body>
+</html>

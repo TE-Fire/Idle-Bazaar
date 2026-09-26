@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A6 订单管理 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi on" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">订单管理</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">王</span><span>王运营<br><span class="rl js-role-name">运营</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="card">
+        <div class="card-hd" style="border-bottom:0;">
+          <div class="seg" id="tabs">
+            <button class="on" data-tab="o1">全部</button>
+            <button data-tab="o2">待付款</button>
+            <button data-tab="o3">待面交</button>
+            <button data-tab="o4">已完成</button>
+            <button data-tab="o5">纠纷中 <b>2</b></button>
+            <button data-tab="o6">已退款</button>
+          </div>
+          <div class="right"><span class="sub">全平台为模拟支付 + 线下交付，无真实资金流</span></div>
+        </div>
+
+        <div class="filters">
+          <div class="fi"><label>订单号</label><input class="inp" placeholder="OD2026…"></div>
+          <div class="fi"><label>买家</label><input class="inp" placeholder="账号 ID"></div>
+          <div class="fi"><label>卖家</label><input class="inp" placeholder="账号 ID"></div>
+          <div class="fi"><label>面交点</label><select class="sel"><option>全部</option><option>图书馆一楼中庭</option><option>三食堂南门</option></select></div>
+          <div class="fi"><label>下单时间</label><input class="date" value="2026-09-20 ~ 2026-09-26"></div>
+          <div class="right"><button class="btn">重置</button><button class="btn pri">查询</button></div>
+        </div>
+
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th>订单号</th><th>商品</th><th style="width:96px;">买家</th><th style="width:96px;">卖家</th>
+                <th style="width:96px;" class="num">金额</th><th style="width:120px;">面交点</th>
+                <th style="width:96px;">状态</th><th style="width:130px;">下单时间</th><th style="width:180px;" class="num">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>OD20260926001</td>
+                <td><div class="cell-main"><span class="thumb p2"></span><span class="ttl">高等数学（第七版）上下册</span></div></td>
+                <td>U10455</td><td>U10077</td><td class="num">¥45.00</td><td>二食堂南门</td>
+                <td><span class="tag pending">待付款</span></td><td>2026-09-26 11:42</td>
+                <td><div class="ops"><button class="btn link" data-open="dOrder">查看</button><button class="btn link" data-perm="order.refund">取消订单</button></div></td>
+              </tr>
+              <tr>
+                <td>OD20260925018</td>
+                <td><div class="cell-main"><span class="thumb p3"></span><span class="ttl">宜家折叠书桌 120×60</span></div></td>
+                <td>U10391</td><td>U10512</td><td class="num">¥120.00</td><td>三食堂南门</td>
+                <td><span class="tag run">待面交</span></td><td>2026-09-25 20:15</td>
+                <td><div class="ops"><button class="btn link" data-open="dOrder">查看</button><button class="btn link" data-perm="order.refund">强制退款</button></div></td>
+              </tr>
+              <tr>
+                <td>OD20260924007</td>
+                <td><div class="cell-main"><span class="thumb p1"></span><span class="ttl">机械键盘 87 键 茶轴</span></div></td>
+                <td>U10401</td><td>U10293</td><td class="num">¥210.00</td><td>图书馆一楼中庭</td>
+                <td><span class="tag fail">纠纷中</span></td><td>2026-09-24 15:30</td>
+                <td><div class="ops"><button class="btn link" data-open="dDispute">介入裁决</button><button class="btn link" data-perm="order.arbitrate">冻结</button></div></td>
+              </tr>
+              <tr>
+                <td>OD20260923011</td>
+                <td><div class="cell-main"><span class="thumb p4"></span><span class="ttl">考研数学笔记 三本</span></div></td>
+                <td>U10520</td><td>U10338</td><td class="num">¥68.00</td><td>图书馆一楼中庭</td>
+                <td><span class="tag pass">已完成</span></td><td>2026-09-23 10:02</td>
+                <td><div class="ops"><button class="btn link" data-open="dOrder">查看</button><span class="locked">已终态</span></div></td>
+              </tr>
+              <tr>
+                <td>OD20260922009</td>
+                <td><div class="cell-main"><span class="thumb p5"></span><span class="ttl">Nike 运动鞋 42 码</span></div></td>
+                <td>U10588</td><td>U10645</td><td class="num">¥180.00</td><td>东门快递柜旁</td>
+                <td><span class="tag off">已退款</span></td><td>2026-09-22 18:47</td>
+                <td><div class="ops"><button class="btn link" data-open="dOrder">查看</button><span class="locked">已终态</span></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">共 894 条　每页 20 条<div class="right"><button class="pg on">1</button><button class="pg">2</button><button class="pg">›</button></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-bd" style="font-size:var(--f-xs);color:var(--text-3);line-height:1.8;">
+          <b style="color:var(--text-2);">状态机（管理端为权威）</b>　待付款 ─30min超时→ 已取消；待付款 ─付款→ 待面交 ─核销→ 已完成 → 互评；
+          待面交支持<b>当面拒收</b>（不计违约，这是线下相对快递的根本差异）；任一方发起 → 纠纷中（冻结）→ 裁决 → 已完成 / 已退款。
+          商品<b>无「已预定」状态</b>：拍下只生成待付款订单，不锁库存，先付款先得。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 订单详情 -->
+<div class="drawer-mask" id="dOrder" style="display:none;">
+  <div class="drawer">
+    <div class="drawer-hd"><h3>订单详情</h3><span class="tag run">待面交</span><button class="x" data-close>×</button></div>
+    <div class="drawer-bd">
+      <div class="steps">
+        <span class="step done"><span class="dot">✓</span>待付款</span><span class="ln"></span>
+        <span class="step cur"><span class="dot">2</span>待面交</span><span class="ln"></span>
+        <span class="step"><span class="dot">3</span>已完成</span><span class="ln"></span>
+        <span class="step"><span class="dot">4</span>互评</span>
+      </div>
+      <dl class="kv">
+        <dt>订单号</dt><dd>OD20260925018</dd>
+        <dt>商品</dt><dd>宜家折叠书桌 120×60 白色 带抽屉</dd>
+        <dt>金额</dt><dd>¥120.00 <span style="color:var(--text-3);">（模拟支付，无真实资金流）</span></dd>
+        <dt>买家 / 卖家</dt><dd>U10391 / U10512</dd>
+        <dt>面交点</dt><dd>三食堂南门（11:00–13:00 / 17:00–19:00）</dd>
+        <dt>约定时间</dt><dd>2026-09-26 12:10</dd>
+        <dt>核销码</dt><dd>QX-8F3K-29（双方扫码核验，当面验货后生效）</dd>
+      </dl>
+      <div class="tl">
+        <div class="it"><span class="t">09-25 20:15</span><span class="c">买家下单，生成待付款订单</span></div>
+        <div class="it"><span class="t">09-25 20:16</span><span class="c">买家付款成功，商品转「已售出」</span></div>
+        <div class="it"><span class="t">09-25 20:31</span><span class="c">双方约定面交：09-26 12:10 三食堂南门</span></div>
+      </div>
+      <div class="notice info">当面验货规则：买家当场验货，不符可拒收 → 退款且<b>不计违约</b>；已核销则视为交付完成。</div>
+    </div>
+    <div class="drawer-ft">
+      <div class="right">
+        <button class="btn" data-close>关闭</button>
+        <button class="btn danger" data-perm="order.refund">强制退款</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 纠纷介入 -->
+<div class="drawer-mask" id="dDispute" style="display:none;">
+  <div class="drawer">
+    <div class="drawer-hd"><h3>纠纷介入</h3><span class="tag fail">纠纷中</span><button class="x" data-close>×</button></div>
+    <div class="drawer-bd">
+      <div class="notice err">取证关键：必须看<b>商品快照</b>（下单时的价格 / 成色 / 描述），而非当前商品——卖家可能事后改价改描述。</div>
+
+      <div class="sec-t">商品快照（下单时）</div>
+      <div class="pics"><div class="pic p1"></div></div>
+      <dl class="kv">
+        <dt>标题</dt><dd>机械键盘 87 键 茶轴</dd>
+        <dt>快照价格</dt><dd>¥210.00</dd>
+        <dt>快照成色</dt><dd><span class="tag g-b">B 轻微使用痕迹</span></dd>
+        <dt>快照描述</dt><dd>「按键无冲，手感正常，附赠备用键帽一套。」</dd>
+        <dt>当前商品</dt><dd style="color:var(--st-fail);">已被强制下架（另案处置）</dd>
+      </dl>
+
+      <div class="sec-t">买家主张</div>
+      <div class="quote">「收到后发现 3 个键失灵，与『手感正常』不符，要求退款。已拍实物视频。」</div>
+
+      <div class="sec-t">卖家主张</div>
+      <div class="quote">「面交时当面验过货，买家确认无问题后才扫码核销。核销后 2 天才提出，不同意退款。」</div>
+
+      <div class="sec-t">聊天记录片段</div>
+      <div class="tl">
+        <div class="it"><span class="t">09-24 15:30</span><span class="c">买家：键盘收到，先试试</span></div>
+        <div class="it"><span class="t">09-24 15:52</span><span class="c">卖家：有问题当面说</span></div>
+        <div class="it"><span class="t">09-24 16:01</span><span class="c">系统：核销码 QX-2M7P-14 已核销，交付完成</span></div>
+        <div class="it"><span class="t">09-26 09:14</span><span class="c">买家发起纠纷：3 个键失灵</span></div>
+      </div>
+
+      <div class="sec-t">裁决选项</div>
+      <div class="quote">① 退款买家（全额/部分）　② 放款卖家（维持交易）　③ 部分退（双方各担）——裁决后订单转终态并记录信用分变动。</div>
+      <div class="warnbox">已核销订单的纠纷以支持「部分退」为主；全额退款需说明为何越过验货环节，处置理由须留痕供申诉复盘。</div>
+    </div>
+    <div class="drawer-ft">
+      <div class="right">
+        <button class="btn" data-close>取消</button>
+        <button class="btn" data-perm="order.arbitrate">放款卖家</button>
+        <button class="btn" data-perm="order.arbitrate">部分退款</button>
+        <button class="btn danger" data-perm="order.arbitrate">全额退款</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+document.querySelectorAll('#tabs button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+    b.classList.add('on');
+  });
+});
+</script>
+</body>
+</html>

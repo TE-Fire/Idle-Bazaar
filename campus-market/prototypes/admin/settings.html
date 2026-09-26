@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A9 系统设置 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi on" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">系统设置</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">张</span><span>张主任<br><span class="rl js-role-name">超级管理员</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="notice info">
+        本页仅<b>超级管理员</b>可见（<code>settings.view</code>）。审核员与运营看不到该菜单——这是权限隔离的直接体现，不是隐藏入口。
+      </div>
+
+      <div class="card">
+        <div class="card-hd" style="border-bottom:0;">
+          <div class="seg" id="tabs">
+            <button class="on" data-tab="s1">管理员账号</button>
+            <button data-tab="s2">角色权限矩阵</button>
+            <button data-tab="s3">SLA 配置</button>
+            <button data-tab="s4">操作日志</button>
+          </div>
+          <div class="right"><button class="btn sm pri" data-perm="settings.edit">新增管理员</button></div>
+        </div>
+
+        <!-- 管理员 -->
+        <div class="pane" id="s1">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>账号</th><th>姓名</th><th style="width:130px;">角色</th><th style="width:120px;">状态</th><th style="width:150px;">最近登录</th><th style="width:180px;" class="num">操作</th></tr></thead>
+              <tbody>
+                <tr><td>admin_zhang</td><td>张主任</td><td><span class="tag run">超级管理员</span></td><td><span class="tag pass">正常</span></td><td>2026-09-26 13:58</td><td><div class="ops"><button class="btn link" data-perm="settings.edit">编辑</button><button class="btn link dn" data-perm="settings.edit">停用</button></div></td></tr>
+                <tr><td>review_li</td><td>李审核</td><td><span class="tag plain">审核员</span></td><td><span class="tag pass">正常</span></td><td>2026-09-26 12:10</td><td><div class="ops"><button class="btn link" data-perm="settings.edit">编辑</button><button class="btn link dn" data-perm="settings.edit">停用</button></div></td></tr>
+                <tr><td>ops_wang</td><td>王运营</td><td><span class="tag plain">运营</span></td><td><span class="tag pass">正常</span></td><td>2026-09-26 11:26</td><td><div class="ops"><button class="btn link" data-perm="settings.edit">编辑</button><button class="btn link dn" data-perm="settings.edit">停用</button></div></td></tr>
+                <tr><td>view_zhao</td><td>赵只读</td><td><span class="tag plain">只读</span></td><td><span class="tag pass">正常</span></td><td>2026-09-25 20:02</td><td><div class="ops"><button class="btn link" data-perm="settings.edit">编辑</button><button class="btn link dn" data-perm="settings.edit">停用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">角色变更即时生效：菜单与按钮按新矩阵重算，正在进行的写操作在提交时由后端二次校验。</div>
+        </div>
+
+        <!-- 权限矩阵 -->
+        <div class="pane" id="s2" style="display:none;">
+          <div class="card-bd" style="padding-bottom:0;">
+            <div class="notice info" style="margin-bottom:var(--s-3);">
+              最小粒度是<b>权限点</b>而非页面。关键互斥：<code>review.judge</code>（裁决商品）与 <code>user.ban</code>（封禁账号）分属审核员与超级管理员，
+              保证「能判商品的人不能封人」。前端按此表渲染，后端按同一张表校验。
+            </div>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl perm">
+              <thead><tr><th class="l">权限点</th><th class="l">说明</th><th>超级管理员</th><th>审核员</th><th>运营</th><th>只读</th></tr></thead>
+              <tbody>
+                <tr><td class="l"><code>dashboard.view</code></td><td class="l">查看数据看板</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+                <tr><td class="l"><code>item.view</code></td><td class="l">查看商品</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+                <tr><td class="l"><code>item.offline</code></td><td class="l">下架商品</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>item.delete</code></td><td class="l">删除商品（软删）</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>user.view</code></td><td class="l">查看用户</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="y">✓</td></tr>
+                <tr><td class="l"><code>user.verify</code></td><td class="l">学号认证审核 / 信用调整</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>user.ban</code></td><td class="l">封禁 / 解封账号</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>review.judge</code></td><td class="l">审核通过 / 驳回</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>review.forceoff</code></td><td class="l">强制下架 / 举报判成立</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>review.appeal</code></td><td class="l">申诉复审（换人原则）</td><td class="y">✓</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>order.refund</code></td><td class="l">强制退款</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>order.arbitrate</code></td><td class="l">纠纷介入裁决</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>content.edit</code></td><td class="l">维护分类 / 成色 / 面交点</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>report.view</code></td><td class="l">查看数据报表</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+                <tr><td class="l"><code>settings.edit</code></td><td class="l">角色 / SLA / 管理员配置</td><td class="y">✓</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+                <tr><td class="l"><code>log.view</code></td><td class="l">查看操作日志</td><td class="y">✓</td><td class="n">—</td><td class="y">✓</td><td class="n">—</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">只读角色用于答辩巡盘与校方检查：能看全部数据，不能做任何写操作，避免演示时误改数据。</div>
+        </div>
+
+        <!-- SLA 配置 -->
+        <div class="pane" id="s3" style="display:none;">
+          <div class="card-bd">
+            <div style="display:flex;flex-direction:column;gap:var(--s-4);max-width:640px;">
+              <div class="field">
+                <label>首审响应达标阈值（分钟）</label>
+                <input class="inp" value="120" data-perm="settings.edit">
+                <span style="font-size:var(--f-xs);color:var(--text-3);">从商品进入队列到首次处置完成，超过即记未达标</span>
+              </div>
+              <div class="field">
+                <label>P95 首审时长上限（小时）</label>
+                <input class="inp" value="6" data-perm="settings.edit">
+              </div>
+              <div class="field">
+                <label>积压红牌阈值（小时）</label>
+                <input class="inp" value="24" data-perm="settings.edit">
+                <span style="font-size:var(--f-xs);color:var(--text-3);">超过该时长未处置的件数在看板单列，需当日清零</span>
+              </div>
+              <div class="field">
+                <label>整体达标率目标（%）</label>
+                <input class="inp" value="95" data-perm="settings.edit">
+              </div>
+              <div class="field">
+                <label>单条平均处置时长目标（秒）</label>
+                <input class="inp" value="30" data-perm="settings.edit">
+                <span style="font-size:var(--f-xs);color:var(--text-3);">操作效率指标，与响应时效是两个层级，不可混用</span>
+              </div>
+              <div class="field">
+                <label>申诉复审承诺时效（小时）</label>
+                <input class="inp" value="48" data-perm="settings.edit">
+              </div>
+              <div><button class="btn pri" data-perm="settings.edit">保存配置</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作日志 -->
+        <div class="pane" id="s4" style="display:none;">
+          <div class="tbl-wrap">
+            <table class="tbl compact">
+              <thead><tr><th style="width:150px;">时间</th><th style="width:110px;">操作人</th><th style="width:110px;">角色</th><th style="width:130px;">动作</th><th>对象与依据</th><th style="width:90px;">结果</th></tr></thead>
+              <tbody>
+                <tr><td>2026-09-26 13:58</td><td>张主任</td><td>超级管理员</td><td>封禁账号</td><td>U10288 · 校外人员引流 · 举报成立-重</td><td><span class="tag fail">已执行</span></td></tr>
+                <tr><td>2026-09-26 12:10</td><td>李审核</td><td>审核员</td><td>审核通过</td><td>IT20260925001742 高等数学 · 四项均通过</td><td><span class="tag pass">通过</span></td></tr>
+                <tr><td>2026-09-26 11:42</td><td>王运营</td><td>运营</td><td>强制下架</td><td>IT20260926003 iPad Pro · 价格异常 + 疑似刷量</td><td><span class="tag fail">已下架</span></td></tr>
+                <tr><td>2026-09-26 10:26</td><td>李审核</td><td>审核员</td><td>驳回</td><td>IT20260926002 电动车 · 原因：校外引流</td><td><span class="tag pending">驳回</span></td></tr>
+                <tr><td>2026-09-26 09:34</td><td>张主任</td><td>超级管理员</td><td>修改 SLA 阈值</td><td>首审响应 180 → 120 分钟</td><td><span class="tag pass">已保存</span></td></tr>
+                <tr><td>2026-09-25 21:08</td><td>王运营</td><td>运营</td><td>认证通过</td><td>U10599 郑同学 · 一卡通核对一致</td><td><span class="tag pass">已认证</span></td></tr>
+                <tr><td>2026-09-25 19:52</td><td>王运营</td><td>运营</td><td>内容发布</td><td>新增面交点「西区宿舍 7 号楼下」</td><td><span class="tag pass">已发布</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">所有写操作必须留痕（谁、何时、依据、结果），申诉复审时可完整复盘。日志只追加，不可编辑或删除。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+document.querySelectorAll('#tabs button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+    b.classList.add('on');
+    document.querySelectorAll('.pane').forEach(function (p) { p.style.display = 'none'; });
+    document.getElementById(b.dataset.tab).style.display = '';
+  });
+});
+</script>
+</body>
+</html>

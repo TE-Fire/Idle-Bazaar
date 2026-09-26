@@ -1,0 +1,56 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "never"
+  },
+  "[java]": {
+    "editor.defaultFormatter": "redhat.java",
+    "editor.formatOnSave": false
+  },
+  "[vue]": {
+    "editor.defaultFormatter": "Vue.volar"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.trimFinalNewlines": true,
+  "files.encoding": "utf8",
+  "files.autoGuessEncoding": false,
+
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/dist": true,
+    "**/.vite": true,
+    "**/unpackage": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/dist": true,
+    "**/pnpm-lock.yaml": true,
+    "**/.workbuddy": true
+  },
+
+  "eslint.validate": ["javascript", "typescript", "vue"],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "vue.server.hybridMode": true,
+
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "java.import.gradle.enabled": false,
+  "maven.view": "hierarchical",
+
+  "git.autofetch": true,
+  "git.confirmSync": false,
+  "git.enableSmartCommit": true
+}

@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>高等数学 第七版 · 跳蚤校园（Web 端 · 详情页）</title>
+<style>
+/* ══ Design Token —— 与列表页同源（三端共用）══ */
+:root{
+  --c-brand:#FFD100; --c-brand-dark:#E8BC00; --c-price:#FF5000;
+  --c-bg:#F5F5F6; --c-surface:#FFFFFF; --c-border:#E8E8EC; --c-border-strong:#DCDCE2;
+  --t-1:#1F1F26; --t-2:#5E5E68; --t-3:#9A9AA4;
+  --c-ok:#0FA968; --c-warn:#FF8F1F;
+  --s-1:4px; --s-2:8px; --s-3:12px; --s-4:16px; --s-5:20px; --s-6:24px; --s-8:32px; --s-10:40px;
+  --f-xs:12px; --f-sm:13px; --f-base:14px; --f-md:16px; --f-lg:20px; --f-xl:25px; --f-2xl:31px;
+  --r-sm:4px; --r-md:6px; --r-lg:8px; --r-xl:12px;
+  --sh-1:0 1px 3px rgba(20,20,30,.06); --sh-2:0 4px 14px rgba(20,20,30,.10);
+  --nav-h:60px; --cat-h:44px; --content-max:1280px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{
+  font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:var(--f-base);color:var(--t-1);line-height:1.6;background:var(--c-bg);-webkit-font-smoothing:antialiased;
+}
+a{color:inherit;text-decoration:none;}
+button{font:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+ul{list-style:none;}
+
+/* ══ 顶部导航（与列表页一致）══ */
+.nav{position:sticky;top:0;z-index:50;background:var(--c-surface);border-bottom:1px solid var(--c-border);}
+.nav-in{max-width:var(--content-max);margin:0 auto;height:var(--nav-h);display:flex;align-items:center;gap:var(--s-5);padding:0 var(--s-6);}
+.logo{display:flex;align-items:center;gap:var(--s-2);font-size:var(--f-lg);font-weight:800;letter-spacing:-.02em;}
+.logo .mark{width:26px;height:26px;border-radius:var(--r-md);background:var(--c-brand);display:grid;place-items:center;font-size:14px;font-weight:900;}
+.campus{flex:0 0 auto;font-size:var(--f-sm);color:var(--t-2);padding:5px 10px;border:1px solid var(--c-border-strong);border-radius:var(--r-md);}
+.campus b{color:var(--t-1);font-weight:600;}
+.search{flex:1;max-width:520px;display:flex;height:36px;border:2px solid var(--c-brand);border-radius:var(--r-md);overflow:hidden;}
+.search .sel{flex:0 0 auto;padding:0 10px;display:flex;align-items:center;font-size:var(--f-sm);color:var(--t-2);background:#FFFCE8;border-right:1px solid var(--c-border);}
+.search input{flex:1;border:none;outline:none;padding:0 var(--s-3);font-size:var(--f-base);background:transparent;}
+.search input::placeholder{color:var(--t-3);}
+.search button{flex:0 0 auto;width:64px;background:var(--c-brand);font-weight:700;display:grid;place-items:center;}
+.nav-acts{margin-left:auto;display:flex;align-items:center;gap:var(--s-4);}
+.nav-acts .lnk{font-size:var(--f-base);color:var(--t-2);position:relative;}
+.nav-acts .lnk:hover{color:var(--t-1);}
+.nav-acts .dot{position:absolute;top:-4px;right:-8px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--c-price);color:#fff;font-size:10px;line-height:16px;text-align:center;font-weight:700;}
+.btn-pub{background:var(--c-brand);font-weight:700;height:36px;padding:0 var(--s-4);border-radius:var(--r-md);display:flex;align-items:center;gap:6px;}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#8FB8F6,#5B7FD6);}
+
+.cat{background:var(--c-surface);border-bottom:1px solid var(--c-border);}
+.cat-in{max-width:var(--content-max);margin:0 auto;height:var(--cat-h);display:flex;align-items:center;gap:var(--s-6);padding:0 var(--s-6);}
+.cat a{font-size:var(--f-md);color:var(--t-2);white-space:nowrap;}
+.cat a.on{color:var(--t-1);font-weight:700;border-bottom:3px solid var(--c-brand);}
+.cat .right{margin-left:auto;display:flex;gap:var(--s-4);font-size:var(--f-sm);color:var(--t-3);}
+
+/* ══ 主体 ══ */
+.shell{max-width:var(--content-max);margin:0 auto;padding:var(--s-5) var(--s-6) var(--s-10);}
+.crumb{font-size:var(--f-xs);color:var(--t-3);margin-bottom:var(--s-4);}
+.crumb b{color:var(--t-1);font-weight:600;}
+
+.detail{display:flex;gap:var(--s-6);align-items:flex-start;}
+
+/* 左：图 */
+.gal{flex:0 0 480px;width:480px;}
+.gal .big{aspect-ratio:4/3;border-radius:var(--r-xl);background:linear-gradient(135deg,#FFD9A8,#FF9E5E);position:relative;overflow:hidden;}
+.gal .big .flag{position:absolute;left:var(--s-3);top:var(--s-3);background:rgba(31,31,38,.72);color:#fff;font-size:var(--f-xs);font-weight:700;padding:2px 8px;border-radius:var(--r-sm);}
+.gal .big .cnt{position:absolute;right:var(--s-3);bottom:var(--s-3);background:rgba(31,31,38,.55);color:#fff;font-size:var(--f-xs);padding:2px 10px;border-radius:999px;}
+.thumbs{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--s-2);margin-top:var(--s-3);}
+.thumbs span{aspect-ratio:1;border-radius:var(--r-md);border:2px solid transparent;cursor:pointer;}
+.thumbs span.on{border-color:var(--c-brand);}
+.gal .note{margin-top:var(--s-4);background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);padding:var(--s-4);}
+.gal .note h5{font-size:var(--f-base);font-weight:700;margin-bottom:var(--s-2);}
+.gal .note p{font-size:var(--f-sm);color:var(--t-2);line-height:1.75;}
+.gal .note p + p{margin-top:var(--s-2);}
+
+/* 右：信息 */
+.info{flex:1;min-width:0;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-xl);padding:var(--s-6);}
+.info h1{font-size:var(--f-xl);font-weight:700;line-height:1.4;letter-spacing:-.01em;}
+.info .tags{display:flex;flex-wrap:wrap;gap:var(--s-2);margin-top:var(--s-3);}
+.info .tags span{font-size:var(--f-xs);padding:2px 8px;border-radius:var(--r-sm);background:#F5F5F8;color:var(--t-2);}
+.info .tags span.hl{background:#FFF8DB;color:#8A7300;border:1px solid #F2DFA0;}
+.info .tags span.g{background:rgba(15,169,104,.10);color:var(--c-ok);}
+
+.pricebox{margin-top:var(--s-4);padding:var(--s-4);background:#FFF9F5;border:1px solid #FFE0D2;border-radius:var(--r-lg);display:flex;align-items:baseline;gap:var(--s-3);flex-wrap:wrap;}
+.pricebox .now{font-size:var(--f-2xl);color:var(--c-price);font-weight:800;letter-spacing:-.02em;line-height:1.1;}
+.pricebox .old{font-size:var(--f-sm);color:var(--t-3);text-decoration:line-through;}
+.pricebox .off{font-size:var(--f-xs);color:#fff;background:var(--c-price);padding:1px 6px;border-radius:var(--r-sm);font-weight:700;}
+.pricebox .want{margin-left:auto;font-size:var(--f-sm);color:var(--t-2);}
+.pricebox .want b{color:var(--c-price);}
+
+.metalist{margin-top:var(--s-4);display:grid;grid-template-columns:repeat(2,1fr);gap:var(--s-3) var(--s-4);}
+.metalist .it{font-size:var(--f-sm);}
+.metalist .it span{color:var(--t-3);display:block;font-size:var(--f-xs);}
+.metalist .it b{font-weight:600;}
+
+/* 卖家卡 */
+.seller{margin-top:var(--s-5);border:1px solid var(--c-border);border-radius:var(--r-lg);padding:var(--s-4);display:flex;align-items:center;gap:var(--s-3);}
+.seller .av{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#8FB8F6,#5B7FD6);flex:0 0 44px;}
+.seller .who{flex:1;min-width:0;}
+.seller .who b{font-size:var(--f-md);font-weight:700;}
+.seller .who .m{font-size:var(--f-xs);color:var(--t-3);margin-top:2px;display:flex;gap:var(--s-2);flex-wrap:wrap;}
+.seller .who .m i{font-style:normal;color:var(--c-ok);}
+.seller .who .m i.gr{color:var(--t-3);}
+.seller .ent{font-size:var(--f-sm);color:var(--t-2);border:1px solid var(--c-border-strong);border-radius:var(--r-md);height:32px;padding:0 var(--s-3);display:flex;align-items:center;}
+
+.acts{margin-top:var(--s-5);display:flex;gap:var(--s-3);}
+.acts .pri{flex:1;height:46px;background:var(--c-brand);border-radius:var(--r-md);font-size:var(--f-md);font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;}
+.acts .pri:hover{background:var(--c-brand-dark);}
+.acts .sec{width:120px;height:46px;border:1px solid var(--c-border-strong);border-radius:var(--r-md);font-size:var(--f-base);display:flex;align-items:center;justify-content:center;gap:6px;color:var(--t-2);}
+.acts .sec:hover{border-color:var(--c-brand);color:var(--t-1);}
+.acts .cmp{width:120px;height:46px;border:1px solid var(--c-border-strong);border-radius:var(--r-md);font-size:var(--f-base);display:flex;align-items:center;justify-content:center;gap:6px;color:var(--t-2);}
+.acts .cmp:hover{border-color:var(--c-brand);color:var(--t-1);}
+
+/* 面交点 */
+.meet{margin-top:var(--s-5);border:1px solid var(--c-border);border-radius:var(--r-lg);overflow:hidden;}
+.meet .h{padding:var(--s-3) var(--s-4);background:#FBFBFB;border-bottom:1px solid var(--c-border);font-size:var(--f-sm);font-weight:700;display:flex;justify-content:space-between;align-items:center;}
+.meet .h span{font-weight:400;color:var(--t-3);font-size:var(--f-xs);}
+.meet .map{height:120px;position:relative;background:
+  repeating-linear-gradient(0deg,#EEF2F7 0 15px,#E7ECF3 15px 16px),
+  repeating-linear-gradient(90deg,#EEF2F7 0 15px,#E7ECF3 15px 16px);}
+.meet .map .road{position:absolute;background:#fff;}
+.meet .map .r1{left:0;right:0;top:52px;height:8px;}
+.meet .map .r2{top:0;bottom:0;left:150px;width:8px;}
+.meet .map .blk{position:absolute;background:#DCE3EC;border-radius:2px;}
+.meet .map .b1{left:24px;top:14px;width:70px;height:28px;}
+.meet .map .b2{left:180px;top:14px;width:96px;height:28px;}
+.meet .map .b3{left:24px;top:74px;width:70px;height:32px;}
+.meet .map .b4{left:180px;top:74px;width:96px;height:32px;}
+.meet .map .pin{
+  position:absolute;left:150px;top:52px;transform:translate(-50%,-50%);
+  width:16px;height:16px;border-radius:50%;background:var(--c-price);border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.2);
+}
+.meet .map .pin::after{content:"图书馆南门";position:absolute;left:22px;top:-6px;white-space:nowrap;font-size:11px;background:#fff;padding:1px 6px;border-radius:var(--r-sm);box-shadow:var(--sh-1);color:var(--t-1);}
+.meet .lg{padding:var(--s-3) var(--s-4);font-size:var(--f-xs);color:var(--t-3);display:flex;gap:var(--s-4);flex-wrap:wrap;}
+.meet .lg b{color:var(--t-2);font-weight:600;}
+
+/* 校园安全提示（本平台特色） */
+.safety{margin-top:var(--s-5);background:#FFF8DB;border:1px solid #F2DFA0;border-radius:var(--r-lg);padding:var(--s-4);}
+.safety h5{font-size:var(--f-base);font-weight:700;color:#6B5B00;margin-bottom:var(--s-2);}
+.safety ol{margin-left:18px;font-size:var(--f-sm);color:#6B5B00;line-height:1.8;}
+.safety ol li{margin-bottom:2px;}
+
+/* ══ 下方推荐 ══ */
+.sec{margin-top:var(--s-10);}
+.sec-h{display:flex;align-items:baseline;gap:var(--s-3);margin-bottom:var(--s-4);}
+.sec-h h3{font-size:var(--f-lg);font-weight:700;letter-spacing:-.01em;}
+.sec-h span{font-size:var(--f-sm);color:var(--t-3);}
+.sec-h a{margin-left:auto;font-size:var(--f-sm);color:var(--t-3);}
+.sec-h a:hover{color:var(--t-1);}
+.rcards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s-4);}
+.rcard{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);overflow:hidden;transition:transform .18s ease, box-shadow .18s ease;}
+.rcard:hover{transform:translateY(-3px);box-shadow:var(--sh-2);}
+.rcard .ph{aspect-ratio:4/3;}
+.rcard .bd{padding:var(--s-3);}
+.rcard .tt{font-size:var(--f-sm);line-height:1.45;height:38px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.rcard .pr{margin-top:5px;font-size:var(--f-md);color:var(--c-price);font-weight:800;}
+.rcard .mt{margin-top:4px;font-size:var(--f-xs);color:var(--t-3);}
+
+.demonote{
+  max-width:var(--content-max);margin:var(--s-8) auto 0;padding:var(--s-3) var(--s-5);
+  background:#FFF8DB;border:1px solid #F2DFA0;border-radius:var(--r-lg);font-size:var(--f-sm);color:#6B5B00;
+  display:flex;gap:var(--s-3);align-items:flex-start;
+}
+.demonote b{font-weight:700;}
+.demonote .x{margin-left:auto;font-size:var(--f-xs);color:#9A8620;white-space:nowrap;}
+</style>
+</head>
+<body>
+
+<!-- ══ 顶部导航 ══ -->
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk">消息<span class="dot">3</span></a>
+      <a class="lnk">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a><a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell">
+  <div class="crumb"><a>首页</a> / <a>教材教辅</a> / <a>大一大二公共课</a> / <b>高等数学 第七版</b></div>
+
+  <div class="detail">
+    <!-- 左：图 -->
+    <div class="gal">
+      <div class="big">
+        <span class="flag">几乎全新</span>
+        <span class="cnt">1 / 5</span>
+      </div>
+      <div class="thumbs">
+        <span class="on" style="background:linear-gradient(135deg,#FFD9A8,#FF9E5E)"></span>
+        <span style="background:linear-gradient(135deg,#FFE8C2,#F5B85C)"></span>
+        <span style="background:linear-gradient(135deg,#F3E4D2,#D8BFA4)"></span>
+        <span style="background:linear-gradient(135deg,#E8E2D8,#C6BCAE)"></span>
+        <span style="background:linear-gradient(135deg,#DDE5EE,#B4C1CE)"></span>
+      </div>
+
+      <div class="note">
+        <h5>商品描述</h5>
+        <p>上学期高数上用的教材，上下册都在，同济大学第七版。前六章有用铅笔写的课堂笔记，字迹清楚，其余部分干净无涂画，无缺页无卷边。</p>
+        <p>封面边角有轻微磨损，内页完好。附带一本人手写的章节小结，期末复习用得上，一起送。</p>
+        <p>因为专业分流后用不上了，便宜出给学弟学妹。支持图书馆南门当面交易，可以先翻再决定。</p>
+      </div>
+    </div>
+
+    <!-- 右：信息 -->
+    <div class="info">
+      <h1>高等数学 第七版 上下册 同济大学 带笔记</h1>
+      <div class="tags">
+        <span class="hl">教材教辅</span>
+        <span class="g">几乎全新</span>
+        <span>可议价</span>
+        <span>当面交易</span>
+        <span>3 小时前发布</span>
+      </div>
+
+      <div class="pricebox">
+        <span class="now">¥18</span>
+        <span class="old">原价 ¥68</span>
+        <span class="off">2.6 折</span>
+        <span class="want"><b>3</b> 人想要 · 浏览 128</span>
+      </div>
+
+      <div class="metalist">
+        <div class="it"><span>成色评级</span><b>几乎全新（B 级）</b></div>
+        <div class="it"><span>所属校区</span><b>中心校区</b></div>
+        <div class="it"><span>面交地点</span><b>图书馆南门</b></div>
+        <div class="it"><span>购买时间</span><b>2025 年 9 月</b></div>
+        <div class="it"><span>是否包送</span><b>不包送，可议</b></div>
+        <div class="it"><span>商品编号</span><b>CM-20260926-0412</b></div>
+      </div>
+
+      <div class="seller">
+        <span class="av"></span>
+        <div class="who">
+          <b>陈同学</b>
+          <div class="m">
+            <i>✓ 学号已认证</i>
+            <i>✓ 信用极好</i>
+            <i class="gr">机械学院 · 大三</i>
+            <i class="gr">成交 12 笔</i>
+          </div>
+        </div>
+        <span class="ent">进入主页</span>
+      </div>
+
+      <div class="acts">
+        <button class="pri">我想要 · 联系卖家</button>
+        <button class="cmp">＋ 加入对比</button>
+        <button class="sec">♡ 收藏</button>
+      </div>
+
+      <div class="meet">
+        <div class="h">校内面交点 <span>3 个可选 · 均为校内公共区域</span></div>
+        <div class="map">
+          <span class="blk b1"></span><span class="blk b2"></span><span class="blk b3"></span><span class="blk b4"></span>
+          <span class="road r1"></span><span class="road r2"></span>
+          <span class="pin"></span>
+        </div>
+        <div class="lg">
+          <span><b>默认：</b>图书馆南门</span>
+          <span><b>备选：</b>三食堂门口 · 教学楼 A 座一层</span>
+          <span><b>距离：</b>距你当前位置约 320 m</span>
+        </div>
+      </div>
+
+      <div class="safety">
+        <h5>校园面交须知</h5>
+        <ol>
+          <li>请在校园内的公共区域交易，不要前往宿舍内部或校外偏僻地点。</li>
+          <li>当面验货再确认收货，平台在确认前不会把款项打给卖家。</li>
+          <li>优先选择已完成学号认证的卖家，交易纠纷可申请平台介入。</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- 卖家其他闲置 -->
+  <div class="sec">
+    <div class="sec-h"><h3>卖家的其他闲置</h3><span>共 4 件</span><a>查看全部</a></div>
+    <div class="rcards">
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#D9F3D2,#8FD69B)"></span>
+        <div class="bd"><div class="tt">线性代数 教材 + 习题全解</div><div class="pr">¥20</div><div class="mt">几乎全新 · 中心校区</div></div>
+      </a>
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#CFE3FF,#8FB8F6)"></span>
+        <div class="bd"><div class="tt">大学物理 上下册 带实验册</div><div class="pr">¥25</div><div class="mt">轻微使用 · 中心校区</div></div>
+      </a>
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#FFE8C2,#F5B85C)"></span>
+        <div class="bd"><div class="tt">考研数学 复习全书 全套</div><div class="pr">¥38</div><div class="mt">几乎全新 · 中心校区</div></div>
+      </a>
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#EFDCFF,#BF9BE8)"></span>
+        <div class="bd"><div class="tt">桌面台灯 护眼可调光</div><div class="pr">¥30</div><div class="mt">轻微使用 · 中心校区</div></div>
+      </a>
+    </div>
+  </div>
+
+  <!-- 同类推荐 -->
+  <div class="sec">
+    <div class="sec-h"><h3>看过这件的人也在看</h3><span>基于同校区浏览行为</span><a>换一批</a></div>
+    <div class="rcards">
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#FFD9A8,#FF9E5E)"></span>
+        <div class="bd"><div class="tt">高等数学 第七版 全新未拆</div><div class="pr">¥26</div><div class="mt">全新未拆 · 东校区</div></div>
+      </a>
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#E4F7DE,#A5DEAF)"></span>
+        <div class="bd"><div class="tt">微积分 教材 + 课后答案</div><div class="pr">¥16</div><div class="mt">八成新 · 南苑</div></div>
+      </a>
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#DCE9FF,#9CB8EE)"></span>
+        <div class="bd"><div class="tt">概率论与数理统计 浙大版</div><div class="pr">¥18</div><div class="mt">几乎全新 · 中心校区</div></div>
+      </a>
+      <a class="rcard">
+        <span class="ph" style="background:linear-gradient(135deg,#F5E8FF,#CFB0F0)"></span>
+        <div class="bd"><div class="tt">高数笔记本 手写整理版</div><div class="pr">¥10</div><div class="mt">几乎全新 · 东校区</div></div>
+      </a>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <span><b>页面说明：</b>详情页沿用与列表页相同的 Token（闲鱼黄 #FFD100 只用于发布按钮与选中态，价格用橙红 #FF5000 分离）。校园特色字段为「成色评级 + 校区 + 校内面交点 + 学号认证」四项，其中面交点地图为 CSS 绘制的占位示意。</span>
+  <span class="x">静态原型 · 无 JS</span>
+</div>
+
+</body>
+</html>

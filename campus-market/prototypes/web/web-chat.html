@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · Web 端 P6 消息</title>
+<link rel="stylesheet" href="web.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk on">消息<span class="dot">3</span></a>
+      <a class="lnk">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a>
+    <a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a><a>其他闲置</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell narrow">
+  <div class="main">
+    <div class="crumb"><b>首页</b> / 消息</div>
+
+    <div class="chat2">
+      <!-- 左：会话列表 -->
+      <div class="left">
+        <div class="hd">消息
+          <span class="seg"><span class="on">私信 2</span><span>交易 3</span><span>系统 1</span></span>
+        </div>
+        <div class="list">
+          <div class="row on">
+            <div class="av" style="background:linear-gradient(135deg,#FF8A33,#FF6A00);">刘</div>
+            <div class="mid">
+              <div class="nm">阿刘 <span>刚刚</span></div>
+              <div class="ms">好的，那周六上午图书馆一楼见</div>
+            </div>
+            <span class="rd"></span>
+          </div>
+          <div class="row">
+            <div class="av" style="background:linear-gradient(135deg,#5B8DEF,#3C6DD8);">陈</div>
+            <div class="mid">
+              <div class="nm">陈学长 <span>3 分钟前</span></div>
+              <div class="ms">资料还在的，明天下午图书馆门口？</div>
+            </div>
+            <span class="rd"></span>
+          </div>
+          <div class="row">
+            <div class="av" style="background:linear-gradient(135deg,#3CB37A,#0FA968);">王</div>
+            <div class="mid">
+              <div class="nm">骑车的小王 <span>昨天</span></div>
+              <div class="ms">车还在，刹车刚换过，随时可以看</div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="av" style="background:#F2F3F5;color:var(--t-2);">单</div>
+            <div class="mid">
+              <div class="nm">交易通知 <span>10 分钟前</span></div>
+              <div class="ms">#20260926：1 小时后图书馆一楼中庭见面</div>
+            </div>
+            <span class="rd"></span>
+          </div>
+          <div class="row">
+            <div class="av" style="background:#F2F3F5;color:var(--t-2);">审</div>
+            <div class="mid">
+              <div class="nm">系统通知 <span>2 小时前</span></div>
+              <div class="ms">你发布的「米家台灯 1S」已通过审核</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：对话 -->
+      <div class="right">
+        <div class="hd">
+          阿刘
+          <span class="mini">计算机学院 · 学号已认证 · 成交 27 笔</span>
+        </div>
+
+        <div class="body">
+          <div class="sys">平台提示：请在校园面交点交易，勿站外付款</div>
+
+          <div style="display:flex;gap:var(--s-3);background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r-lg);padding:var(--s-3);align-self:flex-start;">
+            <div class="pic p2" style="width:72px;height:54px;border-radius:var(--r-sm);flex:0 0 auto;">iPad</div>
+            <div>
+              <div style="font-size:var(--f-sm);font-weight:600;">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+              <div style="font-size:var(--f-lg);color:var(--c-price);font-weight:800;">¥1,580</div>
+            </div>
+          </div>
+
+          <div class="bw">
+            <div class="av" style="background:linear-gradient(135deg,#FF8A33,#FF6A00);">刘</div>
+            <div class="bub">你好，机器还在的～</div>
+          </div>
+
+          <div class="bw me">
+            <div class="av" style="background:linear-gradient(135deg,#5B8DEF,#3C6DD8);">我</div>
+            <div class="bub">想问下电池健康到底多少？有没有磕碰？</div>
+          </div>
+
+          <div class="bw">
+            <div class="av" style="background:linear-gradient(135deg,#FF8A33,#FF6A00);">刘</div>
+            <div class="bub">92%，全程贴膜带壳，边框无磕碰。价格标的是实在价，见面还能再聊。</div>
+          </div>
+
+          <div class="bw">
+            <div class="av" style="background:linear-gradient(135deg,#FF8A33,#FF6A00);">刘</div>
+            <div class="bcard">
+              <div class="h">面交约定</div>
+              <div class="b">地点：图书馆一楼中庭<br>时间：9-27（周六）10:30<br>备注：我带充电器和壳，你当场验机</div>
+              <div class="f"><div>修改</div><div class="go">查看订单</div></div>
+            </div>
+          </div>
+
+          <div class="bw me">
+            <div class="av" style="background:linear-gradient(135deg,#5B8DEF,#3C6DD8);">我</div>
+            <div class="bub">好的，周六见</div>
+          </div>
+        </div>
+
+        <div class="compose">
+          <div class="quick">
+            <span>还在吗</span><span>能便宜点吗</span><span>什么时候方便</span><span>在哪里面交</span><span>发我一张实拍</span>
+          </div>
+          <div class="bar">
+            <textarea placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+            <div style="display:flex;flex-direction:column;gap:var(--s-2);">
+              <button class="btn sm">发图片</button>
+              <button class="btn sm pri">发送</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <div>
+    <b>P6 消息 · 桌面双栏。</b>左会话列表 + 右对话同屏，是桌面相对手机的独占形态；打字与贴图在电脑上更快。
+    <ul>
+      <li>三分区沿用小程序端：私信 / 交易通知 / 系统通知分开，避免通知淹没对话</li>
+      <li>议价<b>不进入数据模型</b>：聊天里口头议价，订单金额一律按标价成交</li>
+    </ul>
+  </div>
+  <span class="x">原型 · 纯 HTML/CSS</span>
+</div>
+
+</body>
+</html>

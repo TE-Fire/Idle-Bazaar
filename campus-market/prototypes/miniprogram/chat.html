@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M5 消息（聊天页）</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M5 聊天</span>
+    <b>二手平台的本质是「聊聊」</b>（Carousell 结论）。<b>面交约定卡</b>是唯一的结构化消息，可直接回填订单；议价只在聊天里口头进行，<b>订单金额一律按标价成交</b>。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="back"></span>
+      <span class="title">阿刘</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <div class="chat">
+        <div class="sysline">9-26 09:12 · 平台提示：请在校园面交点交易，勿站外付款</div>
+
+        <!-- 商品上下文卡 -->
+        <div style="display:flex;gap:8px;background:var(--c-surface);border-radius:var(--r-lg);padding:8px;">
+          <div style="width:56px;height:56px;border-radius:var(--r-md);overflow:hidden;flex:0 0 auto;"><div class="ph p2" style="width:100%;height:100%;font-size:10px;">iPad</div></div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:var(--f-sm);color:var(--t-1);line-height:1.4;" class="wtitle">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+            <div style="font-size:var(--f-lg);font-weight:700;color:var(--c-price);">¥1,580</div>
+          </div>
+        </div>
+
+        <div class="bwrap">
+          <div class="av" style="background:#FF8A33;">刘</div>
+          <div class="bub">你好，机器还在的～</div>
+        </div>
+
+        <div class="bwrap me">
+          <div class="av" style="background:#3C6DD8;">我</div>
+          <div class="bub">还在吗？想问下 1,480 可以出吗</div>
+        </div>
+
+        <div class="bwrap">
+          <div class="av" style="background:#FF8A33;">刘</div>
+          <div class="bub">太低了，机器保护得很好，配件也全送你</div>
+        </div>
+
+        <div class="bwrap me">
+          <div class="av" style="background:#3C6DD8;">我</div>
+          <div class="bub">1,450 出吗？今天下午就能面交</div>
+        </div>
+
+        <div class="bwrap">
+          <div class="av" style="background:#FF8A33;">刘</div>
+          <div class="bub">标的就是实在价，最低 1,520 吧，配件都送你</div>
+        </div>
+
+        <div class="bwrap me">
+          <div class="av" style="background:#3C6DD8;">我</div>
+          <div class="bub">行，那就按标价 ¥1,580 走，配件给我留着</div>
+        </div>
+
+        <div class="bwrap">
+          <div class="av" style="background:#FF8A33;">刘</div>
+          <div class="bub img"><div class="ph p6">边框实拍</div></div>
+        </div>
+
+        <div class="sysline">已按标价 ¥1,580 生成订单 #20260926（议价是口头沟通，不写入订单金额）</div>
+
+        <!-- 面交约定卡 -->
+        <div class="bwrap">
+          <div class="av" style="background:#FF8A33;">刘</div>
+          <div class="bcard">
+            <div class="bh">面交约定</div>
+            <div class="bb">地点：西区食堂南门<br>时间：9-27（周六）10:30<br>备注：我带充电器和壳，你当场验机</div>
+            <div class="bf"><div>修改</div><div class="go">查看订单</div></div>
+          </div>
+        </div>
+
+        <div class="bwrap me">
+          <div class="av" style="background:#3C6DD8;">我</div>
+          <div class="bub">好的，周六见</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷短语 -->
+    <div class="quickbar">
+      <div class="chip">还在吗</div>
+      <div class="chip">能便宜点吗</div>
+      <div class="chip">什么时候方便</div>
+      <div class="chip">在哪里面交</div>
+    </div>
+
+    <!-- 输入区 -->
+    <div class="inputbar">
+      <div class="ti">发消息…</div>
+      <div class="ico" style="border:1px solid var(--c-border-strong);border-radius:50%;"></div>
+      <div class="ico" style="border:1px solid var(--c-border-strong);border-radius:50%;"></div>
+      <div class="btn sm pri" style="height:36px;padding:0 14px;">发送</div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    ①快捷短语减少打字成本；②<b>面交约定卡</b>是结构化消息，可回填订单（地点 + 时间 + 备注）；③议价不进入数据模型，无报价/还价状态；④长按图片保存、左滑返回沿用系统手势，不引入自定义手势。
+  </div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · Web 端 P3 发布闲置</title>
+<link rel="stylesheet" href="web.css">
+<style>
+.upzone:hover{border-color:var(--c-brand);background:#FFFCE8;}
+.upzone:hover .big{color:#8A6D00;}
+</style>
+</head>
+<body>
+
+<!-- ══ 顶部导航 ══ -->
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk">消息<span class="dot">3</span></a>
+      <a class="lnk on">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 分类导航条 ══ -->
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a>
+    <a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a><a>其他闲置</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell narrow">
+  <div class="main">
+    <div class="crumb"><b>首页</b> / 发布闲置</div>
+
+    <div class="pub">
+      <!-- 左：表单 -->
+      <div class="l">
+
+        <!-- 图片 -->
+        <div class="panel">
+          <div class="ph-head">商品图片<span class="sub">最多 9 张 · 第一张为主图</span></div>
+          <div class="ph-body">
+            <div class="upzone">
+              <div class="big">把图片拖到这里</div>
+              <div class="sm">支持 jpg / png / webp，单张 ≤ 10MB；也可粘贴截图（Ctrl+V）</div>
+              <button class="btn sm">选择文件</button>
+            </div>
+            <div class="thumbs">
+              <div class="thumb main"><div class="pic p2" style="width:100%;height:100%;">iPad 主图</div><span class="del">×</span></div>
+              <div class="thumb"><div class="pic p6" style="width:100%;height:100%;">边框</div><span class="del">×</span></div>
+              <div class="thumb"><div class="pic p8" style="width:100%;height:100%;">屏幕</div><span class="del">×</span></div>
+              <div class="thumb"><div class="pic p4" style="width:100%;height:100%;">配件</div><span class="del">×</span></div>
+              <div class="thumb add">＋</div>
+            </div>
+            <div class="help">拖动缩略图可调整顺序；建议实拍，网络图片会被审核驳回。</div>
+          </div>
+        </div>
+
+        <!-- 基本信息 -->
+        <div class="panel">
+          <div class="ph-head">基本信息</div>
+          <div class="ph-body" style="padding-top:var(--s-2);">
+            <div class="formrow">
+              <div class="lb"><i>*</i> 标题</div>
+              <div class="fd">
+                <input class="inp" value="iPad 9 64G WiFi 版 无磕碰 电池健康 92%">
+                <div class="help">5–50 字。建议写清品牌 + 型号 + 成色，例如「iPad 9 64G 无磕碰 电池 92%」。</div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb"><i>*</i> 分类</div>
+              <div class="fd">
+                <div class="pickrow">
+                  <span class="pick">教材教辅</span>
+                  <span class="pick on">数码电子 › 平板电脑</span>
+                  <span class="pick">自行车 / 电动车</span>
+                  <span class="pick">宿舍家具</span>
+                  <span class="pick">服饰鞋包</span>
+                  <span class="pick">其他闲置</span>
+                </div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb"><i>*</i> 成色</div>
+              <div class="fd">
+                <div class="pickrow">
+                  <span class="pick">A <small>全新未拆</small></span>
+                  <span class="pick on">B <small>几乎全新</small></span>
+                  <span class="pick">C <small>轻微使用</small></span>
+                  <span class="pick">D <small>明显使用</small></span>
+                </div>
+                <div class="help">成色 A–D 由平台统一定义，四端一致；虚标会被举报并影响信用。</div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb"><i>*</i> 价格</div>
+              <div class="fd">
+                <div class="inp grp" style="width:220px;">
+                  <span style="color:var(--c-price);font-weight:800;">¥</span><input value="1580">
+                </div>
+                <div class="help">同类目均价约 ¥1,420（近 30 天成交 86 笔），仅供参考。</div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb">原价</div>
+              <div class="fd">
+                <div class="inp grp" style="width:220px;">
+                  <span style="color:var(--t-3);">¥</span><input value="2499">
+                </div>
+                <div class="help">选填，填写后卡片与详情页显示删除线原价。</div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb">描述</div>
+              <div class="fd">
+                <textarea class="inp">去年入学买的，主要用于记笔记和看网课，全程贴膜带壳，屏幕无划痕、边框无磕碰，电池健康 92%。随机器附赠原装充电器和第三方保护壳。
+
+考研结束出给需要的学弟学妹，只走校内面交，当面验机。</textarea>
+                <div class="help">写清来源、使用时长、瑕疵、配件清单，可以减少一大半来回提问。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 校园信息 -->
+        <div class="panel">
+          <div class="ph-head">校园信息<span class="sub">这四项是与普通二手平台拉开差距的地方</span></div>
+          <div class="ph-body" style="padding-top:var(--s-2);">
+            <div class="formrow">
+              <div class="lb"><i>*</i> 校区</div>
+              <div class="fd">
+                <div class="pickrow">
+                  <span class="pick on">中心校区</span><span class="pick">东区</span><span class="pick">西区</span><span class="pick">南苑</span>
+                </div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb">常用面交点</div>
+              <div class="fd">
+                <div class="pickrow">
+                  <span class="pick on">图书馆一楼中庭</span><span class="pick">西区食堂南门</span><span class="pick">三食堂门口</span><span class="pick">体育馆北门</span>
+                </div>
+                <div class="help">面交点由学校维护，均为监控覆盖区域；可在「我的 → 常用面交点」里设置默认。</div>
+              </div>
+            </div>
+            <div class="formrow">
+              <div class="lb">商品标签</div>
+              <div class="fd">
+                <div class="pickrow">
+                  <span class="pick on">可议价</span><span class="pick">急出</span><span class="pick">包校园配送</span><span class="pick">同院优先</span>
+                </div>
+                <div class="help">「可议价」只是展示标签：买家可在聊天里口头问价，平台不做报价/还价流程，订单金额一律按标价成交。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 提交 -->
+        <div class="panel">
+          <div class="ph-body">
+            <div class="pubfoot">
+              <button class="btn pri lg">发布，送审核</button>
+              <button class="btn lg">存草稿</button>
+              <span class="kbd">快捷键 <b>Ctrl</b> + <b>Enter</b> 直接提交 · <b>Esc</b> 关闭弹窗</span>
+            </div>
+            <div class="help" style="margin-top:var(--s-3);">
+              提交后进入「待审核」，通常 2 小时内完成，审核通过自动上架。改动价格或成色需重新审核；只改描述免审。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右：实时预览 -->
+      <div class="r">
+        <div class="panel">
+          <div class="ph-head">实时预览<span class="sub">与列表页真实版式一致</span></div>
+          <div class="ph-body">
+            <div class="card">
+              <div class="ph">
+                <div class="pic p2 a" style="width:100%;height:100%;">iPad 主图</div>
+                <div class="pic p6 b" style="width:100%;height:100%;">边框（hover 切换）</div>
+                <span class="tag hot">可议价</span>
+                <span class="cmp">＋对比</span>
+              </div>
+              <div class="bd">
+                <div class="tt">iPad 9 64G WiFi 版 无磕碰 电池健康 92%</div>
+                <div class="pr"><b>¥1580</b><s>¥2499</s></div>
+                <div class="mt"><span class="cond b">B 几乎全新</span>中心校区</div>
+              </div>
+              <div class="ft"><span class="av"></span>林小满<span class="sch">刚刚</span></div>
+            </div>
+            <div class="mini" style="margin-top:var(--s-3);">
+              右侧预览用的是列表页同一套卡片组件，所见即所得——标题超过 2 行会截断，发布前能直接看出效果。
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph-head">发布检查</div>
+          <div class="ph-body">
+            <dl class="kv">
+              <dt>图片</dt><dd style="color:var(--c-ok);">4 / 9 已上传</dd>
+              <dt>标题</dt><dd style="color:var(--c-ok);">32 字（5–50）</dd>
+              <dt>价格</dt><dd style="color:var(--c-ok);">¥1,580</dd>
+              <dt>成色</dt><dd style="color:var(--c-ok);">B 级</dd>
+              <dt>校区</dt><dd style="color:var(--c-ok);">中心校区</dd>
+              <dt>面交点</dt><dd style="color:var(--c-ok);">图书馆一楼中庭</dd>
+            </dl>
+            <div class="mini" style="margin-top:var(--s-3);">全部必填项已满足，可以提交。</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph-head">为什么在电脑上发</div>
+          <div class="ph-body">
+            <div class="mini">
+              毕业季一次出 20 本书时，桌面端才是效率解：<br>
+              ① 拖拽批量传图 + 拖动排序；② 右侧实时预览，不用反复「保存—查看」；③ 键盘操作，Ctrl+Enter 直接提交；④ 大屏填写长描述。<br><br>
+              手机上适合临时补一件，两边共用同一套字段与校验。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <div>
+    <b>P3 发布页 · 桌面独占能力：</b>拖拽多图 + 排序 + 右侧实时预览 + Ctrl+Enter 提交。这是 Web 端最体现价值的一页。
+    <ul>
+      <li>提交即送审（先审后发）；改价/改成色需重审，只改描述免审</li>
+      <li>「可议价」<b>只是展示标签</b>，不是独立业务：无报价/还价流程，订单金额一律按标价</li>
+      <li><b>无置顶推广</b>：不做付费曝光，也不提供置顶操作</li>
+    </ul>
+  </div>
+  <span class="x">原型 · 纯 HTML/CSS</span>
+</div>
+
+</body>
+</html>

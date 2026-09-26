@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M8 订单详情</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M8 订单</span>
+    <b>扫码核销是移动端独占能力</b>：卖家/买家出示订单二维码 → 对方扫码 → 双方核销 → 当场验货 → 确认收货。Web 端无此摄像头场景，页面只做状态展示。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="back"></span>
+      <span class="title">订单详情</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <!-- 状态头 -->
+      <div style="background:linear-gradient(135deg,#FF8A33,#FF6A00);padding:var(--s-5) var(--s-4);color:#fff;">
+        <div style="font-size:var(--f-xl);font-weight:600;">待面交</div>
+        <div style="font-size:var(--f-sm);opacity:.92;margin-top:4px;">9-27（周六）10:30 · 西区食堂南门</div>
+      </div>
+
+      <!-- 时间轴 -->
+      <div class="tl">
+        <div class="step done">
+          <div class="dotcol"><span class="dot"></span><span class="line"></span></div>
+          <div class="tx"><div class="h"><b>买家拍下</b></div><div class="t">09-26 09:14</div></div>
+        </div>
+        <div class="step done">
+          <div class="dotcol"><span class="dot"></span><span class="line"></span></div>
+          <div class="tx"><div class="h"><b>已付款（模拟支付）</b> ¥1,580</div><div class="t">09-26 09:15 · 拍下不锁货，付款后商品才转「已售出」</div></div>
+        </div>
+        <div class="step now">
+          <div class="dotcol"><span class="dot"></span><span class="line"></span></div>
+          <div class="tx"><div class="h"><b>待面交</b></div><div class="t">面交前 1 小时与到点各推送一次提醒</div></div>
+        </div>
+        <div class="step">
+          <div class="dotcol"><span class="dot"></span><span class="line"></span></div>
+          <div class="tx"><div class="h">扫码核销 + 确认收货</div><div class="t">当场验货，满意后确认；当场拒收不计违约</div></div>
+        </div>
+        <div class="step">
+          <div class="dotcol"><span class="dot"></span></div>
+          <div class="tx"><div class="h">互评</div><div class="t">完成后 7 天内可评价</div></div>
+        </div>
+      </div>
+
+      <!-- 商品 -->
+      <div class="card" style="margin-top:8px;padding:var(--s-3);display:flex;gap:var(--s-3);">
+        <div style="width:72px;height:72px;border-radius:var(--r-md);overflow:hidden;flex:0 0 auto;"><div class="ph p2" style="width:100%;height:100%;font-size:10px;">iPad</div></div>
+        <div style="flex:1;min-width:0;">
+          <div class="wtitle" style="font-size:var(--f-sm);">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+          <div class="metarow"><span class="cond b">B 几乎全新</span>西区</div>
+          <div class="prow"><span class="pnow" style="font-size:var(--f-md);">¥1,580</span><span class="pold">¥2,499</span></div>
+        </div>
+      </div>
+
+      <!-- 金额 -->
+      <div class="field" style="margin-top:8px;">
+        <div class="frow"><span class="lb">商品价</span><span class="val" style="text-align:right;">¥1,580</span></div>
+        <div class="frow"><span class="lb">平台服务费</span><span class="val" style="text-align:right;color:var(--c-ok);">¥0（校内免收）</span></div>
+        <div class="frow"><span class="lb">实付</span><span class="val" style="text-align:right;color:var(--c-price);font-weight:700;">¥1,580</span></div>
+        <div class="frow"><span class="lb">支付方式</span><span class="val ph-t" style="text-align:right;">模拟支付（线下交付）</span></div>
+      </div>
+
+      <!-- 面交点 -->
+      <div class="card" style="margin-top:8px;">
+        <div class="mapbox">
+          <div class="road h"></div><div class="road v"></div>
+          <div class="blk" style="left:8%;top:12%;width:26%;height:22%;"></div>
+          <div class="blk" style="left:52%;top:14%;width:34%;height:26%;"></div>
+          <div class="blk" style="left:12%;top:62%;width:30%;height:24%;"></div>
+          <div class="pin" style="left:26%;top:52%;"></div>
+          <div class="lbl">西区食堂南门 · 距你 320m</div>
+        </div>
+        <div class="mapbar">
+          <div class="txt">西区食堂南门<small>校内有监控 · 本周 46 笔在此成交</small></div>
+          <div class="btn sm">导航</div>
+        </div>
+      </div>
+
+      <!-- 二维码核销 -->
+      <div class="card" style="margin-top:8px;">
+        <div class="sec-t" style="padding-bottom:4px;">订单二维码<span>见面时出示，双方核销</span></div>
+        <div class="qrbox">
+          <div class="qr"><div class="code"></div></div>
+          <div class="txt">
+            <b>核销码 8 42 1957</b>
+            ① 双方到场 → ② 任一方扫对方的码 → ③ 双方核销成功 → ④ 当场验货 → 确认收货。<br>
+            核销后单方取消将记为违约并影响信用等级。
+          </div>
+        </div>
+      </div>
+
+      <!-- 交易双方 -->
+      <div class="field" style="margin-top:8px;">
+        <div class="frow"><span class="lb">卖家</span><span class="val">阿刘 · 计算机学院<span class="verified" style="margin-left:4px;">已认证</span></span><span class="arrow"></span></div>
+        <div class="frow"><span class="lb">订单号</span><span class="val" style="color:var(--t-2);">#202609260914</span></div>
+        <div class="frow"><span class="lb">下单时间</span><span class="val" style="color:var(--t-2);">2026-09-26 09:14</span></div>
+      </div>
+
+      <div class="notice">
+        <span class="fl">!</span>
+        <div><b>当面验货再确认。</b>验货不通过可当场取消，<b>不计违约</b>——这是线下交易相对快递的根本差异。</div>
+      </div>
+
+      <div class="mini" style="padding:0 12px 24px;">
+        状态机（管理端为裁决方）：拍下生成待付款订单，<b>商品不锁定、先付款先得</b>，30 分钟未付款自动取消；已付款 → 待面交 → 核销 → 已完成 → 互评；任一方发起 → 纠纷中（冻结，转管理端裁决）。
+      </div>
+    </div>
+
+    <!-- 底部操作条 -->
+    <div class="actionbar">
+      <div class="iconbtn">聊一聊</div>
+      <div class="grow">
+        <div class="btn">申请退款</div>
+        <div class="btn pri">确认收货</div>
+      </div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">可扩展性</span>
+    地图区保持「容器 + 导航按钮」结构，未接入第三方地图；后续接入只需把导航按钮换成 <b>wx.openLocation</b>，版式与数据字段不变。支付同理：现为模拟支付，接口层已隔离。
+  </div>
+
+</div>
+</body>
+</html>

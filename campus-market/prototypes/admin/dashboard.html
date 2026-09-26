@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A2 数据看板 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <!-- ── Sider ── -->
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi on" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <!-- ── Header ── -->
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">数据看板</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">张</span><span>张主任<br><span class="rl js-role-name">超级管理员</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- ① KPI -->
+      <div class="kpis">
+        <div class="kpi">
+          <div class="t">今日 GMV</div>
+          <div class="v">¥28,460</div>
+          <div class="c"><span class="up">▲ 12.4%</span><span>环比昨日</span><span class="up">▲ 31.8%</span><span>同比上周</span></div>
+        </div>
+        <div class="kpi">
+          <div class="t">新增商品</div>
+          <div class="v">156 <small>件</small></div>
+          <div class="c"><span class="dn">▼ 3.2%</span><span>环比昨日</span><span class="up">▲ 9.6%</span><span>同比上周</span></div>
+        </div>
+        <div class="kpi">
+          <div class="t">成交笔数</div>
+          <div class="v">58 <small>笔</small></div>
+          <div class="c"><span class="up">▲ 8.7%</span><span>环比昨日</span><span class="up">▲ 14.2%</span><span>同比上周</span></div>
+        </div>
+        <div class="kpi">
+          <div class="t">活跃用户</div>
+          <div class="v">1,204 <small>人</small></div>
+          <div class="c"><span class="up">▲ 5.1%</span><span>环比昨日</span><span class="dn">▼ 1.8%</span><span>同比上周</span></div>
+        </div>
+      </div>
+
+      <!-- ② 审核时效 SLA（2026-09-26 决策：纳入看板） -->
+      <div class="card">
+        <div class="card-hd">
+          <h3>审核时效 SLA</h3>
+          <span class="sub">口径：从商品进入队列 → 首次处置完成</span>
+          <div class="right">
+            <div class="seg"><button class="on">今日</button><button>7 日</button><button>30 日</button><button>本学期</button></div>
+          </div>
+        </div>
+        <div class="card-bd">
+          <div class="kpis" style="grid-template-columns:repeat(5,1fr);">
+            <div class="kpi" style="height:96px;">
+              <div class="t">平均首审时长</div>
+              <div class="v" style="font-size:24px;">26 <small>分钟</small></div>
+              <div class="c"><span>目标 ≤ 120 分钟</span></div>
+            </div>
+            <div class="kpi" style="height:96px;">
+              <div class="t">SLA 达标率</div>
+              <div class="v" style="font-size:24px;">96.2<small>%</small></div>
+              <div class="c"><span class="up">▲ 2.1pt</span><span>目标 ≥ 95%</span></div>
+            </div>
+            <div class="kpi" style="height:96px;">
+              <div class="t">P95 首审时长</div>
+              <div class="v" style="font-size:24px;">4.6 <small>小时</small></div>
+              <div class="c"><span>目标 ≤ 6 小时</span></div>
+            </div>
+            <div class="kpi warn" style="height:96px;">
+              <div class="t">超时积压（&gt;24h）</div>
+              <div class="v" style="font-size:24px;color:var(--st-pending);">3 <small>件</small></div>
+              <div class="c"><span>需今日清零</span></div>
+            </div>
+            <div class="kpi" style="height:96px;">
+              <div class="t">单条平均处置</div>
+              <div class="v" style="font-size:24px;">24 <small>秒</small></div>
+              <div class="c"><span>目标 ≤ 30 秒</span></div>
+            </div>
+          </div>
+
+          <div style="margin-top:var(--s-4);">
+            <div style="display:flex;align-items:center;gap:var(--s-3);font-size:var(--f-xs);color:var(--text-2);margin-bottom:var(--s-2);">
+              <span>近 14 日平均首审时长（分钟）</span>
+              <span class="legend" style="padding:0;"><span><i style="background:var(--brand);"></i>达标</span><span><i style="background:var(--st-fail);"></i>超 SLA</span><span><i style="background:var(--border-ctrl);"></i>目标线 120min</span></span>
+            </div>
+            <div style="position:relative;">
+              <div style="position:absolute;left:0;right:0;top:16px;border-top:1px dashed var(--border-ctrl);z-index:0;"></div>
+              <div class="bars" style="height:160px;position:relative;z-index:1;">
+                <div class="b"><i style="height:41px;"></i><em>38</em></div>
+                <div class="b"><i style="height:45px;"></i><em>42</em></div>
+                <div class="b"><i style="height:37px;"></i><em>35</em></div>
+                <div class="b"><i style="height:55px;"></i><em>51</em></div>
+                <div class="b"><i style="height:50px;"></i><em>47</em></div>
+                <div class="b"><i style="height:42px;"></i><em>39</em></div>
+                <div class="b"><i style="height:47px;"></i><em>44</em></div>
+                <div class="b"><i style="height:62px;"></i><em>58</em></div>
+                <div class="b"><i style="height:141px;background:var(--st-fail);"></i><em style="color:var(--st-fail);">132</em></div>
+                <div class="b"><i style="height:59px;"></i><em>55</em></div>
+                <div class="b"><i style="height:44px;"></i><em>41</em></div>
+                <div class="b"><i style="height:39px;"></i><em>36</em></div>
+                <div class="b"><i style="height:35px;"></i><em>33</em></div>
+                <div class="b"><i style="height:31px;"></i><em>29</em></div>
+              </div>
+            </div>
+            <div class="xlab"><span>09-13</span><span>14</span><span>15</span><span>16</span><span>17</span><span>18</span><span>19</span><span>20</span><span>21</span><span>22</span><span>23</span><span>24</span><span>25</span><span>26</span></div>
+          </div>
+        </div>
+        <div class="foot">
+          SLA 定义（写进论文的运营指标）：首审响应 ≤ <b>2 小时</b> 为达标；P95 ≤ <b>6 小时</b>；超 <b>24 小时</b> 未处置记为积压红牌，需当日清零。
+          单条平均处置 ≤ 30 秒是操作效率指标，与响应时效是两个层级，不可混用。阈值可在「系统设置 · SLA 配置」调整。
+        </div>
+      </div>
+
+      <!-- ③ 趋势 + ④ 构成 -->
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hd">
+            <h3>发布 / 成交趋势</h3>
+            <div class="right"><div class="seg"><button>今日</button><button class="on">7 日</button><button>30 日</button><button>本学期</button></div></div>
+          </div>
+          <div class="chart">
+            <svg class="line" viewBox="0 0 600 170" preserveAspectRatio="none">
+              <line x1="40" y1="140" x2="590" y2="140" stroke="#E5E7EB" stroke-width="1"/>
+              <line x1="40" y1="110" x2="590" y2="110" stroke="#F0F0F4" stroke-width="1" stroke-dasharray="4 4"/>
+              <line x1="40" y1="80"  x2="590" y2="80"  stroke="#F0F0F4" stroke-width="1" stroke-dasharray="4 4"/>
+              <line x1="40" y1="50"  x2="590" y2="50"  stroke="#F0F0F4" stroke-width="1" stroke-dasharray="4 4"/>
+              <line x1="40" y1="25"  x2="590" y2="25"  stroke="#F0F0F4" stroke-width="1" stroke-dasharray="4 4"/>
+              <polyline points="60,66 140,58 220,72 300,45 380,32 460,41 540,50"
+                        fill="none" stroke="#1677FF" stroke-width="2"/>
+              <polyline points="60,114 140,110 220,116 300,101 380,97 460,104 540,107"
+                        fill="none" stroke="#0FA968" stroke-width="2"/>
+              <g fill="#1677FF">
+                <circle cx="60" cy="66" r="3"/><circle cx="140" cy="58" r="3"/><circle cx="220" cy="72" r="3"/>
+                <circle cx="300" cy="45" r="3"/><circle cx="380" cy="32" r="3"/><circle cx="460" cy="41" r="3"/>
+                <circle cx="540" cy="50" r="3"/>
+              </g>
+              <g fill="#0FA968">
+                <circle cx="60" cy="114" r="3"/><circle cx="140" cy="110" r="3"/><circle cx="220" cy="116" r="3"/>
+                <circle cx="300" cy="101" r="3"/><circle cx="380" cy="97" r="3"/><circle cx="460" cy="104" r="3"/>
+                <circle cx="540" cy="107" r="3"/>
+              </g>
+              <g font-size="11" fill="#9A9AA4">
+                <text x="40" y="158">09-20</text><text x="126" y="158">09-21</text><text x="206" y="158">09-22</text>
+                <text x="286" y="158">09-23</text><text x="366" y="158">09-24</text><text x="446" y="158">09-25</text>
+                <text x="526" y="158">09-26</text>
+                <text x="8" y="144">0</text><text x="0" y="84">100</text><text x="0" y="29">200</text>
+              </g>
+            </svg>
+            <div class="legend"><span><i style="background:#1677FF;"></i>发布量</span><span><i style="background:#0FA968;"></i>成交量</span><span style="color:var(--text-3);">纵轴从 0 起，不做平滑</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3>品类成交构成</h3>
+            <div class="right"><div class="seg"><button class="on">成交量</button><button>发布量</button><button>成交率</button></div></div>
+          </div>
+          <div class="card-bd" style="display:flex;gap:var(--s-6);align-items:center;">
+            <div style="position:relative;">
+              <div class="donut" style="background:conic-gradient(#1677FF 0 32%,#0FA968 32% 55%,#FF8F1F 55% 74%,#7C4DFF 74% 87%,#00B5C4 87% 95%,#8C8C94 95% 100%);"></div>
+              <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle,#fff 0 46px,transparent 47px);">
+                <span style="font-size:var(--f-lg);font-weight:600;">1,842</span>
+                <span style="font-size:11px;color:var(--text-3);">总成交/件</span>
+              </div>
+            </div>
+            <div class="dlegend">
+              <div class="r"><i style="background:#1677FF;"></i>教材教辅<span class="n">590 · 32.0%</span></div>
+              <div class="r"><i style="background:#0FA968;"></i>数码电子<span class="n">424 · 23.0%</span></div>
+              <div class="r"><i style="background:#FF8F1F;"></i>生活用品<span class="n">350 · 19.0%</span></div>
+              <div class="r"><i style="background:#7C4DFF;"></i>服饰鞋包<span class="n">239 · 13.0%</span></div>
+              <div class="r"><i style="background:#00B5C4;"></i>图书笔记<span class="n">147 · 8.0%</span></div>
+              <div class="r"><i style="background:#8C8C94;"></i>其他<span class="n">92 · 5.0%</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ④ 成色分布 + TOP-N -->
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hd"><h3>成色等级分布</h3><span class="sub">A 几乎全新 · B 轻微使用 · C 明显痕迹 · D 有瑕疵</span></div>
+          <div class="chart">
+            <div class="bars">
+              <div class="b"><i style="height:96px;background:var(--grade-a);"></i><em>A</em></div>
+              <div class="b"><i style="height:150px;background:var(--grade-b);"></i><em>B</em></div>
+              <div class="b"><i style="height:118px;background:var(--grade-c);"></i><em>C</em></div>
+              <div class="b"><i style="height:54px;background:var(--grade-d);"></i><em>D</em></div>
+            </div>
+            <div class="xlab"><span>A 22%</span><span>B 41%</span><span>C 27%</span><span>D 10%</span></div>
+            <div class="foot" style="border:0;padding:var(--s-3) 0 0;">成色评级 A–D 由后台字典下发，三端共用同一文案与色值，前端不得硬编码。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><h3>活跃学院 TOP 10</h3><span class="sub">按近 30 日成交笔数</span></div>
+          <div class="card-bd">
+            <div style="display:flex;flex-direction:column;gap:var(--s-2);font-size:var(--f-xs);">
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">计算机学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:100%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">286</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">机械工程学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:78%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">223</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">经济管理学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:70%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">201</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">艺术学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:61%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">175</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">外国语学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:53%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">152</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">材料学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:46%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">132</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">土木工程学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:39%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">112</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">生命科学学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:33%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">95</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">物理学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:27%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">78</span></div>
+              <div style="display:flex;align-items:center;gap:var(--s-2);"><span style="flex:0 0 132px;">法学院</span><span style="flex:1;height:14px;background:var(--gray-100);border-radius:3px;"><i style="display:block;width:22%;height:14px;background:var(--brand);border-radius:3px;"></i></span><span style="flex:0 0 46px;text-align:right;">64</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ⑤ 待处置队列 + ⑥ 异常预警 -->
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hd"><h3>待处置队列</h3><span class="sub">按权重排序，非按时间</span></div>
+          <div class="card-bd flush">
+            <table class="tbl compact">
+              <tbody>
+                <tr>
+                  <td style="width:38px;color:var(--text-3);">◧</td>
+                  <td>待审核商品</td>
+                  <td class="num"><b>18</b> 件</td>
+                  <td class="minor">最久等待 9h12m</td>
+                  <td class="ops"><a class="btn link" href="review.html">去处理</a></td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text-3);">◈</td>
+                  <td>待受理举报</td>
+                  <td class="num"><b>6</b> 件</td>
+                  <td class="minor">含 2 件高风险</td>
+                  <td class="ops"><a class="btn link" href="review.html">去处理</a></td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text-3);">◐</td>
+                  <td>待复审申诉</td>
+                  <td class="num"><b>3</b> 件</td>
+                  <td class="minor">优先级高于普通审核</td>
+                  <td class="ops"><a class="btn link" href="review.html">去处理</a></td>
+                </tr>
+                <tr>
+                  <td style="color:var(--text-3);">◉</td>
+                  <td>待认证审核</td>
+                  <td class="num"><b>11</b> 人</td>
+                  <td class="minor">低频高责任，不做批量通过</td>
+                  <td class="ops"><a class="btn link" href="users.html">去处理</a></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd"><h3>异常预警</h3><span class="sub">校园平台特色规则</span></div>
+          <div class="card-bd" style="display:flex;flex-direction:column;gap:var(--s-3);">
+            <div class="notice err">
+              <span>价格异常</span><span style="color:var(--text-2);">「iPad Pro 2024」标价 ¥320，偏离同类目均价 3 倍以上，已拦截待人工确认</span>
+              <a class="btn link" style="margin-left:auto;white-space:nowrap;" href="review.html">查看</a>
+            </div>
+            <div class="notice warn">
+              <span>疑似刷量</span><span style="color:var(--text-2);">账号 U10293 于 09-26 03:12–03:40 连续发布 14 件同类商品</span>
+              <a class="btn link" style="margin-left:auto;white-space:nowrap;" href="users.html">查看</a>
+            </div>
+            <div class="notice warn">
+              <span>面交点过载</span><span style="color:var(--text-2);">三食堂面交点近 7 日 68 笔，超出建议承载（50 笔/周），建议增设点位</span>
+              <a class="btn link" style="margin-left:auto;white-space:nowrap;" href="report.html">查看</a>
+            </div>
+            <div class="notice info">
+              <span>申诉临期</span><span style="color:var(--text-2);">2 件申诉距 48 小时承诺时效不足 6 小时</span>
+              <a class="btn link" style="margin-left:auto;white-space:nowrap;" href="review.html">查看</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-bd" style="font-size:var(--f-xs);color:var(--text-3);line-height:1.8;">
+          <b style="color:var(--text-2);">本页说明</b>　信息层级严格按「KPI → SLA → 趋势 → 构成 → TOP-N → 待处置 → 异常」排列，共 5 张图表，达到规范上限（3–5 张），其余图表（学期时间轴 / 学院×品类矩阵 / 面交所热力 / 循环率）收在「数据报表 A8」。
+          数据为 mock 演示值；上升用红、下降用绿（中国股市惯例），且均配 ▲▼ 符号，不靠颜色单独表意。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

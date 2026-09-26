@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A3 商品管理 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi on" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">商品管理</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">王</span><span>王运营<br><span class="rl js-role-name">运营</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="card">
+        <div class="filters">
+          <div class="fi"><label>关键词</label><input class="inp wide" placeholder="标题 / 商品 ID / 卖家"></div>
+          <div class="fi"><label>状态</label><select class="sel"><option>全部</option><option>在售</option><option>已下架</option><option>已售出</option><option>已强制下架</option></select></div>
+          <div class="fi"><label>分类</label><select class="sel"><option>全部</option><option>教材教辅</option><option>数码电子</option><option>生活用品</option></select></div>
+          <div class="fi"><label>校区</label><select class="sel"><option>全部</option><option>东校区</option><option>西校区</option></select></div>
+          <div class="fi"><label>发布时间</label><input class="date" value="2026-09-01 ~ 2026-09-26"></div>
+          <button class="btn sm">展开筛选</button>
+          <div class="right"><button class="btn">重置</button><button class="btn pri">查询</button></div>
+        </div>
+
+        <div class="bulkbar">
+          已选中 <b>2</b> 件商品
+          <div class="right">
+            <button class="btn sm" data-perm="item.offline">批量下架</button>
+            <button class="btn sm danger" data-perm="item.delete">批量删除</button>
+            <button class="btn sm">导出 CSV</button>
+          </div>
+        </div>
+
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th style="width:36px;"><input type="checkbox" checked></th>
+                <th>商品</th><th style="width:110px;">卖家</th><th style="width:96px;">分类</th>
+                <th style="width:72px;">成色</th><th style="width:92px;" class="num">价格</th>
+                <th style="width:88px;">校区</th><th style="width:96px;">状态</th>
+                <th style="width:130px;">发布时间</th><th style="width:180px;" class="num">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="sel">
+                <td><input type="checkbox" checked></td>
+                <td><div class="cell-main"><span class="thumb p1"></span><span class="ttl">iPad Pro 11 寸 2024 款 128G WiFi 版</span></div></td>
+                <td>U10293 王同学</td><td>数码电子</td>
+                <td><span class="tag g-b">B</span></td><td class="num">¥320</td><td>东校区</td>
+                <td><span class="tag pending">待审核</span></td><td>2026-09-26 02:58</td>
+                <td><div class="ops"><button class="btn link" data-open="dItem">查看</button><button class="btn link" data-perm="item.offline">下架</button><button class="btn link dn" data-perm="item.delete">删除</button></div></td>
+              </tr>
+              <tr class="sel">
+                <td><input type="checkbox" checked></td>
+                <td><div class="cell-main"><span class="thumb p2"></span><span class="ttl">高等数学（第七版）上下册 + 习题全解</span></div></td>
+                <td>U10077 刘同学</td><td>教材教辅</td>
+                <td><span class="tag g-a">A</span></td><td class="num">¥45</td><td>西校区</td>
+                <td><span class="tag pass">在售</span></td><td>2026-09-25 19:40</td>
+                <td><div class="ops"><button class="btn link" data-open="dItem">查看</button><button class="btn link" data-perm="item.offline">下架</button><button class="btn link dn" data-perm="item.delete">删除</button></div></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cell-main"><span class="thumb p3"></span><span class="ttl">宜家折叠书桌 120×60 白色 带抽屉</span></div></td>
+                <td>U10512 陈同学</td><td>生活用品</td>
+                <td><span class="tag g-c">C</span></td><td class="num">¥120</td><td>东校区</td>
+                <td><span class="tag pass">在售</span></td><td>2026-09-25 14:02</td>
+                <td><div class="ops"><button class="btn link" data-open="dItem">查看</button><button class="btn link" data-perm="item.offline">下架</button><button class="btn link dn" data-perm="item.delete">删除</button></div></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cell-main"><span class="thumb p4"></span><span class="ttl">考研数学笔记 手抄 三本 含真题整理</span></div></td>
+                <td>U10338 赵同学</td><td>图书笔记</td>
+                <td><span class="tag g-b">B</span></td><td class="num">¥68</td><td>西校区</td>
+                <td><span class="tag off">已售出</span></td><td>2026-09-24 10:16</td>
+                <td><div class="ops"><button class="btn link" data-open="dItem">查看</button><span class="locked">已终态</span></div></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cell-main"><span class="thumb p5"></span><span class="ttl">Nike 运动鞋 42 码 九成新 男女同款</span></div></td>
+                <td>U10645 孙同学</td><td>服饰鞋包</td>
+                <td><span class="tag g-d">D</span></td><td class="num">¥180</td><td>东校区</td>
+                <td><span class="tag fail">已强制下架</span></td><td>2026-09-23 21:35</td>
+                <td><div class="ops"><button class="btn link" data-open="dItem">查看</button><button class="btn link" data-perm="item.delete">删除</button></div></td>
+              </tr>
+              <tr>
+                <td><input type="checkbox"></td>
+                <td><div class="cell-main"><span class="thumb p6"></span><span class="ttl">电动车 48V 二手 校内代步</span></div></td>
+                <td>U10288 周同学</td><td>生活用品</td>
+                <td><span class="tag g-c">C</span></td><td class="num">¥760</td><td>西校区</td>
+                <td><span class="tag off">已下架</span></td><td>2026-09-22 08:11</td>
+                <td><div class="ops"><button class="btn link" data-open="dItem">查看</button><button class="btn link" data-perm="item.delete">删除</button></div></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="pager">共 1,286 条　每页 20 条<div class="right"><button class="pg on">1</button><button class="pg">2</button><button class="pg">3</button><button class="pg">…</button><button class="pg">65</button><button class="pg">›</button></div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-bd" style="font-size:var(--f-xs);color:var(--text-3);line-height:1.8;">
+          <b style="color:var(--text-2);">边界</b>　本页<b>不做置顶 / 推广</b>（2026-09-26 决策：校园场景不引入付费逻辑），也<b>不代卖家改价改描述</b>——只能下架或强制下架，避免责任不清。
+          删除为软删除并保留 30 天，操作全部记入操作日志。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="drawer-mask" id="dItem" style="display:none;">
+  <div class="drawer">
+    <div class="drawer-hd"><h3>商品详情</h3><span class="tag pass">在售</span><button class="x" data-close>×</button></div>
+    <div class="drawer-bd">
+      <div class="sec-t">基本信息</div>
+      <dl class="kv">
+        <dt>商品 ID</dt><dd>IT20260925001742</dd>
+        <dt>标题</dt><dd>高等数学（第七版）上下册 + 习题全解</dd>
+        <dt>分类</dt><dd>教材教辅 / 数学</dd>
+        <dt>成色</dt><dd><span class="tag g-a">A 几乎全新</span></dd>
+        <dt>价格</dt><dd>¥45 <span style="color:var(--text-3);">（原价 ¥78）</span></dd>
+        <dt>校区</dt><dd>西校区</dd>
+        <dt>面交点</dt><dd>二食堂南门（11:00–13:00 / 17:00–19:00）</dd>
+      </dl>
+      <div class="sec-t">图片</div>
+      <div class="pics"><div class="pic p2"></div><div class="pic p4"></div><div class="pic p6"></div></div>
+      <div class="sec-t">状态流转</div>
+      <div class="steps">
+        <span class="step done"><span class="dot">✓</span>草稿</span><span class="ln"></span>
+        <span class="step done"><span class="dot">✓</span>待审核</span><span class="ln"></span>
+        <span class="step cur"><span class="dot">3</span>在售</span><span class="ln"></span>
+        <span class="step"><span class="dot">4</span>已售出</span>
+      </div>
+      <div class="tl">
+        <div class="it"><span class="t">09-25 19:40</span><span class="c">提交审核</span></div>
+        <div class="it"><span class="t">09-25 20:06</span><span class="c">李审核 通过（用时 26 分钟，SLA 达标）</span></div>
+        <div class="it"><span class="t">09-26 09:15</span><span class="c">被浏览 128 次，收藏 9 次</span></div>
+      </div>
+      <div class="sec-t">可处置动作</div>
+      <div class="quote">仅可<b>下架</b>（卖家可自行重上架）或<b>强制下架</b>（记违规 + 扣分）。不支持编辑标题、价格、描述。</div>
+    </div>
+    <div class="drawer-ft">
+      <span style="font-size:var(--f-xs);color:var(--text-3);">破坏性操作需二次确认并写明影响范围</span>
+      <div class="right">
+        <button class="btn" data-close>关闭</button>
+        <button class="btn danger" data-perm="item.offline">下架该商品</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus · Y2K 复古回潮</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --cyan: #00D8FF;
+    --pink: #FF6FD8;
+    --lime: #C6FF3D;
+    --violet: #8A6BFF;
+    --deep: #1B1A4E;
+  }
+  body {
+    font-family: "Trebuchet MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--deep);
+    min-height: 100vh;
+    padding: 32px 24px 64px;
+    line-height: 1.6;
+    background:
+      radial-gradient(circle at 18% 12%, #FFFFFF 0%, rgba(255,255,255,0) 38%),
+      linear-gradient(170deg, #BFE6FF 0%, #DCD6FF 45%, #FFD9F2 100%);
+    background-attachment: fixed;
+    position: relative;
+  }
+  /* 透视网格：Y2K 数字未来的标志地板 */
+  body::before {
+    content: ""; position: fixed; inset: auto 0 0 0; height: 46vh; z-index: 0; pointer-events: none;
+    background:
+      repeating-linear-gradient(90deg, rgba(138,107,255,.30) 0 1px, transparent 1px 64px),
+      repeating-linear-gradient(0deg, rgba(138,107,255,.22) 0 1px, transparent 1px 40px);
+    -webkit-mask-image: linear-gradient(to top, #000, transparent);
+    mask-image: linear-gradient(to top, #000, transparent);
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; position: relative; z-index: 1; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .back {
+    text-decoration: none; color: #fff; font-size: 13px; font-weight: 700; letter-spacing: .06em;
+    padding: 10px 18px; border-radius: 999px;
+    background: linear-gradient(180deg, #9B7BFF, #6C46E8);
+    border: 1px solid rgba(255,255,255,.75);
+    box-shadow: 0 4px 0 #4B2EB0, inset 0 1px 0 rgba(255,255,255,.85);
+  }
+  .back:hover { transform: translateY(2px); box-shadow: 0 2px 0 #4B2EB0, inset 0 1px 0 rgba(255,255,255,.85); }
+  .tagline {
+    font-size: 11px; font-weight: 700; letter-spacing: .3em; color: #fff;
+    background: linear-gradient(90deg, var(--pink), var(--violet)); padding: 6px 14px; border-radius: 999px;
+  }
+
+  /* 塑料外壳：半透明 + 顶部白高光 + 外层发光 */
+  .shell-y2k {
+    background: linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.42));
+    border: 1.5px solid rgba(255,255,255,.95);
+    border-radius: 24px;
+    box-shadow: 0 10px 30px rgba(90,70,180,.22), inset 0 2px 0 rgba(255,255,255,1), inset 0 -2px 6px rgba(160,140,220,.28);
+    backdrop-filter: blur(6px);
+  }
+
+  .chrome {
+    background: linear-gradient(180deg, #FFFFFF 0%, #CFE4FF 34%, #7E8FC4 50%, #E9F2FF 62%, #FFFFFF 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    -webkit-text-stroke: 1px rgba(70,70,130,.35);
+  }
+
+  .winbar {
+    display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 24px 24px 0 0;
+    background: linear-gradient(90deg, #6C46E8, #00B7E4 55%, #FF6FD8);
+    border-bottom: 1.5px solid rgba(255,255,255,.8);
+  }
+  .winbar .b { width: 12px; height: 12px; border-radius: 3px; background: rgba(255,255,255,.9); box-shadow: inset 0 -2px 0 rgba(0,0,0,.15); }
+  .winbar .t { font-size: 11.5px; font-weight: 700; color: #fff; letter-spacing: .14em; }
+
+  .grid-main { display: grid; grid-template-columns: 240px 1fr; gap: 16px; align-items: start; }
+  .side { padding: 18px; }
+  .side .winbar { margin: -18px -18px 16px; border-radius: 24px 0 0 0; }
+
+  .logo { font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+  .logo small { display: block; font-size: 10.5px; letter-spacing: .28em; color: #6A66A8; font-weight: 700; margin-top: 4px; }
+
+  .nav a {
+    display: block; padding: 9px 12px; margin-bottom: 8px; border-radius: 12px; text-decoration: none;
+    color: var(--deep); font-size: 14px; font-weight: 700;
+    border: 1.5px solid rgba(255,255,255,.9);
+    background: linear-gradient(180deg, rgba(255,255,255,.85), rgba(226,232,255,.6));
+    box-shadow: inset 0 1px 0 #fff;
+  }
+  .nav a.active { background: linear-gradient(180deg, #FFE3F7, #FFC2EC); border-color: #fff; box-shadow: 0 3px 0 #D47BBB, inset 0 1px 0 #fff; }
+  .nav a:hover { background: linear-gradient(180deg, #DFF6FF, #B8E9FF); }
+
+  .main { padding: 20px 22px 24px; }
+  .main h1 { font-size: 30px; font-weight: 800; letter-spacing: -.01em; }
+  .sub { font-size: 12px; font-weight: 700; letter-spacing: .12em; color: #6A66A8; margin-top: 8px; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; }
+  .stat {
+    padding: 14px 16px; border-radius: 18px; text-align: center;
+    border: 1.5px solid rgba(255,255,255,.95);
+    box-shadow: 0 5px 0 rgba(120,100,200,.35), inset 0 2px 0 #fff;
+  }
+  .s1 { background: linear-gradient(180deg, #E6FBFF, #B6EEFF); }
+  .s2 { background: linear-gradient(180deg, #FFE9FA, #FFC4EE); }
+  .s3 { background: linear-gradient(180deg, #F2FFD6, #D6FF94); }
+  .stat .n { font-size: 27px; font-weight: 800; line-height: 1.1; }
+  .stat .l { font-size: 10.5px; font-weight: 700; letter-spacing: .2em; color: #5B579B; }
+
+  .cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px; }
+  .panel {
+    padding: 18px 20px; border-radius: 18px;
+    border: 1.5px solid rgba(255,255,255,.95);
+    background: linear-gradient(180deg, rgba(255,255,255,.82), rgba(238,240,255,.55));
+    box-shadow: 0 6px 0 rgba(120,100,200,.22), inset 0 2px 0 #fff;
+  }
+  .panel h2 {
+    font-size: 15px; font-weight: 800; display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1.5px dashed rgba(110,100,190,.4);
+  }
+  .chip {
+    font-size: 10px; font-weight: 700; letter-spacing: .16em; color: #fff; padding: 3px 10px; border-radius: 999px;
+    background: linear-gradient(90deg, var(--cyan), var(--violet));
+  }
+
+  .task { display: flex; align-items: center; gap: 12px; margin-bottom: 11px; }
+  .task .nm { font-size: 14px; font-weight: 700; width: 150px; }
+  .task .bar {
+    flex: 1; height: 12px; border-radius: 999px; overflow: hidden;
+    background: rgba(255,255,255,.75); border: 1.5px solid rgba(255,255,255,.95);
+    box-shadow: inset 0 1px 3px rgba(110,90,190,.25);
+  }
+  .task .bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #00D8FF, #FF6FD8, #C6FF3D); background-size: 220% 100%; }
+  .task .pct { font-size: 12px; font-weight: 800; width: 38px; text-align: right; color: #5B579B; }
+
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 11px; }
+  .av {
+    width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 12px; font-weight: 800; color: #fff;
+    border: 2px solid #fff; box-shadow: 0 2px 6px rgba(90,70,180,.35), inset 0 2px 0 rgba(255,255,255,.6);
+  }
+  .who div { font-size: 13px; font-weight: 700; }
+  .who div small { display: block; font-size: 10.5px; font-weight: 600; color: #6A66A8; letter-spacing: .05em; }
+
+  .cmd {
+    margin-top: 18px; display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 999px;
+    background: rgba(255,255,255,.85); border: 1.5px solid rgba(255,255,255,.95);
+    box-shadow: inset 0 2px 5px rgba(110,90,190,.22);
+  }
+  .cmd input { flex: 1; border: 0; outline: 0; background: transparent; font-family: inherit; font-size: 14px; font-weight: 700; color: var(--deep); }
+  .cmd input::placeholder { color: #9B97C8; }
+  .cmd button {
+    border: 1.5px solid #fff; font: inherit; font-weight: 800; font-size: 13px; color: #fff; cursor: pointer;
+    padding: 8px 22px; border-radius: 999px; background: linear-gradient(180deg, #FF8CE0, #D64BB5); box-shadow: 0 4px 0 #A82F8C;
+  }
+  .cmd button:hover { transform: translateY(2px); box-shadow: 0 2px 0 #A82F8C; }
+
+  .spark { position: absolute; width: 14px; height: 14px; z-index: 2; }
+  .spark::before, .spark::after { content: ""; position: absolute; inset: 0; background: #fff; clip-path: polygon(50% 0,58% 42%,100% 50%,58% 58%,50% 100%,42% 58%,0 50%,42% 42%); }
+  .spark::after { transform: scale(.55) rotate(45deg); opacity: .55; }
+  .sp1 { top: 6px; right: 40px; } .sp2 { top: 84px; left: -4px; } .sp3 { top: 22px; left: 46%; }
+
+  .note { margin-top: 22px; padding: 20px 22px; border-radius: 20px; }
+  .note h3 { font-size: 15px; font-weight: 800; margin-bottom: 12px; }
+  .note ul { margin-left: 18px; font-size: 13px; color: #36337A; }
+  .note li { margin-bottom: 7px; }
+  code { font-family: Consolas, monospace; font-size: 12px; padding: 2px 7px; border-radius: 6px; background: rgba(255,255,255,.9); border: 1px solid rgba(255,255,255,.95); color: #4A2FA0; }
+
+  @media (max-width: 900px) {
+    .grid-main, .cols { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+    .side .winbar { border-radius: 24px 24px 0 0; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="../index.html">← 返回目录</a>
+    <div class="tagline">STYLE 04 / Y2K RETRO</div>
+  </div>
+
+  <div class="grid-main">
+    <aside class="side shell-y2k">
+      <span class="spark sp2"></span>
+      <div class="winbar"><span class="b"></span><span class="b"></span><span class="b"></span><span class="t">NIMBUS 2000</span></div>
+      <div class="logo chrome">Nimbus<small>TEAM DASHBOARD</small></div>
+      <nav class="nav" style="margin-top:16px">
+        <a href="#" class="active">概览</a>
+        <a href="#">项目</a>
+        <a href="#">日程</a>
+        <a href="#">团队</a>
+        <a href="#">设置</a>
+      </nav>
+      <div class="panel" style="margin-top:14px;font-size:12px;font-weight:700">
+        MEMBER : 李明<br>STATUS : <span style="color:#D64BB5">BUSY</span><br>LOAD : 12 ITEMS
+      </div>
+    </aside>
+
+    <main class="main shell-y2k">
+      <span class="spark sp1"></span>
+      <h1 class="chrome">早上好，李明。</h1>
+      <p class="sub">SYSTEM DATE : 2026.09.25 — 3 DEADLINES APPROACHING</p>
+
+      <div class="stats">
+        <div class="stat s1"><div class="n">12</div><div class="l">PROJECTS</div></div>
+        <div class="stat s2"><div class="n">48</div><div class="l">TASKS</div></div>
+        <div class="stat s3"><div class="n">76%</div><div class="l">DONE</div></div>
+      </div>
+
+      <div class="cols">
+        <section class="panel">
+          <h2>进行中的任务 <span class="chip">WEEKLY</span></h2>
+          <div class="task"><span class="nm">设计系统 v3 重构</span><span class="bar"><i style="width:82%"></i></span><span class="pct">82%</span></div>
+          <div class="task"><span class="nm">组件库文档补全</span><span class="bar"><i style="width:56%"></i></span><span class="pct">56%</span></div>
+          <div class="task"><span class="nm">移动端适配核对</span><span class="bar"><i style="width:34%"></i></span><span class="pct">34%</span></div>
+          <div class="task"><span class="nm">无障碍走查</span><span class="bar"><i style="width:18%"></i></span><span class="pct">18%</span></div>
+          <form class="cmd" onsubmit="return false;">
+            <input placeholder="TYPE A COMMAND…">
+            <button>ENTER</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>团队 <span class="chip">5 ONLINE</span></h2>
+          <div class="who"><div class="av" style="background:linear-gradient(180deg,#FF9BE3,#C23FA8)">YL</div><div>杨岚<small>FRONTEND · EDITING</small></div></div>
+          <div class="who"><div class="av" style="background:linear-gradient(180deg,#7FE0FF,#2C8FD6)">ZK</div><div>张可<small>VISUAL · IN MEETING</small></div></div>
+          <div class="who"><div class="av" style="background:linear-gradient(180deg,#DFFF9B,#8BC63C)">WJ</div><div>王靖<small>PRODUCT · IDLE</small></div></div>
+          <div class="panel" style="margin-top:14px;font-size:12.5px;font-weight:700;line-height:1.9">
+            10:24 上传「组件规范_final2」<br>
+            09:50 评论「配色方案 A」<br>
+            YESTERDAY 完成 8 项任务
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="note shell-y2k">
+    <h3>风格实现要点</h3>
+    <ul>
+      <li>塑料外壳：垂直渐变半透明白 + <code>inset 0 2px 0 #fff</code> 顶部高光 + 底部同色系暗描边，做出"玻壳厚度"</li>
+      <li>Chrome 金属字：<code>background-clip: text</code> + 银蓝渐变（白→浅蓝→灰→白）+ <code>-webkit-text-stroke</code> 勾边</li>
+      <li>标配元素：渐变标题栏（Win98 窗体）、透视网格地板、星芒闪点、像素级大写微文案 + 大字母间距</li>
+      <li>配色锚点：青 #00D8FF / 品红 #FF6FD8 / 柠绿 #C6FF3D / 紫 #8A6BFF</li>
+      <li>毕设风险：潮流度最高，但<b>评委口味两极分化</b>，部分老师会认为"不够专业" —— 建议用在潮牌、音乐、亚文化类选题，别用在管理信息系统</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

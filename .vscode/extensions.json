@@ -1,0 +1,24 @@
+{
+  "recommendations": [
+    "Vue.volar",
+    "Vue.vscode-typescript-vue-plugin",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "EditorConfig.EditorConfig",
+    "eamodio.gitlens",
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-spring-boot",
+    "vscjava.vscode-maven",
+    "redhat.vscode-xml",
+    "bradlc.vscode-tailwindcss",
+    "ms-azuretools.vscode-docker",
+    "chencl1986.mysql-syntax",
+    "cweijan.vscode-database-client2",
+    "MS-CEINTL.vscode-language-pack-zh-hans",
+    "ZixuanWang.vscode-office"
+  ],
+  "unwantedRecommendations": [
+    "octref.vetur",
+    "ms-vscode.vscode-typescript-next"
+  ]
+}

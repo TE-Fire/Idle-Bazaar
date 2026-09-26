@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>校园二手交易平台 · 参考设计 Board</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #F4F4F6; color: #16171C; line-height: 1.6; padding: 40px 24px 72px;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; }
+  a { color: #35509E; }
+
+  header { margin-bottom: 34px; }
+  .eyebrow { font-size: 12px; letter-spacing: .22em; color: #8A8A93; font-weight: 600; }
+  h1 { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin: 8px 0 10px; }
+  .lead { font-size: 14px; color: #5A5A63; max-width: 780px; }
+  .tip { margin-top: 14px; font-size: 13px; color: #6A6A73; border-left: 3px solid #CFCFD8; padding-left: 12px; }
+
+  h2.sec {
+    font-size: 19px; font-weight: 600; letter-spacing: -.01em; margin: 40px 0 6px;
+    padding-top: 26px; border-top: 1px solid #E2E2E8;
+  }
+  .sec-lead { font-size: 13px; color: #6A6A73; margin-bottom: 20px; }
+
+  /* ── 方向卡片容器 ───────────────────── */
+  .grid-phones { display: flex; gap: 20px; flex-wrap: wrap; }
+  .pd { flex: 1 1 250px; min-width: 250px; background: #fff; border: 1px solid #E4E4EA; border-radius: 14px; padding: 16px; }
+  .pd-tag { font-size: 11px; letter-spacing: .16em; color: #9A9AA3; font-weight: 700; }
+  .pd-name { font-size: 16px; font-weight: 600; margin: 3px 0 2px; }
+  .pd-ref { font-size: 12px; color: #8A8A93; margin-bottom: 12px; }
+  .pd ul { margin: 14px 0 0 16px; font-size: 12.5px; color: #55555E; }
+  .pd li { margin-bottom: 5px; }
+
+  /* ── 手机外壳（共用骨架） ─────────────── */
+  .phone {
+    width: 100%; max-width: 240px; margin: 0 auto; height: 470px;
+    border-radius: 26px; overflow: hidden; position: relative;
+    display: flex; flex-direction: column; padding: 14px 12px 12px;
+  }
+  .bar { display: flex; justify-content: space-between; font-size: 10px; font-weight: 700; letter-spacing: .05em; padding: 0 4px 8px; }
+  .hd { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+  .hd small { display: block; font-size: 9.5px; font-weight: 500; letter-spacing: .04em; margin-top: 1px; }
+  .srch { font-size: 11px; padding: 7px 10px; margin-bottom: 8px; }
+  .chips { display: flex; gap: 5px; overflow: hidden; margin-bottom: 9px; }
+  .chips span, .chips b { font-size: 9.5px; padding: 3px 8px; white-space: nowrap; }
+  .feed { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; align-content: start; }
+  .feed .card { overflow: hidden; }
+  .feed .card:nth-child(even) { margin-top: 12px; }
+  .feed .img { display: block; width: 100%; height: 72px; }
+  .feed .t { font-size: 10px; font-weight: 600; line-height: 1.35; padding: 5px 6px 0; }
+  .feed .pr { display: flex; align-items: baseline; gap: 4px; padding: 3px 6px 0; }
+  .feed .pr b { font-size: 12px; font-weight: 800; }
+  .feed .pr span { font-size: 8px; padding: 1px 4px; }
+  .feed .who { display: block; font-size: 8.5px; padding: 2px 6px 6px; }
+  .tab {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 46px;
+    display: flex; align-items: center; justify-content: space-around; font-size: 9.5px; font-weight: 700;
+  }
+  .tab .pub { font-size: 17px; line-height: 1; }
+
+  /* m1 社区信息流型 · 闲鱼/转转/ Carousell */
+  .m1 { background: #fff; border: 1px solid #ECECEC; }
+  .m1 .bar { color: #9A9A9A; }
+  .m1 .hd { color: #16171C; } .m1 .hd small { color: #A0A0A0; }
+  .m1 .srch { background: #F3F3F5; color: #9A9A9A; border-radius: 8px; }
+  .m1 .chips b { background: #FF6A00; color: #fff; border-radius: 999px; }
+  .m1 .chips span { background: #F3F3F5; color: #6A6A6A; border-radius: 999px; }
+  .m1 .feed .card { background: #fff; border: 1px solid #EFEFEF; border-radius: 10px; }
+  .m1 .feed .i1 { background: linear-gradient(135deg,#FFD9A8,#FF9E5E); }
+  .m1 .feed .i2 { background: linear-gradient(135deg,#CFE3FF,#8FB8F6); }
+  .m1 .feed .i3 { background: linear-gradient(135deg,#D9F3D2,#8FD69B); }
+  .m1 .feed .i4 { background: linear-gradient(135deg,#EFDCFF,#BF9BE8); }
+  .m1 .feed .t { color: #23232A; }
+  .m1 .feed .pr b { color: #FF5500; } .m1 .feed .pr span { background: #FFF1E6; color: #C25A00; border-radius: 4px; }
+  .m1 .feed .who { color: #A0A0A0; }
+  .m1 .tab { background: #fff; border-top: 1px solid #EFEFEF; color: #A0A0A0; }
+  .m1 .tab b { color: #FF5500; }
+  .m1 .tab .pub { color: #fff; background: #FF6A00; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; }
+
+  /* m2 Depop 潮流社交型 */
+  .m2 { background: #fff; border: 1px solid #111; }
+  .m2 .bar { color: #111; }
+  .m2 .hd { color: #111; text-transform: none; } .m2 .hd small { color: #777; letter-spacing: .12em; }
+  .m2 .srch { border: 1.5px solid #111; color: #888; border-radius: 0; }
+  .m2 .chips b { background: #111; color: #D7F205; border-radius: 0; }
+  .m2 .chips span { border: 1.5px solid #ddd; color: #666; border-radius: 0; }
+  .m2 .feed { gap: 3px; }
+  .m2 .feed .card { background: #fff; border-radius: 0; }
+  .m2 .feed .card:nth-child(even) { margin-top: 0; }
+  .m2 .feed .img { height: 96px; border-radius: 0; }
+  .m2 .feed .i1 { background: linear-gradient(140deg,#2B2B2B,#6E6E6E); }
+  .m2 .feed .i2 { background: linear-gradient(140deg,#C8C8C8,#EFEFEF); }
+  .m2 .feed .i3 { background: linear-gradient(140deg,#3C3C3C,#111); }
+  .m2 .feed .i4 { background: linear-gradient(140deg,#E8E8E8,#BABABA); }
+  .m2 .feed .t { color: #111; letter-spacing: .02em; }
+  .m2 .feed .pr b { color: #111; } .m2 .feed .pr span { background: #D7F205; color: #111; }
+  .m2 .feed .who { color: #888; letter-spacing: .06em; text-transform: uppercase; }
+  .m2 .tab { background: #fff; border-top: 1.5px solid #111; color: #888; }
+  .m2 .tab b { color: #111; }
+  .m2 .tab .pub { color: #111; background: #D7F205; border: 1.5px solid #111; width: 28px; height: 28px; display: grid; place-items: center; }
+
+  /* m3 Claymorphism 校园亲和型 */
+  .m3 { background: #F3F1FF; }
+  .m3 .bar { color: #9C93C9; }
+  .m3 .hd { color: #3C3468; } .m3 .hd small { color: #9C93C9; }
+  .m3 .srch {
+    background: #FFFDFF; color: #B4ACE0; border-radius: 999px;
+    box-shadow: inset 0 -3px 0 rgba(140,120,220,.10), 0 6px 14px rgba(140,120,220,.16);
+  }
+  .m3 .chips b { background: #FFF6FB; color: #C4549B; border-radius: 999px; box-shadow: inset 0 -2px 0 rgba(190,120,180,.18); }
+  .m3 .chips span { background: #FFFDFF; color: #9389C4; border-radius: 999px; box-shadow: inset 0 -2px 0 rgba(140,120,220,.12); }
+  .m3 .feed { gap: 8px; }
+  .m3 .feed .card {
+    background: #FFFDFF; border-radius: 20px;
+    box-shadow: 0 8px 18px rgba(150,130,225,.22), inset 0 -3px 0 rgba(150,130,225,.14);
+  }
+  .m3 .feed .img { height: 70px; margin: 5px 5px 0; border-radius: 16px; }
+  .m3 .feed .i1 { background: linear-gradient(140deg,#FFE0C7,#FFB98C); }
+  .m3 .feed .i2 { background: linear-gradient(140deg,#DCE8FF,#A9C4FF); }
+  .m3 .feed .i3 { background: linear-gradient(140deg,#DEF7DE,#9ED89E); }
+  .m3 .feed .i4 { background: linear-gradient(140deg,#FBE0F5,#E3A9DE); }
+  .m3 .feed .t { color: #453D73; }
+  .m3 .feed .pr b { color: #C4549B; } .m3 .feed .pr span { background: #FDE9F6; color: #C4549B; border-radius: 999px; }
+  .m3 .feed .who { color: #B2AADB; }
+  .m3 .tab {
+    background: #FFFDFF; color: #B2AADB; border-radius: 22px; margin: 0 4px 4px; height: 42px;
+    box-shadow: 0 -4px 14px rgba(150,130,225,.14), inset 0 3px 0 #fff;
+  }
+  .m3 .tab b { color: #C4549B; }
+  .m3 .tab .pub { color: #fff; background: linear-gradient(160deg,#E58FD0,#C4549B); width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 4px 10px rgba(196,84,155,.35); }
+
+  /* m4 Neo-Brutalism 校园潮牌型 */
+  .m4 { background: #FFFDF5; background-image: radial-gradient(#111 1px, transparent 1px); background-size: 14px 14px; border: 2px solid #111; }
+  .m4 .bar { color: #111; }
+  .m4 .hd { color: #111; } .m4 .hd small { color: #555; }
+  .m4 .srch { background: #fff; border: 2px solid #111; color: #888; border-radius: 0; box-shadow: 3px 3px 0 #111; }
+  .m4 .chips b { background: #111; color: #FFE01B; border-radius: 0; border: 2px solid #111; }
+  .m4 .chips span { background: #fff; color: #111; border: 2px solid #111; border-radius: 0; }
+  .m4 .feed { gap: 7px; }
+  .m4 .feed .card { background: #fff; border: 2px solid #111; border-radius: 0; box-shadow: 3px 3px 0 #111; }
+  .m4 .feed .img { height: 66px; }
+  .m4 .feed .i1 { background: repeating-linear-gradient(45deg,#FFD34D 0 6px,#FFC000 6px 12px); }
+  .m4 .feed .i2 { background: repeating-linear-gradient(45deg,#7FC4FF 0 6px,#3B94E8 6px 12px); }
+  .m4 .feed .i3 { background: repeating-linear-gradient(45deg,#FF9BCB 0 6px,#FF5FA8 6px 12px); }
+  .m4 .feed .i4 { background: repeating-linear-gradient(45deg,#8CE8B0 0 6px,#2FBF6B 6px 12px); }
+  .m4 .feed .t { color: #111; font-weight: 800; }
+  .m4 .feed .pr b { color: #111; font-weight: 800; } .m4 .feed .pr span { background: #FFE01B; color: #111; border: 1.5px solid #111; }
+  .m4 .feed .who { color: #555; font-weight: 700; }
+  .m4 .tab { background: #FFE01B; border-top: 2.5px solid #111; color: #111; }
+  .m4 .tab b { text-decoration: underline; }
+  .m4 .tab .pub { color: #111; background: #fff; border: 2px solid #111; width: 28px; height: 28px; display: grid; place-items: center; box-shadow: 2px 2px 0 #111; }
+
+  /* ── 管理端（共用骨架） ───────────────── */
+  .adc { background: #fff; border: 1px solid #E4E4EA; border-radius: 14px; padding: 18px; margin-bottom: 22px; }
+  .adc-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .adc-head .tag { font-size: 11px; letter-spacing: .16em; color: #9A9AA3; font-weight: 700; }
+  .adc-head .nm { font-size: 16px; font-weight: 600; }
+  .adc-head .rf { font-size: 12px; color: #8A8A93; }
+  .adc > ul { margin: 14px 0 0 16px; font-size: 12.5px; color: #55555E; }
+
+  .adm { display: grid; grid-template-columns: 168px 1fr; gap: 14px; border-radius: 12px; padding: 14px; }
+  .adm .side { padding: 14px 12px; }
+  .adm .lg { font-size: 15px; font-weight: 700; margin-bottom: 14px; }
+  .adm .lg small { display: block; font-size: 9.5px; letter-spacing: .1em; font-weight: 500; margin-top: 2px; }
+  .adm .side nav span, .adm .side nav b { display: block; font-size: 11.5px; padding: 7px 10px; margin-bottom: 3px; }
+  .adm .main { padding: 14px 16px 16px; }
+  .adm .mh { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .adm .mh h3 { font-size: 15px; font-weight: 600; }
+  .adm .mh .pill { font-size: 10.5px; padding: 4px 10px; }
+  .adm .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }
+  .adm .k { padding: 11px 12px; }
+  .adm .k l { display: block; font-size: 10.5px; letter-spacing: .04em; }
+  .adm .k n { display: block; font-size: 19px; font-weight: 700; line-height: 1.3; }
+  .adm .k d { font-size: 10.5px; font-weight: 700; }
+  .adm .row { display: grid; grid-template-columns: 1.6fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .adm .pane { padding: 12px 13px; }
+  .adm .pane h4 { font-size: 12px; font-weight: 600; margin-bottom: 10px; }
+  .adm .lgd { display: flex; flex-wrap: wrap; gap: 8px; font-size: 10px; margin-top: 8px; }
+  .adm .lgd i { display: inline-block; width: 8px; height: 8px; margin-right: 4px; }
+  .adm .brow { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 11px; }
+  .adm .brow em { font-style: normal; width: 62px; flex: none; }
+  .adm .brow u { flex: 1; height: 8px; text-decoration: none; }
+  .adm .brow s { text-decoration: none; width: 34px; text-align: right; font-weight: 700; font-size: 10.5px; }
+  .adm .qrow { display: flex; justify-content: space-between; font-size: 11px; padding: 7px 0; }
+  .adm .qrow + .qrow { border-top-width: 1px; border-top-style: solid; }
+  .adm .qrow b { font-weight: 700; }
+
+  /* v1 Minimal Dark 指挥舱 */
+  .v1 { background: #0E0F13; }
+  .v1 .side { background: #14161B; border: 1px solid #23262E; border-radius: 10px; color: #7E8494; }
+  .v1 .lg { color: #E9EBF2; } .v1 .lg small { color: #5F6675; }
+  .v1 .side nav span { color: #8A90A0; border-radius: 7px; }
+  .v1 .side nav b { color: #E9EBF2; background: #1E222B; border-radius: 7px; font-weight: 600; }
+  .v1 .main { background: #14161B; border: 1px solid #23262E; border-radius: 10px; }
+  .v1 .mh h3 { color: #E9EBF2; }
+  .v1 .mh .pill { background: #1E222B; border: 1px solid #2C313C; color: #9AA2B2; border-radius: 999px; }
+  .v1 .k { background: #171A20; border: 1px solid #242831; border-radius: 10px; }
+  .v1 .k l { color: #7E8494; } .v1 .k n { color: #EFF1F7; }
+  .v1 .k d.up { color: #37D9A6; } .v1 .k d.dn { color: #FF6B81; } .v1 .k d.wn { color: #FFB44D; }
+  .v1 .pane { background: #171A20; border: 1px solid #242831; border-radius: 10px; color: #B7BDCB; }
+  .v1 .pane h4 { color: #E9EBF2; }
+  .v1 .qrow + .qrow { border-top-color: #242831; }
+  .v1 svg .grid { stroke: #232830; }
+  .v1 svg .line { stroke: #7C8CFF; }
+  .v1 svg .area { fill: rgba(124,140,255,.14); }
+  .v1 .brow em { color: #B7BDCB; }
+  .v1 .brow u { background: #20242D; }
+  .v1 .brow s { color: #9AA2B2; }
+  .v1 .c1 { background: #7C8CFF; } .v1 .c2 { background: #37D9A6; } .v1 .c3 { background: #FFB44D; }
+  .v1 .c4 { background: #FF6B81; } .v1 .c5 { background: #6FD2FF; }
+
+  /* v2 Light 卡片式分析台 */
+  .v2 { background: #F5F6FA; }
+  .v2 .side { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(30,40,80,.06); color: #64697A; }
+  .v2 .lg { color: #1B1D26; } .v2 .lg small { color: #9AA0B4; }
+  .v2 .side nav span { color: #6A7080; border-radius: 7px; }
+  .v2 .side nav b { color: #35509E; background: #EEF2FF; border-radius: 7px; font-weight: 600; }
+  .v2 .main { background: #fff; border-radius: 10px; box-shadow: 0 2px 8px rgba(30,40,80,.06); }
+  .v2 .mh h3 { color: #1B1D26; }
+  .v2 .mh .pill { background: #EEF2FF; color: #35509E; border-radius: 999px; font-weight: 600; }
+  .v2 .k { background: #FBFCFF; border: 1px solid #EAECF5; border-radius: 10px; }
+  .v2 .k l { color: #8A90A4; } .v2 .k n { color: #1B1D26; }
+  .v2 .k d.up { color: #12915F; } .v2 .k d.dn { color: #D13B4E; } .v2 .k d.wn { color: #C77A05; }
+  .v2 .pane { background: #FBFCFF; border: 1px solid #EAECF5; border-radius: 10px; color: #5A6172; }
+  .v2 .pane h4 { color: #1B1D26; }
+  .v2 .qrow + .qrow { border-top-color: #EFF1F7; }
+  .v2 svg .grid { stroke: #EDF0F7; }
+  .v2 svg .line { stroke: #3B6FE0; }
+  .v2 svg .area { fill: rgba(59,111,224,.10); }
+  .v2 .brow em { color: #5A6172; }
+  .v2 .brow u { background: #EEF1F9; }
+  .v2 .brow s { color: #6A7080; }
+  .v2 .c1 { background: #3B6FE0; } .v2 .c2 { background: #1BA57A; } .v2 .c3 { background: #F0A82E; }
+  .v2 .c4 { background: #D9536C; } .v2 .c5 { background: #16A6C8; }
+
+  /* v3 Neo-Brutalism 数据墙 */
+  .v3 { background: #FFFDF5; background-image: radial-gradient(#111 1px, transparent 1px); background-size: 18px 18px; }
+  .v3 .side { background: #FFE01B; border: 2.5px solid #111; border-radius: 8px; box-shadow: 4px 4px 0 #111; color: #111; }
+  .v3 .lg { color: #111; font-weight: 800; } .v3 .lg small { color: #444; }
+  .v3 .side nav span { color: #111; background: #FFFDF5; border: 2px solid #111; border-radius: 0; font-weight: 700; }
+  .v3 .side nav b { color: #111; background: #fff; border: 2px solid #111; border-radius: 0; box-shadow: 3px 3px 0 #111; font-weight: 800; }
+  .v3 .main { background: #fff; border: 2.5px solid #111; border-radius: 8px; box-shadow: 5px 5px 0 #111; }
+  .v3 .mh h3 { color: #111; font-weight: 800; }
+  .v3 .mh .pill { background: #FFE01B; border: 2.5px solid #111; color: #111; border-radius: 0; font-weight: 800; }
+  .v3 .k { border: 2.5px solid #111; border-radius: 0; box-shadow: 4px 4px 0 #111; background: #fff; }
+  .v3 .k:nth-child(1) { background: #8CE8B0; } .v3 .k:nth-child(3) { background: #9FD4FF; }
+  .v3 .k l { color: #333; font-weight: 700; } .v3 .k n { color: #111; font-weight: 800; }
+  .v3 .k d.up { color: #0B6B3A; } .v3 .k d.dn { color: #A32238; } .v3 .k d.wn { color: #7A4A00; }
+  .v3 .pane { border: 2.5px solid #111; border-radius: 0; box-shadow: 4px 4px 0 #111; background: #fff; color: #333; }
+  .v3 .pane h4 { color: #111; font-weight: 800; }
+  .v3 .qrow + .qrow { border-top-color: #111; border-top-width: 1.5px; }
+  .v3 svg .grid { stroke: #E4E0CE; }
+  .v3 svg .line { stroke: #111; }
+  .v3 svg .area { fill: rgba(255,224,27,.35); }
+  .v3 .brow em { color: #111; font-weight: 700; }
+  .v3 .brow u { background: #fff; border: 2px solid #111; }
+  .v3 .brow s { color: #111; }
+  .v3 .c1 { background: #111; } .v3 .c2 { background: #FF6A00; } .v3 .c3 { background: #FFE01B; border: 2px solid #111; }
+  .v3 .c4 { background: #4D9FFF; } .v3 .c5 { background: #00D394; }
+
+  .ref-tbl { width: 100%; border-collapse: collapse; font-size: 13px; background: #fff; border: 1px solid #E4E4EA; border-radius: 12px; overflow: hidden; }
+  .ref-tbl th, .ref-tbl td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #EFEFF3; vertical-align: top; }
+  .ref-tbl th { background: #FAFAFC; font-size: 12px; color: #6A6A73; font-weight: 600; }
+  .ref-tbl tr:last-child td { border-bottom: 0; }
+  .ref-tbl td b { font-weight: 600; }
+
+  .cols2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .box { background: #fff; border: 1px solid #E4E4EA; border-radius: 12px; padding: 16px 18px; }
+  .box h3 { font-size: 15px; font-weight: 600; margin-bottom: 10px; }
+  .box ol, .box ul { margin-left: 18px; font-size: 13px; color: #4A4A53; }
+  .box li { margin-bottom: 8px; }
+
+  @media (max-width: 900px) {
+    .cols2 { grid-template-columns: 1fr; }
+    .adm { grid-template-columns: 1fr; }
+    .adm .row { grid-template-columns: 1fr; }
+    .adm .kpis { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">GRADUATION PROJECT · CAMPUS SECOND-HAND MARKETPLACE</div>
+    <h1>参考设计 Board</h1>
+    <p class="lead">下面每个方向都用<b>完全相同的骨架与内容</b>渲染（同一套信息架构），差别只在视觉层。这样你看的是「风格差异」本身，而不是被内容差异干扰。</p>
+    <p class="tip">上半部分：用户端（移动端）4 个方向 · 下半部分：Web 管理端数据可视化 3 个方向。</p>
+  </header>
+
+  <h2 class="sec">用户端 · 移动端视觉方向</h2>
+  <p class="sec-lead">统一内容：问候 + 认证状态 / 搜索 / 分类 chips / 双列商品瀑布流 / 底部 5 Tab（含突出的发布入口）。</p>
+
+  <div class="grid-phones">
+
+    <div class="pd">
+      <div class="pd-tag">方向 A</div>
+      <div class="pd-name">社区信息流型</div>
+      <div class="pd-ref">参考：闲鱼 / 转转 / Carousell</div>
+      <div class="phone m1">
+        <div class="bar"><span>9:41</span><span>●●●</span></div>
+        <div class="hd">你好，王小明<small>XX 大学 · 学号已认证</small></div>
+        <div class="srch">搜索 教材 / 电动车 / 演唱会票</div>
+        <div class="chips"><b>全部</b><span>教材书籍</span><span>数码</span><span>电动车</span></div>
+        <div class="feed">
+          <div class="card"><i class="img i1"></i><p class="t">高等数学 第七版上册</p><div class="pr"><b>¥18</b><span>教材</span></div><span class="who">数理学院 · 李同学</span></div>
+          <div class="card"><i class="img i2"></i><p class="t">iPad 9 代 256G WiFi</p><div class="pr"><b>¥1250</b><span>数码</span></div><span class="who">设传学院 · 张同学</span></div>
+          <div class="card"><i class="img i3"></i><p class="t">雅迪电动车 八成新</p><div class="pr"><b>¥680</b><span>代步</span></div><span class="who">大四 · 王学长</span></div>
+          <div class="card"><i class="img i4"></i><p class="t">演唱会门票 内场 A 区</p><div class="pr"><b>¥420</b><span>票券</span></div><span class="who">经管学院 · 陈同学</span></div>
+        </div>
+        <div class="tab"><b>首页</b><span>分类</span><span class="pub">+</span><span>消息</span><span>我的</span></div>
+      </div>
+      <ul>
+        <li>橙色主色 + 白色分割，信息密度高</li>
+        <li>卡片圆角 + 浅灰细描边，双列瀑布流</li>
+        <li><b>最稳妥</b>，评委接受度高，但容易做成学生作业模板</li>
+        <li>适合功能数量多、要塞很多入口的方案</li>
+      </ul>
+    </div>
+
+    <div class="pd">
+      <div class="pd-tag">方向 B</div>
+      <div class="pd-name">潮流社交型</div>
+      <div class="pd-ref">参考：Depop / Instagram</div>
+      <div class="phone m2">
+        <div class="bar"><span>9:41</span><span>●●●</span></div>
+        <div class="hd">你好，王小明<small>XX 大学 · 学号已认证</small></div>
+        <div class="srch">搜索 教材 / 电动车 / 演唱会票</div>
+        <div class="chips"><b>全部</b><span>教材书籍</span><span>数码</span><span>电动车</span></div>
+        <div class="feed">
+          <div class="card"><i class="img i1"></i><p class="t">高等数学 第七版上册</p><div class="pr"><b>¥18</b><span>教材</span></div><span class="who">数理学院 · 李同学</span></div>
+          <div class="card"><i class="img i2"></i><p class="t">iPad 9 代 256G WiFi</p><div class="pr"><b>¥1250</b><span>数码</span></div><span class="who">设传学院 · 张同学</span></div>
+          <div class="card"><i class="img i3"></i><p class="t">雅迪电动车 八成新</p><div class="pr"><b>¥680</b><span>代步</span></div><span class="who">大四 · 王学长</span></div>
+          <div class="card"><i class="img i4"></i><p class="t">演唱会门票 内场 A 区</p><div class="pr"><b>¥420</b><span>票券</span></div><span class="who">经管学院 · 陈同学</span></div>
+        </div>
+        <div class="tab"><b>首页</b><span>分类</span><span class="pub">+</span><span>消息</span><span>我的</span></div>
+      </div>
+      <ul>
+        <li>黑白色为主 + 荧光点缀，图片极致优先</li>
+        <li>零圆角、紧间距、图片铺满，像图册</li>
+        <li>契合年轻群体，"卖的是卖家的审美"</li>
+        <li>风险：潮流类服饰好做，教材/数码类会偏冷感</li>
+      </ul>
+    </div>
+
+    <div class="pd">
+      <div class="pd-tag">方向 C</div>
+      <div class="pd-name">校园亲和型</div>
+      <div class="pd-ref">参考：Claymorphism / 学生工具类</div>
+      <div class="phone m3">
+        <div class="bar"><span>9:41</span><span>●●●</span></div>
+        <div class="hd">你好，王小明<small>XX 大学 · 学号已认证</small></div>
+        <div class="srch">搜索 教材 / 电动车 / 演唱会票</div>
+        <div class="chips"><b>全部</b><span>教材书籍</span><span>数码</span><span>电动车</span></div>
+        <div class="feed">
+          <div class="card"><i class="img i1"></i><p class="t">高等数学 第七版上册</p><div class="pr"><b>¥18</b><span>教材</span></div><span class="who">数理学院 · 李同学</span></div>
+          <div class="card"><i class="img i2"></i><p class="t">iPad 9 代 256G WiFi</p><div class="pr"><b>¥1250</b><span>数码</span></div><span class="who">设传学院 · 张同学</span></div>
+          <div class="card"><i class="img i3"></i><p class="t">雅迪电动车 八成新</p><div class="pr"><b>¥680</b><span>代步</span></div><span class="who">大四 · 王学长</span></div>
+          <div class="card"><i class="img i4"></i><p class="t">演唱会门票 内场 A 区</p><div class="pr"><b>¥420</b><span>票券</span></div><span class="who">经管学院 · 陈同学</span></div>
+        </div>
+        <div class="tab"><b>首页</b><span>分类</span><span class="pub">+</span><span>消息</span><span>我的</span></div>
+      </div>
+      <ul>
+        <li>大圆角 + 厚柔阴影 + 马卡龙色</li>
+        <li>心理距离最短，"不像在交易，像在借东西"</li>
+        <li>对新生 / 低年级学生最友好，降低发布门槛</li>
+        <li>缺点：商品多了会显"糊"，信息密度上不去</li>
+      </ul>
+    </div>
+
+    <div class="pd">
+      <div class="pd-tag">方向 D</div>
+      <div class="pd-name">校园潮牌型</div>
+      <div class="pd-ref">参考：Neo-Brutalism / 校园文创</div>
+      <div class="phone m4">
+        <div class="bar"><span>9:41</span><span>●●●</span></div>
+        <div class="hd">你好，王小明<small>XX 大学 · 学号已认证</small></div>
+        <div class="srch">搜索 教材 / 电动车 / 演唱会票</div>
+        <div class="chips"><b>全部</b><span>教材书籍</span><span>数码</span><span>电动车</span></div>
+        <div class="feed">
+          <div class="card"><i class="img i1"></i><p class="t">高等数学 第七版上册</p><div class="pr"><b>¥18</b><span>教材</span></div><span class="who">数理学院 · 李同学</span></div>
+          <div class="card"><i class="img i2"></i><p class="t">iPad 9 代 256G WiFi</p><div class="pr"><b>¥1250</b><span>数码</span></div><span class="who">设传学院 · 张同学</span></div>
+          <div class="card"><i class="img i3"></i><p class="t">雅迪电动车 八成新</p><div class="pr"><b>¥680</b><span>代步</span></div><span class="who">大四 · 王学长</span></div>
+          <div class="card"><i class="img i4"></i><p class="t">演唱会门票 内场 A 区</p><div class="pr"><b>¥420</b><span>票券</span></div><span class="who">经管学院 · 陈同学</span></div>
+        </div>
+        <div class="tab"><b>首页</b><span>分类</span><span class="pub">+</span><span>消息</span><span>我的</span></div>
+      </div>
+      <ul>
+        <li>粗黑描边 + 零模糊硬阴影 + 高饱和</li>
+        <li>校园文创 / 社团气质的调性，辨识度最强</li>
+        <li>天然高对比（无障碍友好）、零 GPU 开销</li>
+        <li>缺点：不能做"精致感"，部分评委嫌太闹</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <h2 class="sec">Web 管理端 · 数据可视化方向</h2>
+  <p class="sec-lead">统一内容：4 个 KPI / 成交额趋势 / 品类构成环图 / 学院活跃 TOP5 / 待处理队列。</p>
+
+  <!-- v1 -->
+  <div class="adc">
+    <div class="adc-head"><span class="tag">方向 X</span><span class="nm">指挥舱 · Minimal Dark</span><span class="rf">参考：Linear / Vercel Analytics</span></div>
+    <div class="adm v1">
+      <aside class="side">
+        <div class="lg">跳蚤校市<small>管理后台</small></div>
+        <nav><b>数据概览</b><span>用户管理</span><span>商品审核</span><span>订单管理</span><span>举报处理</span><span>权限设置</span></nav>
+      </aside>
+      <div class="main">
+        <div class="mh"><h3>数据概览</h3><span class="pill">近 7 日</span></div>
+        <div class="kpis">
+          <div class="k"><l>今日成交额</l><n>¥24,860</n><d class="up">▲ 18.2%</d></div>
+          <div class="k"><l>新增用户</l><n>342</n><d class="up">▲ 9.4%</d></div>
+          <div class="k"><l>在售商品</l><n>1,284</n><d class="dn">▼ 2.1%</d></div>
+          <div class="k"><l>待处理举报</l><n>17</n><d class="wn">需审核</d></div>
+        </div>
+        <div class="row">
+          <div class="pane">
+            <h4>成交额趋势</h4>
+            <svg viewBox="0 0 340 130" style="width:100%;height:118px">
+              <line class="grid" x1="0" y1="26" x2="340" y2="26" stroke-width="1"/>
+              <line class="grid" x1="0" y1="58" x2="340" y2="58" stroke-width="1"/>
+              <line class="grid" x1="0" y1="90" x2="340" y2="90" stroke-width="1"/>
+              <polygon class="area" points="0,104 48,84 96,96 144,58 192,68 240,34 288,46 340,18 340,120 0,120"/>
+              <polyline class="line" fill="none" stroke-width="2" points="0,104 48,84 96,96 144,58 192,68 240,34 288,46 340,18"/>
+              <circle cx="240" cy="34" r="3" class="c1" fill="#7C8CFF"/>
+            </svg>
+          </div>
+          <div class="pane">
+            <h4>品类构成</h4>
+            <svg viewBox="0 0 110 110" style="width:100%;height:96px">
+              <g transform="rotate(-90 55 55)">
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#242831" stroke-width="15"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#7C8CFF" stroke-width="15" stroke-dasharray="100 239"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#37D9A6" stroke-width="15" stroke-dasharray="65 239" stroke-dashoffset="-100"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#FFB44D" stroke-width="15" stroke-dasharray="45 239" stroke-dashoffset="-165"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#FF6B81" stroke-width="15" stroke-dasharray="29 239" stroke-dashoffset="-210"/>
+              </g>
+            </svg>
+            <div class="lgd"><span><i class="c1"></i>数码 36%</span><span><i class="c2"></i>教材 24%</span><span><i class="c3"></i>代步 16%</span><span><i class="c4"></i>其他 11%</span></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="pane">
+            <h4>学院活跃 TOP 5</h4>
+            <div class="brow"><em>计算机学院</em><u style="width:0"><span style="display:block;width:92%;height:100%" class="c1"></span></u><s>412</s></div>
+            <div class="brow"><em>经管学院</em><u style="width:0"><span style="display:block;width:74%;height:100%" class="c2"></span></u><s>331</s></div>
+            <div class="brow"><em>设传学院</em><u style="width:0"><span style="display:block;width:58%;height:100%" class="c3"></span></u><s>256</s></div>
+            <div class="brow"><em>数理学院</em><u style="width:0"><span style="display:block;width:41%;height:100%" class="c5"></span></u><s>187</s></div>
+            <div class="brow"><em>外语学院</em><u style="width:0"><span style="display:block;width:28%;height:100%" class="c4"></span></u><s>124</s></div>
+          </div>
+          <div class="pane">
+            <h4>待处理队列</h4>
+            <div class="qrow"><span>商品审核 · 数码</span><b>8</b></div>
+            <div class="qrow"><span>举报待裁定</span><b>6</b></div>
+            <div class="qrow"><span>价格异常预警</span><b>3</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul>
+      <li>深色底 + 发丝描边 + 数据色霓虹点， charts 的色彩对比最强</li>
+      <li>适合长时间盯屏，"专业感 / 克制感"最强</li>
+      <li>缺点：打印成论文附录会偏暗，截图进 PPT 需要重新调</li>
+      <li>图表上限明确：一屏 3–5 个图表，再多认知负担陡增</li>
+    </ul>
+  </div>
+
+  <!-- v2 -->
+  <div class="adc">
+    <div class="adc-head"><span class="tag">方向 Y</span><span class="nm">分析台 · Light Card</span><span class="rf">参考：Ant Design Pro / Metabase</span></div>
+    <div class="adm v2">
+      <aside class="side">
+        <div class="lg">跳蚤校市<small>管理后台</small></div>
+        <nav><b>数据概览</b><span>用户管理</span><span>商品审核</span><span>订单管理</span><span>举报处理</span><span>权限设置</span></nav>
+      </aside>
+      <div class="main">
+        <div class="mh"><h3>数据概览</h3><span class="pill">近 7 日</span></div>
+        <div class="kpis">
+          <div class="k"><l>今日成交额</l><n>¥24,860</n><d class="up">▲ 18.2%</d></div>
+          <div class="k"><l>新增用户</l><n>342</n><d class="up">▲ 9.4%</d></div>
+          <div class="k"><l>在售商品</l><n>1,284</n><d class="dn">▼ 2.1%</d></div>
+          <div class="k"><l>待处理举报</l><n>17</n><d class="wn">需审核</d></div>
+        </div>
+        <div class="row">
+          <div class="pane">
+            <h4>成交额趋势</h4>
+            <svg viewBox="0 0 340 130" style="width:100%;height:118px">
+              <line class="grid" x1="0" y1="26" x2="340" y2="26" stroke-width="1"/>
+              <line class="grid" x1="0" y1="58" x2="340" y2="58" stroke-width="1"/>
+              <line class="grid" x1="0" y1="90" x2="340" y2="90" stroke-width="1"/>
+              <polygon class="area" points="0,104 48,84 96,96 144,58 192,68 240,34 288,46 340,18 340,120 0,120"/>
+              <polyline class="line" fill="none" stroke-width="2" points="0,104 48,84 96,96 144,58 192,68 240,34 288,46 340,18"/>
+              <circle cx="240" cy="34" r="3" fill="#3B6FE0"/>
+            </svg>
+          </div>
+          <div class="pane">
+            <h4>品类构成</h4>
+            <svg viewBox="0 0 110 110" style="width:100%;height:96px">
+              <g transform="rotate(-90 55 55)">
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#EDF0F7" stroke-width="15"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#3B6FE0" stroke-width="15" stroke-dasharray="100 239"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#1BA57A" stroke-width="15" stroke-dasharray="65 239" stroke-dashoffset="-100"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#F0A82E" stroke-width="15" stroke-dasharray="45 239" stroke-dashoffset="-165"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#D9536C" stroke-width="15" stroke-dasharray="29 239" stroke-dashoffset="-210"/>
+              </g>
+            </svg>
+            <div class="lgd"><span><i class="c1"></i>数码 36%</span><span><i class="c2"></i>教材 24%</span><span><i class="c3"></i>代步 16%</span><span><i class="c4"></i>其他 11%</span></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="pane">
+            <h4>学院活跃 TOP 5</h4>
+            <div class="brow"><em>计算机学院</em><u style="width:0"><span style="display:block;width:92%;height:100%;border-radius:4px" class="c1"></span></u><s>412</s></div>
+            <div class="brow"><em>经管学院</em><u style="width:0"><span style="display:block;width:74%;height:100%;border-radius:4px" class="c2"></span></u><s>331</s></div>
+            <div class="brow"><em>设传学院</em><u style="width:0"><span style="display:block;width:58%;height:100%;border-radius:4px" class="c3"></span></u><s>256</s></div>
+            <div class="brow"><em>数理学院</em><u style="width:0"><span style="display:block;width:41%;height:100%;border-radius:4px" class="c5"></span></u><s>187</s></div>
+            <div class="brow"><em>外语学院</em><u style="width:0"><span style="display:block;width:28%;height:100%;border-radius:4px" class="c4"></span></u><s>124</s></div>
+          </div>
+          <div class="pane">
+            <h4>待处理队列</h4>
+            <div class="qrow"><span>商品审核 · 数码</span><b>8</b></div>
+            <div class="qrow"><span>举报待裁定</span><b>6</b></div>
+            <div class="qrow"><span>价格异常预警</span><b>3</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul>
+      <li>白底 + 柔和阴影卡片，中国 B 端最常见、最安全</li>
+      <li>打印/投影都不会翻车，论文附录截图友好</li>
+      <li>缺点：同质化严重，几乎每个毕设管理端都长这样</li>
+      <li>若走这条路，亮点必须放在<b>图表内容</b>（校园特有数据主题）而不是皮肤</li>
+    </ul>
+  </div>
+
+  <!-- v3 -->
+  <div class="adc">
+    <div class="adc-head"><span class="tag">方向 Z</span><span class="nm">数据墙 · Neo-Brutalism</span><span class="rf">参考：粗野主义数据可视化</span></div>
+    <div class="adm v3">
+      <aside class="side">
+        <div class="lg">跳蚤校市<small>管理后台</small></div>
+        <nav><b>数据概览</b><span>用户管理</span><span>商品审核</span><span>订单管理</span><span>举报处理</span><span>权限设置</span></nav>
+      </aside>
+      <div class="main">
+        <div class="mh"><h3>数据概览</h3><span class="pill">近 7 日</span></div>
+        <div class="kpis">
+          <div class="k"><l>今日成交额</l><n>¥24,860</n><d class="up">▲ 18.2%</d></div>
+          <div class="k"><l>新增用户</l><n>342</n><d class="up">▲ 9.4%</d></div>
+          <div class="k"><l>在售商品</l><n>1,284</n><d class="dn">▼ 2.1%</d></div>
+          <div class="k"><l>待处理举报</l><n>17</n><d class="wn">需审核</d></div>
+        </div>
+        <div class="row">
+          <div class="pane">
+            <h4>成交额趋势</h4>
+            <svg viewBox="0 0 340 130" style="width:100%;height:118px">
+              <line class="grid" x1="0" y1="26" x2="340" y2="26" stroke-width="1"/>
+              <line class="grid" x1="0" y1="58" x2="340" y2="58" stroke-width="1"/>
+              <line class="grid" x1="0" y1="90" x2="340" y2="90" stroke-width="1"/>
+              <polygon class="area" points="0,104 48,84 96,96 144,58 192,68 240,34 288,46 340,18 340,120 0,120"/>
+              <polyline class="line" fill="none" stroke-width="3" points="0,104 48,84 96,96 144,58 192,68 240,34 288,46 340,18"/>
+              <rect x="236" y="30" width="8" height="8" fill="#FF6A00" stroke="#111" stroke-width="2"/>
+            </svg>
+          </div>
+          <div class="pane">
+            <h4>品类构成</h4>
+            <svg viewBox="0 0 110 110" style="width:100%;height:96px">
+              <g transform="rotate(-90 55 55)">
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#FFF" stroke-width="15"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#FF6A00" stroke-width="15" stroke-dasharray="100 239"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#4D9FFF" stroke-width="15" stroke-dasharray="65 239" stroke-dashoffset="-100"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#FFE01B" stroke-width="15" stroke-dasharray="45 239" stroke-dashoffset="-165"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#00D394" stroke-width="15" stroke-dasharray="29 239" stroke-dashoffset="-210"/>
+                <circle cx="55" cy="55" r="38" fill="none" stroke="#111" stroke-width="1.5"/>
+              </g>
+            </svg>
+            <div class="lgd"><span><i class="c2"></i>数码 36%</span><span><i class="c4"></i>教材 24%</span><span><i class="c3"></i>代步 16%</span><span><i class="c5"></i>其他 11%</span></div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="pane">
+            <h4>学院活跃 TOP 5</h4>
+            <div class="brow"><em>计算机学院</em><u><span style="display:block;width:92%;height:100%" class="c1"></span></u><s>412</s></div>
+            <div class="brow"><em>经管学院</em><u><span style="display:block;width:74%;height:100%" class="c2"></span></u><s>331</s></div>
+            <div class="brow"><em>设传学院</em><u><span style="display:block;width:58%;height:100%" class="c3"></span></u><s>256</s></div>
+            <div class="brow"><em>数理学院</em><u><span style="display:block;width:41%;height:100%" class="c4"></span></u><s>187</s></div>
+            <div class="brow"><em>外语学院</em><u><span style="display:block;width:28%;height:100%" class="c5"></span></u><s>124</s></div>
+          </div>
+          <div class="pane">
+            <h4>待处理队列</h4>
+            <div class="qrow"><span>商品审核 · 数码</span><b>8</b></div>
+            <div class="qrow"><span>举报待裁定</span><b>6</b></div>
+            <div class="qrow"><span>价格异常预警</span><b>3</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul>
+      <li>粗黑描边 + 硬阴影 + 高饱和色块，数据像海报</li>
+      <li>和用户端走同一套语言时，<b>整套系统是"一套视觉"</b>，论文完整感最强</li>
+      <li>截图放进 PPT 非常出挑</li>
+      <li>风险：大面积高饱和刺眼，长时间看数据会累；评委口味两极</li>
+    </ul>
+  </div>
+
+  <h2 class="sec">现有真实产品参考（点进去自己看）</h2>
+  <p class="sec-lead">以上方向的对标原型。不要只看截图，要走一遍它们的发布流程和商品详情。</p>
+
+  <table class="ref-tbl">
+    <tr><th style="width:14%">产品</th><th style="width:20%">定位</th><th style="width:30%">视觉关键词</th><th style="width:36%">可借鉴的机制</th></tr>
+    <tr><td><b>闲鱼</b><br><a href="https://www.goofish.com" target="_blank">goofish.com</a></td><td>全品类闲置 + 兴趣社区</td><td>黄色主色，白色分割，高信息密度</td><td>鱼塘（兴趣聚合）· 信用分影响曝光 · 智能定价参考（暗色弱化显示成交区间）</td></tr>
+    <tr><td><b>转转</b><br><a href="https://www.zhuanzhuan.com" target="_blank">zhuanzhuan.com</a></td><td>3C 数码为主的专业二手</td><td>橙红主色，比闲鱼克制，分类优先级高</td><td>"分类"做成独立 Tab · 自建验机 + 质保 · 发布端图片编辑（美化/贴纸/马赛克）</td></tr>
+    <tr><td><b>多抓鱼</b><br><a href="https://www.duozhuayu.com" target="_blank">duozhuayu.com</a></td><td>垂直二手图书</td><td>低饱和、大留白、编辑排版感、近乎零装饰</td><td>统一成色评级→免去沟通成本 · 极强品类纪律 · 靠克制建立质感</td></tr>
+    <tr><td><b>Depop</b><br><a href="https://www.depop.com" target="_blank">depop.com</a></td><td>二手潮流服饰，Z 世代</td><td>极像 Instagram：双列正方形图，卖家自身出镜</td><td>卖家像经营自媒体 · 过滤器极细（品类/品牌/预算/尺码）· 社交式购物</td></tr>
+    <tr><td><b>Vinted</b><br><a href="https://www.vinted.com" target="_blank">vinted.com</a></td><td>欧洲最大二手服饰市场</td><td>明亮、干净、有效率感</td><td>卖家免费发布 + 买家保护费 · 通知与私信分离 · 强制标注尺码/成色/材质</td></tr>
+    <tr><td><b>Carousell</b><br><a href="https://www.carousell.com" target="_blank">carousell.com</a></td><td><b>校园起家</b> → 全品类</td><td>瀑布流 + 强分类入口 + "杂货店感"</td><td>App 核心是"聊聊"而非上架 · 校园 → 全品类的扩展路径 · 分类入口前置</td></tr>
+    <tr><td><b>Mercari / OfferUp / Poshmark</b></td><td>日 / 美本地交易</td><td>清单化 / 本地面交 / 社交拍卖</td><td>OfferUp 的本地面交机制 · Poshmark 的直播卖货</td></tr>
+  </table>
+
+  <h2 class="sec">两个待定问题的建议</h2>
+  <div class="cols2">
+    <div class="box">
+      <h3>小程序 or App？</h3>
+      <ol>
+        <li><b>时间紧 / 求稳</b>：微信小程序 + Web 管理端。这是同类毕设的标准配置，风险最低，扫码即可演示。</li>
+        <li><b>想加分</b>：用 <b>uni-app（或 Taro）</b>写一套代码，同时编译出小程序 + H5 + 安卓 APK。答辩时三端同屏，论文里能写成"多端一致性方案"，明显比单做一个假 App 扎实。</li>
+        <li><b>共同的坑</b>：微信支付要商户资质，个人主体基本申请不下来。毕设通用解法是做<b>模拟支付 + 线下交付</b>（线下自提反而贴合校园场景）。</li>
+        <li>登录用 <code>wx.login</code> 一键获取；在此之上加<b>学号/校园邮箱二次认证</b>，这是校园平台最有说服力的一张牌。</li>
+      </ol>
+    </div>
+    <div class="box">
+      <h3>管理端可视化做什么才有亮点？</h3>
+      <ul>
+        <li><b>学期时间轴对比</b>：学期初 / 学期末 / 毕业季三个流量峰值，做成年度热力条</li>
+        <li><b>学院 × 品类热力矩阵</b>：哪个学院在交易什么，这是纯校园才有的数据故事</li>
+        <li><b>面交所热力图</b>：校内地图上的交易热点地点（楼栋 / 宿舍区）</li>
+        <li><b>循环率指标卡</b>：二手循环带来的减碳估算，ESG 角度很出挑</li>
+        <li><b>预警区</b>：异常交易 / 刷量 / 价格异常，运营动作入口（这块功能本身也能写论文）</li>
+        <li>图表数量控制在<b>一屏 3–5 个</b>，再多阅读成本陡增</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="tip" style="margin-top:24px">配套文档：<a href="现有产品与设计参考.md">现有产品与设计参考.md</a>（含竞品表格全文、灵感检索入口、选题判断）。另外可复用 <a href="../ui-styles/UI视觉构成要素体系.md">../ui-styles/UI视觉构成要素体系.md</a> 的六层架构来写论文的视觉设计章节。</p>
+  <p class="tip">若用户端还要做 Web 版，看 <a href="用户端Web版board.html">用户端Web版board.html</a>（Web 端 4 个方向 + 响应式断点 + 三端 Token 统一策略）。</p>
+
+</div>
+</body>
+</html>

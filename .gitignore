@@ -1,0 +1,113 @@
+# ══════════════════════════════════════════════════════════════
+# 校园二手交易平台 campus-market
+# 覆盖：Windows / VSCode / Java-Maven(Spring Boot) / Node-pnpm-Vite / uni-app
+# ══════════════════════════════════════════════════════════════
+
+# ── 操作系统 ───────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# ── VSCode ─────────────────────────────────────────────────
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.vscode-test/
+.history/
+
+# ── 其他 IDE（防止混用 IntelliJ 时污染）────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+.project
+.classpath
+.settings/
+
+# ── Java / Maven（Spring Boot）─────────────────────────────
+target/
+build/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+*.class
+*.log
+*.log.*
+hs_err_pid*
+replay_pid*
+.flattened-pom.xml
+
+# ── Node / pnpm / Vite ─────────────────────────────────────
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml.bak
+package-lock.json.bak
+dist/
+dist-ssr/
+dist/build/
+.vite/
+.vite-opt/
+.cache/
+.temp/
+.tmp/
+coverage/
+*.local
+.eslintcache
+.stylelintcache
+.rpt2_cache/
+.serverless/
+.webpack/
+
+# ── uni-app / 小程序 ───────────────────────────────────────
+unpackage/
+.hbuilderx/
+.hbuilderx
+project.config.json.bak
+project.private.config.json
+
+# ── 环境变量与密钥（禁止入库）──────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.keystore
+*.jks
+secrets.yml
+application-prod.yml
+application-secret.yml
+application-prod.properties
+
+# ── 项目本地产物与运行时数据 ───────────────────────────────
+uploads/
+storage/
+**/logs/
+logs/
+*.sql.bak
+dump-*.sql
+*.dump
+docker-data/
+.workbuddy/

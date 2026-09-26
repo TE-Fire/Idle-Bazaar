@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A8 数据报表 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+<style>
+.weekrow{display:flex;gap:3px;align-items:center;}
+.weekrow .lb{width:56px;font-size:11px;color:var(--text-2);flex:0 0 auto;}
+.cell-w{width:26px;height:22px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text-3);}
+.w0{background:#F5F7FA;} .w1{background:#E6F0FF;color:#1F1F26;}
+.w2{background:#BAE0FF;color:#1F1F26;} .w3{background:#69B1FF;color:#fff;} .w4{background:#1677FF;color:#fff;}
+.campus{position:relative;height:280px;background:#F7F9FC;border:1px solid var(--border);border-radius:var(--r-md);overflow:hidden;}
+.blk{position:absolute;border:1px solid #D7DEE9;border-radius:4px;background:#EEF3FA;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-2);}
+.hot{position:absolute;border-radius:50%;background:rgba(229,72,77,.18);border:1px solid rgba(229,72,77,.45);display:flex;align-items:center;justify-content:center;font-size:11px;color:#9B1C1F;font-weight:600;}
+.area{width:100%;height:150px;display:block;}
+</style>
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi on" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">数据报表</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">张</span><span>张主任<br><span class="rl js-role-name">超级管理员</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="notice info">
+        本页承载<b>校园独有的四张可视化牌</b>：学期时间轴对比、学院 × 品类热力矩阵、校内面交所热力、二手循环率（减碳）。
+        这是本设计相对通用二手平台的差异化点，也是论文的主要论据来源。
+      </div>
+
+      <!-- 图 1 学期时间轴 -->
+      <div class="card">
+        <div class="card-hd">
+          <h3>① 学期时间轴对比</h3><span class="sub">校历周 × 发布/成交强度，可对比两学期</span>
+          <div class="right"><div class="seg"><button class="on">2026 秋</button><button>2026 春</button><button>两学期对比</button></div></div>
+        </div>
+        <div class="card-bd">
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            <div class="weekrow">
+              <span class="lb">发布量</span>
+              <span class="cell-w w3">186</span><span class="cell-w w4">214</span><span class="cell-w w3">162</span><span class="cell-w w2">96</span>
+              <span class="cell-w w1">64</span><span class="cell-w w1">58</span><span class="cell-w w2">88</span><span class="cell-w w1">71</span>
+              <span class="cell-w w1">66</span><span class="cell-w w2">92</span><span class="cell-w w1">74</span><span class="cell-w w1">69</span>
+              <span class="cell-w w2">101</span><span class="cell-w w3">148</span><span class="cell-w w3">172</span><span class="cell-w w4">236</span>
+              <span class="cell-w w4">268</span><span class="cell-w w3">154</span>
+            </div>
+            <div class="weekrow">
+              <span class="lb">成交量</span>
+              <span class="cell-w w2">52</span><span class="cell-w w3">61</span><span class="cell-w w2">47</span><span class="cell-w w1">28</span>
+              <span class="cell-w w1">19</span><span class="cell-w w1">16</span><span class="cell-w w1">25</span><span class="cell-w w1">21</span>
+              <span class="cell-w w1">18</span><span class="cell-w w1">27</span><span class="cell-w w1">22</span><span class="cell-w w1">20</span>
+              <span class="cell-w w2">33</span><span class="cell-w w2">44</span><span class="cell-w w3">58</span><span class="cell-w w3">72</span>
+              <span class="cell-w w4">86</span><span class="cell-w w2">49</span>
+            </div>
+            <div class="weekrow" style="padding-top:2px;">
+              <span class="lb"></span>
+              <span class="cell-w w0" style="border:0;">W1</span><span class="cell-w w0" style="border:0;">W2</span><span class="cell-w w0" style="border:0;">W3</span><span class="cell-w w0" style="border:0;">W4</span>
+              <span class="cell-w w0" style="border:0;">W5</span><span class="cell-w w0" style="border:0;">W6</span><span class="cell-w w0" style="border:0;">W7</span><span class="cell-w w0" style="border:0;">W8</span>
+              <span class="cell-w w0" style="border:0;">W9</span><span class="cell-w w0" style="border:0;">W10</span><span class="cell-w w0" style="border:0;">W11</span><span class="cell-w w0" style="border:0;">W12</span>
+              <span class="cell-w w0" style="border:0;">W13</span><span class="cell-w w0" style="border:0;">W14</span><span class="cell-w w0" style="border:0;">W15</span><span class="cell-w w0" style="border:0;">W16</span>
+              <span class="cell-w w0" style="border:0;">W17</span><span class="cell-w w0" style="border:0;">W18</span>
+            </div>
+          </div>
+
+          <div style="margin-top:var(--s-4);">
+            <svg class="line" viewBox="0 0 900 150" preserveAspectRatio="none">
+              <line x1="40" y1="120" x2="880" y2="120" stroke="#E5E7EB"/>
+              <line x1="40" y1="80" x2="880" y2="80" stroke="#F0F0F4" stroke-dasharray="4 4"/>
+              <line x1="40" y1="40" x2="880" y2="40" stroke="#F0F0F4" stroke-dasharray="4 4"/>
+              <polygon points="60,26 106,18 152,31 198,58 244,71 290,74 336,60 382,67 428,69 474,57 520,66 566,68 612,52 658,34 704,27 750,14 796,10 842,32"
+                       fill="#1677FF" fill-opacity="0.12" stroke="#1677FF" stroke-width="2"/>
+              <polyline points="60,88 106,84 152,91 198,104 244,110 290,112 336,106 382,109 428,110 474,105 520,108 566,109 612,102 658,95 704,92 750,86 796,84 842,96"
+                        fill="none" stroke="#0FA968" stroke-width="2"/>
+              <g font-size="10" fill="#9A9AA4">
+                <text x="52" y="138">W1</text><text x="240" y="138">W5</text><text x="428" y="138">W9</text><text x="616" y="138">W13</text><text x="812" y="138">W18</text>
+                <text x="0" y="124">0</text><text x="0" y="44">300</text>
+              </g>
+              <g font-size="10" fill="#8A5A00">
+                <text x="46" y="16" fill="#FF8F1F">▲ 学期初（教材教辅）</text>
+                <text x="700" y="16" fill="#FF8F1F">▲ 期末 / 毕业季</text>
+              </g>
+            </svg>
+          </div>
+          <div class="legend"><span><i style="background:#1677FF;"></i>发布量</span><span><i style="background:#0FA968;"></i>成交量</span><span style="color:var(--text-3);">三个峰值：学期初（教材教辅）、期末（笔记资料 / 小电器）、毕业季（大件生活用品）</span></div>
+        </div>
+        <div class="foot">数据口径：x = 校历周（18 周 + 假期），y = 件数；系列 = 发布量 / 成交量。毕业季峰值出现在春季学期 W16–W18。</div>
+      </div>
+
+      <!-- 图 2 学院 × 品类 -->
+      <div class="card">
+        <div class="card-hd">
+          <h3>② 学院 × 品类热力矩阵</h3><span class="sub">行 = 学院（12）· 列 = 品类（8）· 值 = 成交量</span>
+          <div class="right"><div class="seg"><button class="on">成交量</button><button>发布量</button><button>成交率</button></div></div>
+        </div>
+        <div class="card-bd" style="overflow-x:auto;">
+          <table class="hm">
+            <thead>
+              <tr><th class="l">学院 \ 品类</th><th class="c">教材</th><th class="c">数码</th><th class="c">生活</th><th class="c">服饰</th><th class="c">运动</th><th class="c">图书</th><th class="c">乐器</th><th class="c">其他</th></tr>
+            </thead>
+            <tbody>
+              <tr><td class="cat">计算机学院</td><td class="w2">28</td><td class="w4">142</td><td class="w2">31</td><td class="w1">12</td><td class="w1">18</td><td class="w2">44</td><td class="w0">3</td><td class="w1">8</td></tr>
+              <tr><td class="cat">机械工程学院</td><td class="w3">64</td><td class="w3">58</td><td class="w3">52</td><td class="w1">14</td><td class="w2">36</td><td class="w1">22</td><td class="w0">4</td><td class="w1">13</td></tr>
+              <tr><td class="cat">经济管理学院</td><td class="w4">96</td><td class="w2">34</td><td class="w2">40</td><td class="w2">38</td><td class="w1">15</td><td class="w3">61</td><td class="w0">2</td><td class="w1">9</td></tr>
+              <tr><td class="cat">艺术学院</td><td class="w2">26</td><td class="w2">41</td><td class="w2">33</td><td class="w4">88</td><td class="w1">9</td><td class="w2">29</td><td class="w4">54</td><td class="w2">21</td></tr>
+              <tr><td class="cat">外国语学院</td><td class="w3">72</td><td class="w1">19</td><td class="w2">28</td><td class="w2">31</td><td class="w0">6</td><td class="w4">84</td><td class="w1">7</td><td class="w1">11</td></tr>
+              <tr><td class="cat">材料学院</td><td class="w3">58</td><td class="w2">27</td><td class="w3">49</td><td class="w1">11</td><td class="w1">17</td><td class="w2">35</td><td class="w0">2</td><td class="w1">10</td></tr>
+              <tr><td class="cat">土木工程学院</td><td class="w3">61</td><td class="w2">24</td><td class="w3">56</td><td class="w1">10</td><td class="w2">26</td><td class="w1">23</td><td class="w0">1</td><td class="w1">14</td></tr>
+              <tr><td class="cat">生命科学学院</td><td class="w3">54</td><td class="w1">16</td><td class="w2">38</td><td class="w1">12</td><td class="w1">14</td><td class="w2">42</td><td class="w0">2</td><td class="w1">7</td></tr>
+              <tr><td class="cat">物理学院</td><td class="w3">49</td><td class="w2">33</td><td class="w1">21</td><td class="w0">8</td><td class="w1">11</td><td class="w2">38</td><td class="w0">3</td><td class="w0">5</td></tr>
+              <tr><td class="cat">化学化工学院</td><td class="w3">52</td><td class="w1">18</td><td class="w3">47</td><td class="w1">9</td><td class="w1">13</td><td class="w2">31</td><td class="w0">1</td><td class="w1">12</td></tr>
+              <tr><td class="cat">法学院</td><td class="w3">67</td><td class="w1">15</td><td class="w1">22</td><td class="w2">26</td><td class="w0">7</td><td class="w3">58</td><td class="w0">2</td><td class="w0">6</td></tr>
+              <tr><td class="cat">医学院</td><td class="w4">92</td><td class="w1">20</td><td class="w2">30</td><td class="w1">13</td><td class="w0">8</td><td class="w3">66</td><td class="w0">2</td><td class="w1">9</td></tr>
+            </tbody>
+          </table>
+          <div class="hscale"><span>低</span><span class="bar"></span><span>高</span><span style="margin-left:var(--s-3);">故事：计算机学院出数码、艺术学院出画材乐器、医学院与法学院集中出教材与笔记——这是<b>纯粹的数据故事</b>，可指导品类运营与首页推荐位。</span></div>
+        </div>
+      </div>
+
+      <!-- 图 3 + 图 4 -->
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hd"><h3>③ 校内面交所热力</h3><span class="sub">简化楼栋轮廓，不用真实地图</span></div>
+          <div class="card-bd">
+            <div class="campus">
+              <div class="blk" style="left:6%;top:14%;width:26%;height:30%;">图书馆</div>
+              <div class="blk" style="left:40%;top:8%;width:24%;height:22%;">教学楼 A</div>
+              <div class="blk" style="left:70%;top:12%;width:24%;height:26%;">实验楼</div>
+              <div class="blk" style="left:8%;top:58%;width:22%;height:30%;">三食堂</div>
+              <div class="blk" style="left:36%;top:52%;width:26%;height:24%;">二食堂</div>
+              <div class="blk" style="left:68%;top:52%;width:26%;height:34%;">西区宿舍 7 号</div>
+              <div class="hot" style="left:12%;top:64%;width:52px;height:52px;">68</div>
+              <div class="hot" style="left:17%;top:22%;width:44px;height:44px;">52</div>
+              <div class="hot" style="left:42%;top:58%;width:44px;height:44px;">41</div>
+              <div class="hot" style="left:74%;top:62%;width:34px;height:34px;">29</div>
+              <div class="hot" style="left:78%;top:24%;width:30px;height:30px;">12</div>
+              <div style="position:absolute;left:8px;bottom:6px;font-size:10px;color:var(--text-3);">圆圈大小 = 近 7 日成交笔数；红圈越深表示越接近/超出承载建议</div>
+            </div>
+            <div class="legend"><span><span class="tag fail">三食堂 68 笔 / 建议 50</span></span><span style="color:var(--text-3);">过载点建议增设时段或新增点位</span></div>
+            <div class="foot" style="border:0;padding:var(--s-3) 0 0;">合规说明：使用简化楼栋轮廓而非真实地图底图，规避地图数据合规风险；如需导航能力另接地图 SDK。</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-hd">
+            <h3>④ 二手循环率与减碳</h3>
+            <div class="right"><button class="btn sm" data-open="mCarbon">查看估算假设</button></div>
+          </div>
+          <div class="card-bd">
+            <div style="display:flex;gap:var(--s-6);align-items:center;">
+              <div>
+                <div style="font-size:var(--f-xs);color:var(--text-2);">二手循环率</div>
+                <div style="font-size:38px;font-weight:600;line-height:1.1;">62.4<small style="font-size:var(--f-base);color:var(--text-2);">%</small></div>
+                <div style="font-size:var(--f-xs);color:var(--text-3);">循环 1,842 件 / 发布 2,951 件</div>
+              </div>
+              <div>
+                <div style="font-size:var(--f-xs);color:var(--text-2);">估算减碳量</div>
+                <div style="font-size:38px;font-weight:600;line-height:1.1;color:var(--st-pass);">9.7<small style="font-size:var(--f-base);color:var(--text-2);">t CO₂e</small></div>
+                <div style="font-size:var(--f-xs);color:var(--text-3);">本学期累计（估算）</div>
+              </div>
+            </div>
+
+            <svg class="area" viewBox="0 0 460 150" preserveAspectRatio="none" style="margin-top:var(--s-3);">
+              <line x1="34" y1="120" x2="455" y2="120" stroke="#E5E7EB"/>
+              <line x1="34" y1="80" x2="455" y2="80" stroke="#F0F0F4" stroke-dasharray="4 4"/>
+              <line x1="34" y1="40" x2="455" y2="40" stroke="#F0F0F4" stroke-dasharray="4 4"/>
+              <polygon points="44,104 96,98 148,88 200,74 252,66 304,54 356,44 408,36 452,28"
+                       fill="#0FA968" fill-opacity="0.12" stroke="#0FA968" stroke-width="2"/>
+              <g font-size="10" fill="#9A9AA4">
+                <text x="36" y="138">W1</text><text x="240" y="138">W10</text><text x="430" y="138">W18</text>
+                <text x="8" y="124">0</text><text x="0" y="44">10t</text>
+              </g>
+            </svg>
+            <div class="legend"><span><i style="background:#0FA968;"></i>累计估算减碳（t CO₂e）</span><span style="color:var(--text-3);">随毕业季陡增</span></div>
+
+            <div class="notice warn" style="margin-top:var(--s-3);">
+              <span>减碳量为<b>估算值</b>，非实测：系数取自公开生命周期评价（LCA）文献的量级参考，按品类平均单件重量折算，未考虑运输、使用年限与个体差异。论文中须标注为「估算假设」，不得作为精确结论。</span>
+              <button class="btn link sm" style="margin-left:auto;white-space:nowrap;" data-open="mCarbon">系数与假设</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 审核时效 SLA 明细 -->
+      <div class="card">
+        <div class="card-hd"><h3>审核时效 SLA · 按审核员</h3><span class="sub">运营效率指标，与看板同源</span></div>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead><tr><th>审核员</th><th style="width:110px;" class="num">处置量</th><th style="width:130px;" class="num">平均首审</th><th style="width:110px;" class="num">P95</th><th style="width:110px;" class="num">达标率</th><th style="width:110px;" class="num">超时件</th><th style="width:110px;">结论</th></tr></thead>
+            <tbody>
+              <tr><td>李审核</td><td class="num">286</td><td class="num">24 分钟</td><td class="num">4.2 h</td><td class="num">97.6%</td><td class="num">1</td><td><span class="tag pass">达标</span></td></tr>
+              <tr><td>王审核</td><td class="num">241</td><td class="num">31 分钟</td><td class="num">5.1 h</td><td class="num">95.8%</td><td class="num">2</td><td><span class="tag pass">达标</span></td></tr>
+              <tr><td>陈审核（兼职）</td><td class="num">98</td><td class="num">58 分钟</td><td class="num">7.4 h</td><td class="num" style="color:var(--st-pending);">91.2%</td><td class="num" style="color:var(--st-fail);">6</td><td><span class="tag pending">待改进</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="foot">SLA 阈值：首审 ≤ 2 小时达标、P95 ≤ 6 小时、达标率 ≥ 95%、超 24 小时记积压。阈值可在「系统设置 · SLA 配置」调整。</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 减碳估算假设 -->
+<div class="modal-mask" id="mCarbon" style="display:none;">
+  <div class="modal">
+    <div class="modal-hd">减碳估算的系数与假设</div>
+    <div class="modal-bd">
+      <div class="notice warn">以下系数为<b>估算假设值</b>，用于趋势展示与横向比较，<b>非本校实测数据</b>。论文中须原样标注该声明，避免被质疑数据真实性。</div>
+      <table class="tbl compact">
+        <thead><tr><th>品类</th><th class="num">系数（kg CO₂e / 件）</th><th>依据（量级参考）</th></tr></thead>
+        <tbody>
+          <tr><td>教材教辅</td><td class="num">0.8</td><td class="minor">纸张生产与印刷，单本约 0.3–0.5 kg</td></tr>
+          <tr><td>数码电子</td><td class="num">25.0</td><td class="minor">电子产品制造阶段碳足迹占比最高</td></tr>
+          <tr><td>服饰鞋包</td><td class="num">3.0</td><td class="minor">纺织与成衣加工</td></tr>
+          <tr><td>生活用品</td><td class="num">5.0</td><td class="minor">日用杂货平均单件</td></tr>
+          <tr><td>图书笔记</td><td class="num">0.6</td><td class="minor">手写笔记按纸张计</td></tr>
+          <tr><td>运动户外 / 乐器 / 其他</td><td class="num">2.0</td><td class="minor">保守取低值</td></tr>
+        </tbody>
+      </table>
+      <div style="font-size:var(--f-xs);color:var(--text-2);line-height:1.8;">
+        <b>计算公式</b>　估算减碳（kg）= Σ（各品类循环成交件数 × 对应系数）<br>
+        <b>三条已知局限</b><br>
+        ① 未计入交易过程中的运输与包装排放（校园面交场景下单次运输接近零，但仍未量化）；<br>
+        ② 未区分商品实际剩余使用寿命，默认二手件替代一件新品的全部制造排放，属上限估计；<br>
+        ③ 系数为公开 LCA 文献量级参考，未经本校样本校验，仅用于横向趋势比较。<br>
+        <b>改进方向</b>　后续可接入校内问卷抽样，按品类实测平均重量与替代率，替换为本地化系数。
+      </div>
+    </div>
+    <div class="modal-ft"><button class="btn pri" data-close>知道了</button></div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+</body>
+</html>

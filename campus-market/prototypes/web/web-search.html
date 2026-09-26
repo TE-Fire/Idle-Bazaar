@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · Web 端 P5 搜索结果</title>
+<link rel="stylesheet" href="web.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input value="考研数学" placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk">消息<span class="dot">3</span></a>
+      <a class="lnk">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a>
+    <a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a><a>其他闲置</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell">
+  <!-- 左侧常驻筛选（与首页同一套组件） -->
+  <aside class="side">
+    <div class="fgrp">
+      <h4>分类 <span>清空</span></h4>
+      <ul class="tree">
+        <li><a class="on">教材教辅</a></li>
+        <li>
+          <ul class="sub">
+            <li><a class="on">考研资料</a></li>
+            <li><a>大一大二公共课</a></li>
+            <li><a>专业课</a></li>
+            <li><a>四六级 / 考证</a></li>
+          </ul>
+        </li>
+        <li><a>数码电子</a></li>
+        <li><a>自行车 / 电动车</a></li>
+        <li><a>宿舍家具</a></li>
+      </ul>
+    </div>
+    <div class="fgrp">
+      <h4>价格区间</h4>
+      <div class="prange"><input value="0"><i>—</i><input value="200"></div>
+      <div class="slider"><span class="fill"></span><span class="knob k1"></span><span class="knob k2"></span></div>
+    </div>
+    <div class="fgrp">
+      <h4>成色</h4>
+      <label class="chk"><input type="checkbox" checked> 全新未拆</label>
+      <label class="chk"><input type="checkbox" checked> 几乎全新</label>
+      <label class="chk"><input type="checkbox"> 轻微使用痕迹</label>
+      <label class="chk"><input type="checkbox"> 明显使用痕迹</label>
+    </div>
+    <div class="fgrp">
+      <h4>校区</h4>
+      <label class="chk"><input type="checkbox" checked> 中心校区</label>
+      <label class="chk"><input type="checkbox"> 东区</label>
+      <label class="chk"><input type="checkbox"> 西区</label>
+      <label class="chk"><input type="checkbox"> 南苑</label>
+    </div>
+    <div class="fgrp">
+      <h4>卖家</h4>
+      <label class="chk"><input type="checkbox"> 只看学号认证</label>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="crumb"><b>首页</b> / 搜索「考研数学」</div>
+
+    <!-- 搜索词区 -->
+    <div class="panel" style="margin-bottom:var(--s-4);">
+      <div class="ph-body" style="display:flex;align-items:center;gap:var(--s-4);">
+        <div>
+          <div style="font-size:var(--f-lg);font-weight:800;">考研数学</div>
+          <div class="mini">共 1,286 件相关商品 · 用时 0.03 秒</div>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:var(--s-2);flex-wrap:wrap;justify-content:flex-end;">
+          <span class="chip">数学一</span>
+          <span class="chip">张宇</span>
+          <span class="chip">李永乐</span>
+          <span class="chip">汤家凤</span>
+          <span class="chip">真题</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chips">
+      <span class="lb">已选：</span>
+      <span class="chip">教材教辅 › 考研资料 ×</span>
+      <span class="chip">价格 0–200 ×</span>
+      <span class="chip">中心校区 ×</span>
+      <span class="chip">成色 A / B ×</span>
+      <a class="mini" style="margin-left:var(--s-2);">清空全部</a>
+    </div>
+
+    <div class="toolbar">
+      <span class="n">共 <b>1286</b> 件</span>
+      <span class="sp"></span>
+      <select class="sel">综合排序</select>
+      <select class="sel">发布时间</select>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="ph"><div class="pic p5 a" style="width:100%;height:100%;">教材</div><div class="pic p3 b" style="width:100%;height:100%;">内页</div><span class="tag hot">急出</span><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">考研数学一全套 张宇+李永乐 全新未拆封</div>
+          <div class="pr"><b>¥35</b><s>¥128</s></div>
+          <div class="mt"><span class="cond a">A 全新未拆</span>中心校区</div>
+        </div>
+        <div class="ft"><span class="av"></span>陈学长<span class="sch">3 小时前</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p3 a" style="width:100%;height:100%;">真题</div><div class="pic p5 b" style="width:100%;height:100%;">目录</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">考研数学真题大全解 1987-2025 含解析</div>
+          <div class="pr"><b>¥42</b><s>¥98</s></div>
+          <div class="mt"><span class="cond b">B 几乎全新</span>中心校区</div>
+        </div>
+        <div class="ft"><span class="av"></span>上岸的小赵<span class="sch">昨天</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p4 a" style="width:100%;height:100%;">笔记</div><div class="pic p6 b" style="width:100%;height:100%;">手写</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">数学一 高分手写笔记 130+ 上岸自用</div>
+          <div class="pr"><b>¥88</b></div>
+          <div class="mt"><span class="cond b">B 几乎全新</span>东区</div>
+        </div>
+        <div class="ft"><span class="av"></span>数学狗<span class="sch">2 天前</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p1 a" style="width:100%;height:100%;">教材</div><div class="pic p8 b" style="width:100%;height:100%;">封面</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">李永乐线性代数辅导讲义 2026 版</div>
+          <div class="pr"><b>¥18</b><s>¥45</s></div>
+          <div class="mt"><span class="cond c">C 轻微使用</span>中心校区</div>
+        </div>
+        <div class="ft"><span class="av"></span>阿刘<span class="sch">3 天前</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p5 a" style="width:100%;height:100%;">教材</div><div class="pic p2 b" style="width:100%;height:100%;">全套</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">考研数学三 全套教材+练习册 九成新</div>
+          <div class="pr"><b>¥60</b><s>¥210</s></div>
+          <div class="mt"><span class="cond b">B 几乎全新</span>西区</div>
+        </div>
+        <div class="ft"><span class="av"></span>经院学姐<span class="sch">4 天前</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p7 a" style="width:100%;height:100%;">习题</div><div class="pic p4 b" style="width:100%;height:100%;">内页</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">张宇 1000 题 全新 只写了前 20 页</div>
+          <div class="pr"><b>¥25</b><s>¥68</s></div>
+          <div class="mt"><span class="cond a">A 全新未拆</span>中心校区</div>
+        </div>
+        <div class="ft"><span class="av"></span>小林<span class="sch">5 天前</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p8 a" style="width:100%;height:100%;">教材</div><div class="pic p3 b" style="width:100%;height:100%;">目录</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">高等数学 同济七版 上下册 带笔记</div>
+          <div class="pr"><b>¥15</b><s>¥76</s></div>
+          <div class="mt"><span class="cond d">D 明显使用</span>南苑</div>
+        </div>
+        <div class="ft"><span class="av"></span>大四清仓<span class="sch">6 天前</span></div>
+      </div>
+      <div class="card">
+        <div class="ph"><div class="pic p3 a" style="width:100%;height:100%;">模拟卷</div><div class="pic p5 b" style="width:100%;height:100%;">试卷</div><span class="cmp">＋对比</span></div>
+        <div class="bd">
+          <div class="tt">考研数学模拟卷合集 8 套 未拆封</div>
+          <div class="pr"><b>¥22</b><s>¥64</s></div>
+          <div class="mt"><span class="cond a">A 全新未拆</span>中心校区</div>
+        </div>
+        <div class="ft"><span class="av"></span>卷王<span class="sch">1 周前</span></div>
+      </div>
+    </div>
+
+    <div class="pager">
+      <a>上一页</a><a class="on">1</a><a>2</a><a>3</a><a>4</a><a>5</a><span class="gap">…</span><a>161</a><a>下一页</a>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <div>
+    <b>P5 搜索结果。</b>复用 P1 首页骨架（侧栏 + chips + 工具条 + 网格），只多出「搜索词 + 相关词」区——同一套组件、不同数据源，正是共用基础组件的价值。
+  </div>
+  <span class="x">原型 · 纯 HTML/CSS</span>
+</div>
+
+</body>
+</html>

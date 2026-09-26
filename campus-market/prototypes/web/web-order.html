@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · Web 端 P8 订单详情</title>
+<link rel="stylesheet" href="web.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk">消息<span class="dot">3</span></a>
+      <a class="lnk on">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a>
+    <a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a><a>其他闲置</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell narrow">
+  <div class="main">
+    <div class="crumb"><b>首页</b> / 我的 / 我买到的 / 订单详情</div>
+
+    <!-- 状态步骤条 -->
+    <div class="steps">
+      <div class="st done"><span class="dot">✓</span><span class="tx">拍下<small>09-26 09:14</small></span></div>
+      <span class="line done"></span>
+      <div class="st done"><span class="dot">✓</span><span class="tx">已付款<small>模拟支付 ¥1,580</small></span></div>
+      <span class="line done"></span>
+      <div class="st now"><span class="dot">3</span><span class="tx">待面交<small>09-27 10:30</small></span></div>
+      <span class="line"></span>
+      <div class="st"><span class="dot">4</span><span class="tx">扫码核销 + 确认收货<small>当面验货</small></span></div>
+      <span class="line"></span>
+      <div class="st"><span class="dot">5</span><span class="tx">互评<small>完成后 7 天内</small></span></div>
+    </div>
+
+    <div style="display:flex;gap:var(--s-5);align-items:flex-start;margin-top:var(--s-4);">
+      <!-- 左 -->
+      <div style="flex:1;min-width:0;">
+
+        <div class="panel">
+          <div class="ph-head">商品<span class="sub">订单号 #202609260914</span></div>
+          <div class="ph-body">
+            <div style="display:flex;gap:var(--s-4);align-items:center;">
+              <div class="pic p2" style="width:96px;height:72px;border-radius:var(--r-md);flex:0 0 auto;">iPad</div>
+              <div style="flex:1;min-width:0;">
+                <div style="font-size:var(--f-md);font-weight:600;">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+                <div class="mt" style="font-size:var(--f-xs);color:var(--t-3);margin-top:6px;display:flex;gap:var(--s-3);">
+                  <span class="cond b">B 几乎全新</span><span>中心校区</span><span>图书馆一楼中庭</span>
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:var(--f-xl);color:var(--c-price);font-weight:800;">¥1,580</div>
+                <div class="mini">共 1 件</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph-head">面交信息</div>
+          <div class="ph-body">
+            <dl class="kv">
+              <dt>面交点</dt><dd>图书馆一楼中庭（校内监控覆盖）</dd>
+              <dt>时间</dt><dd>2026-09-27（周六）10:30</dd>
+              <dt>卖家</dt><dd>阿刘 · 计算机学院 · 学号已认证</dd>
+              <dt>备注</dt><dd>卖家带原装充电器与保护壳，买家当场验机</dd>
+            </dl>
+            <div class="mini" style="margin-top:var(--s-3);padding:var(--s-3);background:#F7F7F9;border-radius:var(--r-md);">
+              <b>扫码核销在小程序端完成。</b>Web 端没有摄像头场景，这里只做状态展示与备注补充；见面时请在小程序打开本订单，出示二维码由对方扫码核销。
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph-head">金额</div>
+          <div class="ph-body">
+            <dl class="kv">
+              <dt>商品价</dt><dd>¥1,580</dd>
+              <dt>平台服务费</dt><dd style="color:var(--c-ok);">¥0（校内免收）</dd>
+              <dt>实付</dt><dd style="color:var(--c-price);font-weight:800;font-size:var(--f-lg);">¥1,580</dd>
+              <dt>支付方式</dt><dd>模拟支付（线下交付）</dd>
+            </dl>
+            <div class="mini" style="margin-top:var(--s-3);">
+              平台不承接真实资金流：下单即视为线下交易约定，见面验货后确认收货。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右 -->
+      <div style="flex:0 0 300px;">
+        <div class="panel">
+          <div class="ph-head">当前状态</div>
+          <div class="ph-body">
+            <div style="font-size:var(--f-xl);font-weight:800;color:var(--t-1);">待面交</div>
+            <div class="mini" style="margin-top:4px;">距约定时间还有 1 天 1 小时</div>
+            <div style="display:flex;flex-direction:column;gap:var(--s-2);margin-top:var(--s-4);">
+              <button class="btn pri lg">确认收货</button>
+              <button class="btn lg">申请退款</button>
+              <button class="btn lg">联系卖家</button>
+            </div>
+            <div class="mini" style="margin-top:var(--s-3);">
+              确认收货前请务必当面验货。验货不通过可当场取消，<b>不计违约</b>。
+            </div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="ph-head">规则说明</div>
+          <div class="ph-body">
+            <div class="mini">
+              · <b>无预定机制</b>：拍下后 30 分钟内未付款，订单自动取消；付款前商品不锁定，谁先付款归谁。<br>
+              · 付款成功后商品转为「已售出」，其他人的待付款订单自动取消并收到通知。<br>
+              · 已进入「待面交」后取消需双方确认，单方取消记一次违约，影响信用等级。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <div>
+    <b>P8 订单详情。</b>Web 端负责「把交易推进到待面交」，最后一步（扫码核销、当面验货、确认收货）在手机完成。
+    <ul>
+      <li>已取消「已预定」商品状态：拍下不锁货，付款才占位，避免一物多卖的复杂状态</li>
+      <li>订单金额一律按标价成交（议价不进入订单数据模型）</li>
+    </ul>
+  </div>
+  <span class="x">原型 · 纯 HTML/CSS</span>
+</div>
+
+</body>
+</html>

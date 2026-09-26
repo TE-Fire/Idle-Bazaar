@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序端原型目录</title>
+<style>
+:root{
+  --c-brand:#FF6A00; --c-brand-bg:#FFF1E6; --c-brand-text:#C25A00;
+  --c-bg:#F5F5F6; --c-surface:#FFFFFF; --c-border:#E8E8EC; --c-border-strong:#DCDCE2;
+  --t-1:#1F1F26; --t-2:#5E5E68; --t-3:#9A9AA4; --c-ok:#0FA968;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;font-size:14px;line-height:1.6;
+     color:var(--t-1);background:var(--c-bg);padding:32px 20px 60px;-webkit-font-smoothing:antialiased;}
+.wrap{max-width:900px;margin:0 auto;}
+h1{font-size:24px;font-weight:800;letter-spacing:-.01em;}
+.sub{color:var(--t-2);font-size:13px;margin-top:6px;}
+.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.meta span{font-size:12px;color:var(--t-2);background:var(--c-surface);border:1px solid var(--c-border);
+           border-radius:6px;padding:3px 10px;}
+h2{font-size:16px;font-weight:700;margin:32px 0 12px;padding-bottom:8px;border-bottom:1px solid var(--c-border);}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+a.card{
+  display:block;background:var(--c-surface);border:1px solid var(--c-border);border-radius:10px;
+  padding:14px 16px;text-decoration:none;color:inherit;transition:transform .18s ease-out,box-shadow .18s ease-out;
+}
+a.card:hover{transform:translateY(-3px);box-shadow:0 4px 14px rgba(20,20,30,.10);border-color:var(--c-border-strong);}
+a.card .hd{display:flex;align-items:center;gap:8px;}
+a.card .no{font-size:11px;font-weight:700;color:#fff;background:var(--c-brand);border-radius:4px;padding:2px 7px;}
+a.card .nm{font-size:15px;font-weight:600;}
+a.card .pp{font-size:12px;color:var(--t-3);margin-top:4px;}
+a.card .ds{font-size:12px;color:var(--t-2);margin-top:8px;line-height:1.7;}
+a.card .go{font-size:12px;color:var(--c-brand-text);font-weight:600;margin-top:10px;}
+table{width:100%;border-collapse:collapse;background:var(--c-surface);border:1px solid var(--c-border);border-radius:10px;overflow:hidden;}
+th,td{text-align:left;padding:10px 14px;font-size:13px;border-bottom:1px solid var(--c-border);vertical-align:top;}
+th{background:#FAFAFB;font-weight:600;color:var(--t-2);font-size:12px;}
+tr:last-child td{border-bottom:none;}
+td b{font-weight:600;}
+.tag{display:inline-block;font-size:11px;font-weight:600;color:var(--c-ok);background:#E8F8F0;border-radius:4px;padding:1px 6px;}
+.foot{margin-top:36px;font-size:12px;color:var(--t-3);line-height:1.9;}
+.foot code{background:var(--c-surface);border:1px solid var(--c-border);border-radius:4px;padding:1px 5px;font-size:11px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>跳蚤校园 · 微信小程序端原型</h1>
+  <div class="sub">按业务优先级顺序产出：M1 首页 → M2 详情 → M5 消息 → M8 订单 → M3 发布 → M6 我的 → M10 认证 → M9 个人主页</div>
+  <div class="meta">
+    <span>方向：A 社区信息流型（闲鱼 / 转转 / Carousell）</span>
+    <span>主色：橙 #FF6A00</span>
+    <span>基准屏 375×812</span>
+    <span>纯 HTML + CSS，无 JS</span>
+    <span>v1.0 · 2026-09-26</span>
+  </div>
+
+  <h2>页面原型</h2>
+  <div class="grid">
+    <a class="card" href="home.html">
+      <div class="hd"><span class="no">M1</span><span class="nm">首页信息流</span></div>
+      <div class="pp">pages/index/index</div>
+      <div class="ds">金刚区（单色描边）+ 兴趣频道 + 双列瀑布流 + 悬浮发布按钮 + TabBar。首屏即内容，3 秒内可见 ≥4 件。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="detail.html">
+      <div class="hd"><span class="no">M2</span><span class="nm">商品详情</span></div>
+      <div class="pp">pages/item/detail</div>
+      <div class="ds">图集 + 价格盒 + 成色/校区/面交点 + 卖家卡（认证 + 信用等级）+ 面交静态地图 + 底部操作条。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="chat-list.html">
+      <div class="hd"><span class="no">M5-1</span><span class="nm">消息 · 会话列表</span></div>
+      <div class="pp">pages/chat/list</div>
+      <div class="ds">三分区：私信 / 系统通知 / 交易通知。规避「通知与私信混在一个收件匣」的可用性坑。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="chat.html">
+      <div class="hd"><span class="no">M5-2</span><span class="nm">消息 · 聊天页</span></div>
+      <div class="pp">pages/chat/detail</div>
+      <div class="ds">快捷短语 + <b>面交约定卡</b>（地点 / 时间 / 备注直接回填订单）。议价只在聊天里口头进行，订单金额一律按标价成交。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="order.html">
+      <div class="hd"><span class="no">M8</span><span class="nm">订单详情</span></div>
+      <div class="pp">pages/order/detail</div>
+      <div class="ds">状态时间轴 + 面交点 + <b>订单二维码核销</b>（移动端独占）+ 当面验货规则 + 确认收货。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="publish.html">
+      <div class="hd"><span class="no">M3</span><span class="nm">发布闲置</span></div>
+      <div class="pp">pages/publish/index</div>
+      <div class="ds">轻量发布：选图 ≤9 + 一屏 5 字段 + 更多选项收起 + 提交送审；引导批量发布去 Web 端。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="me.html">
+      <div class="hd"><span class="no">M6</span><span class="nm">我的</span></div>
+      <div class="pp">pages/me/index</div>
+      <div class="ds">信用等级（不暴露分数）+ 待办区前置（审核结果 / 待确认订单）+ 资产入口 + 认证入口。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="verify.html">
+      <div class="hd"><span class="no">M10</span><span class="nm">学号认证</span></div>
+      <div class="pp">pages/verify/index</div>
+      <div class="ds">表单 + 凭证上传 + 审核状态 + 常见驳回原因。学号不对外展示，只展示「已认证」+ 学院。</div>
+      <div class="go">打开 →</div>
+    </a>
+
+    <a class="card" href="user.html">
+      <div class="hd"><span class="no">M9</span><span class="nm">个人主页</span></div>
+      <div class="pp">pages/user/index</div>
+      <div class="ds">认证 / 学院 / 成交数 / 好评率 / 信用等级前置 + 买家评价 + TA 的在售。</div>
+      <div class="go">打开 →</div>
+    </a>
+  </div>
+
+  <h2>本次拍板的三项决策</h2>
+  <table>
+    <tr><th style="width:26%;">未决问题</th><th style="width:20%;">决策</th><th>落地方式（保持可扩展）</th></tr>
+    <tr>
+      <td>微信订阅消息</td>
+      <td><b>不接入</b></td>
+      <td>改为<b>站内消息中心</b>：三分区（私信 / 系统通知 / 交易通知），红点与角标在站内模拟。后续若申请到模板，由服务端下发后在「系统通知」区同源展示，<b>UI 不需改版</b>。</td>
+    </tr>
+    <tr>
+      <td>面交导航 / 第三方地图</td>
+      <td><b>不调起</b></td>
+      <td>地图区做成<b>静态校园示意图</b>（楼栋轮廓 + 路网 + 定位 pin），保持「地图容器 + 导航按钮」的组件拆分。后续接入只需把导航按钮换成 <code>wx.openLocation</code>，版式与数据字段不变。</td>
+    </tr>
+    <tr>
+      <td>信用分是否对外可见</td>
+      <td><b>只显示等级</b></td>
+      <td>对外呈现「信用高 / 中 / 低」+ 三格进度条，<b>不暴露具体分数</b>，避免攀比与刷分。分数仅管理端可见，用于搜索权重与人工审核判定（低于 60 分强制人工审核）。</td>
+    </tr>
+  </table>
+
+  <h2>说明</h2>
+  <div class="foot">
+    · 原型尺寸 <code>375×812</code>，CSS 以 px 呈现：<code>1pt = 1px = 2rpx</code>，落地时数值 ×2 写 rpx。<br>
+    · 样式集中在 <code>mini.css</code>（Token 唯一出处，来自 <code>design/02-移动端小程序-UI设计规范.md</code>），各页面只写结构，不写死色值。<br>
+    · 交互为纯 CSS（<code>:active</code> 按压态、radio 切换分区），无 JS，可直接静态托管演示。<br>
+    · 业务流程依据 <code>business/02-移动端小程序-业务与流程.md</code>；视觉依据 <code>design/02</code>；状态机以 <code>business/03-管理端</code> 为准。<br>
+    · 图片均为本地 CSS 占位块，无外网依赖。
+  </div>
+
+</div>
+</body>
+</html>

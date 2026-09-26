@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A7 内容管理 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi on" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">内容管理</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">王</span><span>王运营<br><span class="rl js-role-name">运营</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="notice info">
+        这四张字典是<b>全端一致性的源头</b>：必须由后台下发，三端不得本地硬编码。任何改动经「发布」后对 Web / 小程序 / 管理端同时生效，并记入操作日志。
+      </div>
+
+      <div class="card">
+        <div class="card-hd" style="border-bottom:0;">
+          <div class="seg" id="tabs">
+            <button class="on" data-tab="c1">分类树</button>
+            <button data-tab="c2">成色等级 A–D</button>
+            <button data-tab="c3">面交点</button>
+            <button data-tab="c4">学院与校区</button>
+          </div>
+          <div class="right"><button class="btn sm" data-perm="content.edit">发布改动</button></div>
+        </div>
+
+        <!-- 分类树 -->
+        <div class="pane" id="c1">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>一级分类</th><th>二级分类</th><th style="width:100px;">商品数</th><th style="width:96px;">状态</th><th style="width:140px;">排序</th><th style="width:160px;" class="num">操作</th></tr></thead>
+              <tbody>
+                <tr><td>教材教辅</td><td>公共课 / 专业课 / 考研资料 / 习题集</td><td class="num">412</td><td><span class="tag pass">启用</span></td><td>1 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>数码电子</td><td>手机平板 / 电脑配件 / 键盘鼠标 / 影音</td><td class="num">356</td><td><span class="tag pass">启用</span></td><td>2 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>生活用品</td><td>宿舍家电 / 家具 / 洗漱 / 收纳</td><td class="num">298</td><td><span class="tag pass">启用</span></td><td>3 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>服饰鞋包</td><td>男装 / 女装 / 鞋 / 箱包</td><td class="num">204</td><td><span class="tag pass">启用</span></td><td>4 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>运动户外</td><td>球类 / 健身 / 骑行 / 露营</td><td class="num">131</td><td><span class="tag pass">启用</span></td><td>5 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>图书笔记</td><td>课外读物 / 手抄笔记 / 试卷资料</td><td class="num">176</td><td><span class="tag pass">启用</span></td><td>6 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>乐器</td><td>吉他 / 键盘乐器 / 民族乐器</td><td class="num">58</td><td><span class="tag pass">启用</span></td><td>7 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>其他</td><td>—</td><td class="num">92</td><td><span class="tag off">停用</span></td><td>8 ↑ ↓</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link" data-perm="content.edit">启用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">两级分类，一级 8 个。停用后不影响已发布商品的历史数据，仅对新发布生效。</div>
+        </div>
+
+        <!-- 成色等级 -->
+        <div class="pane" id="c2" style="display:none;">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th style="width:72px;">等级</th><th style="width:150px;">文案</th><th>判定说明</th><th style="width:120px;">色值（Token）</th><th style="width:110px;">商品数</th><th style="width:160px;" class="num">操作</th></tr></thead>
+              <tbody>
+                <tr><td><span class="tag g-a">A</span></td><td>几乎全新</td><td>无使用痕迹，包装/配件齐全</td><td><code>--grade-a</code></td><td class="num">405</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td><span class="tag g-b">B</span></td><td>轻微使用痕迹</td><td>细微划痕，功能完好</td><td><code>--grade-b</code></td><td class="num">755</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td><span class="tag g-c">C</span></td><td>明显使用痕迹</td><td>外观有磨损，功能正常</td><td><code>--grade-c</code></td><td class="num">498</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td><span class="tag g-d">D</span></td><td>有瑕疵</td><td>存在功能或外观缺陷，须在描述中写明</td><td><code>--grade-d</code></td><td class="num">184</td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">A–D 的文案与色值三端共用，由本表下发；前端只引用 Token，禁止写死。选中 D 级时发布表单强制要求填写瑕疵说明。</div>
+        </div>
+
+        <!-- 面交点 -->
+        <div class="pane" id="c3" style="display:none;">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>名称</th><th style="width:100px;">校区</th><th style="width:180px;">开放时段</th><th style="width:110px;">周承载建议</th><th style="width:110px;">近 7 日实际</th><th style="width:96px;">状态</th><th style="width:160px;" class="num">操作</th></tr></thead>
+              <tbody>
+                <tr><td>图书馆一楼中庭</td><td>东校区</td><td>08:00–22:00</td><td class="num">60 笔</td><td class="num">52 笔</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>三食堂南门</td><td>东校区</td><td>11:00–13:00 / 17:00–19:00</td><td class="num">50 笔</td><td class="num" style="color:var(--st-fail);">68 笔</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>二食堂南门</td><td>西校区</td><td>11:00–13:00 / 17:00–19:00</td><td class="num">50 笔</td><td class="num">41 笔</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>东门快递柜旁</td><td>东校区</td><td>09:00–21:00</td><td class="num">40 笔</td><td class="num">29 笔</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>西区宿舍 7 号楼下</td><td>西校区</td><td>18:00–22:00</td><td class="num">30 笔</td><td class="num">12 笔</td><td><span class="tag off">停用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link" data-perm="content.edit">启用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">面交点数据同时驱动「校内面交所热力」图（见 A8）：实际值超过承载建议 120% 时在看板触发预警，可据此增设点位。</div>
+        </div>
+
+        <!-- 学院与校区 -->
+        <div class="pane" id="c4" style="display:none;">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>学院</th><th style="width:120px;">所属校区</th><th style="width:110px;">用户数</th><th style="width:110px;">在售商品</th><th style="width:96px;">状态</th><th style="width:160px;" class="num">操作</th></tr></thead>
+              <tbody>
+                <tr><td>计算机学院</td><td>东校区</td><td class="num">486</td><td class="num">312</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>机械工程学院</td><td>东校区</td><td class="num">392</td><td class="num">208</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>经济管理学院</td><td>西校区</td><td class="num">351</td><td class="num">176</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>艺术学院</td><td>西校区</td><td class="num">287</td><td class="num">154</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>外国语学院</td><td>西校区</td><td class="num">243</td><td class="num">112</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+                <tr><td>材料学院</td><td>东校区</td><td class="num">219</td><td class="num">98</td><td><span class="tag pass">启用</span></td><td><div class="ops"><button class="btn link" data-perm="content.edit">编辑</button><button class="btn link dn" data-perm="content.edit">停用</button></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="foot">共 12 个学院、2 个校区。学院字段同时用于学号认证核对与「学院 × 品类热力矩阵」。</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+document.querySelectorAll('#tabs button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+    b.classList.add('on');
+    document.querySelectorAll('.pane').forEach(function (p) { p.style.display = 'none'; });
+    document.getElementById(b.dataset.tab).style.display = '';
+  });
+});
+</script>
+</body>
+</html>

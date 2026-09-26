@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UI 设计风格静态演示集</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #FAFAFA; color: #1A1A1A; line-height: 1.65;
+    padding: 48px 24px 72px;
+  }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header { margin-bottom: 36px; }
+  .eyebrow { font-size: 12px; letter-spacing: .22em; color: #8A8A8A; font-weight: 600; }
+  h1 { font-size: 34px; font-weight: 600; letter-spacing: -.02em; margin: 10px 0 12px; }
+  .lead { font-size: 14.5px; color: #5A5A5A; max-width: 720px; }
+  .meta { margin-top: 16px; font-size: 13px; color: #757575; display: flex; gap: 18px; flex-wrap: wrap; }
+  .meta span { border-left: 2px solid #E2E2E2; padding-left: 10px; }
+
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 32px; }
+  .card {
+    display: block; text-decoration: none; color: inherit;
+    background: #fff; border: 1px solid #E8E8E8; border-radius: 14px; overflow: hidden;
+  }
+  .card:hover { border-color: #B9B9B9; }
+  .prev { height: 132px; padding: 16px; position: relative; overflow: hidden; }
+
+  /* 01 Neo-Brutalism 预览 */
+  .p1 { background: #FFFDF5; background-image: radial-gradient(#0B0B0B 1px, transparent 1px); background-size: 16px 16px; }
+  .p1 .b { border: 2.5px solid #000; background: #FFE01B; padding: 4px 10px; font-weight: 800; font-size: 13px; box-shadow: 4px 4px 0 #000; display: inline-block; }
+  .p1 .c { margin-top: 14px; border: 2.5px solid #000; background: #FF7BAC; height: 44px; box-shadow: 4px 4px 0 #000; }
+  .p1 .d { position: absolute; right: 18px; top: 22px; border: 2.5px solid #000; background: #4D9FFF; width: 70px; height: 70px; box-shadow: 4px 4px 0 #000; }
+
+  /* 02 Glassmorphism 预览 */
+  .p2 { background: linear-gradient(135deg, #2B1B6B, #7A2BA8 45%, #10598F); position: relative; }
+  .p2::before { content: ""; position: absolute; width: 150px; height: 150px; border-radius: 50%; background: #FF3D9A; filter: blur(46px); top: -50px; right: -30px; }
+  .p2::after { content: ""; position: absolute; width: 130px; height: 130px; border-radius: 50%; background: #1FB6FF; filter: blur(46px); bottom: -50px; left: 10px; }
+  .p2 .g { position: relative; z-index: 1; background: rgba(255,255,255,.14); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.3); border-radius: 14px; height: 100%; display: flex; align-items: center; padding: 0 16px; color: #fff; font-size: 14px; font-weight: 600; }
+
+  /* 03 AI-Native 预览 */
+  .p3 { background: #F4F4FA; }
+  .p3 .hero { background: linear-gradient(120deg, #1B1740, #3B2A8C 60%, #0D8A80); border-radius: 10px; height: 38px; display: flex; align-items: center; padding: 0 12px; gap: 6px; }
+  .p3 .hero i { width: 6px; height: 6px; border-radius: 2px; background: #7CE7D8; }
+  .p3 .hero b { color: #fff; font-size: 11px; font-weight: 600; }
+  .p3 .sk { height: 8px; border-radius: 5px; background: #E7E7F0; margin-top: 10px; }
+  .p3 .sk.w70 { width: 70%; } .p3 .sk.w45 { width: 45%; }
+
+  /* 04 Y2K 预览 */
+  .p4 { background: linear-gradient(170deg, #BFE6FF, #DCD6FF 50%, #FFD9F2); position: relative; }
+  .p4::before {
+    content: ""; position: absolute; inset: auto 0 0 0; height: 52%;
+    background: repeating-linear-gradient(90deg, rgba(138,107,255,.35) 0 1px, transparent 1px 30px),
+                repeating-linear-gradient(0deg, rgba(138,107,255,.28) 0 1px, transparent 1px 18px);
+    -webkit-mask-image: linear-gradient(to top, #000, transparent); mask-image: linear-gradient(to top, #000, transparent);
+  }
+  .p4 .ch {
+    position: relative; z-index: 1; font-size: 24px; font-weight: 800; letter-spacing: -.01em; display: inline-block; margin-top: 18px;
+    background: linear-gradient(180deg, #FFF, #CFE4FF 34%, #7E8FC4 50%, #E9F2FF 62%, #FFF);
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-stroke: .6px rgba(70,70,130,.35);
+  }
+  .p4 .pill { position: absolute; right: 16px; top: 20px; z-index: 1; padding: 6px 14px; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .16em; color: #fff; background: linear-gradient(90deg, #00D8FF, #8A6BFF); }
+
+  .body { padding: 18px 20px 20px; border-top: 1px solid #EDEDED; }
+  .no { font-size: 11px; letter-spacing: .18em; color: #9A9A9A; font-weight: 700; }
+  .body h2 { font-size: 18px; font-weight: 600; margin: 6px 0 4px; letter-spacing: -.01em; }
+  .en { font-size: 12px; color: #8A8A8A; letter-spacing: .06em; margin-bottom: 12px; }
+  .desc { font-size: 13.5px; color: #4A4A4A; }
+  .tags { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tags span { font-size: 11.5px; padding: 3px 9px; border-radius: 6px; background: #F2F2F2; color: #5A5A5A; }
+  .tags span.hi { background: #EEF2FF; color: #3F51B5; }
+  .go { margin-top: 14px; font-size: 13px; font-weight: 600; color: #1A1A1A; }
+  .card:hover .go { color: #3F51B5; }
+
+  footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #E8E8E8; font-size: 13px; color: #757575; }
+  footer a { color: #1A1A1A; }
+
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="eyebrow">GRADUATION PROJECT · VISUAL DIRECTION RESEARCH</div>
+    <h1>UI 设计风格静态演示集</h1>
+    <p class="lead">从 17 个候选风格中随机抽取 4 个，各自渲染为独立静态页。四个页面使用<b>完全相同的信息结构</b>（虚构产品 Nimbus 团队协作看板：侧边导航 / 统计卡 / 任务进度 / 团队成员 / 命令框），便于公平对比视觉差异。</p>
+    <div class="meta">
+      <span>抽签方式：随机采样（无放回）</span>
+      <span>技术：纯 HTML + CSS，零依赖</span>
+      <span>日期：2026-09-25</span>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <a class="card" href="pages/neo-brutalism.html">
+      <div class="prev p1">
+        <span class="b">NEO-BRUTALISM</span>
+        <div class="c"></div>
+        <div class="d"></div>
+      </div>
+      <div class="body">
+        <div class="no">STYLE 01</div>
+        <h2>新粗野主义</h2>
+        <div class="en">Neo-Brutalism</div>
+        <p class="desc">纯黑粗描边 + 零模糊硬阴影 + 高饱和平涂 + 巨号标题。故意"不精致"，但高对比度是结构性的，天然通过无障碍，且零 GPU 成本。</p>
+        <div class="tags"><span class="hi">毕设适配 ★★★★★</span><span>border 3px</span><span>shadow 6px 0</span><span>零圆角</span></div>
+        <div class="go">打开演示页 →</div>
+      </div>
+    </a>
+
+    <a class="card" href="pages/glassmorphism.html">
+      <div class="prev p2">
+        <div class="g">backdrop-filter: blur(18px)</div>
+      </div>
+      <div class="body">
+        <div class="no">STYLE 02</div>
+        <h2>玻璃拟态</h2>
+        <div class="en">Glassmorphism</div>
+        <p class="desc">半透明磨砂面板 + 鲜艳背景光斑 + 顶部 1px 高光。2026 年最主流的质感语言之一，但需注意 GPU 开销，且需要真正有东西可以糊。</p>
+        <div class="tags"><span class="hi">毕设适配 ★★★★★</span><span>blur</span><span>rgba 白色层</span><span>注意对比度</span></div>
+        <div class="go">打开演示页 →</div>
+      </div>
+    </a>
+
+    <a class="card" href="pages/ai-native.html">
+      <div class="prev p3">
+        <div class="hero"><i></i><i></i><b>把本周逾期的任务整理成一张表</b></div>
+        <div class="sk w70"></div>
+        <div class="sk w45"></div>
+      </div>
+      <div class="body">
+        <div class="no">STYLE 03</div>
+        <h2>生成式界面</h2>
+        <div class="en">AI-Native UI / GenUI</div>
+        <p class="desc">界面随意图实时重组。演示页包含一个可交互的"自适应密度"开关（纯 CSS 实现），以及流式生成、骨架屏、意图链路等状态语言。</p>
+        <div class="tags"><span class="hi">毕设适配 ★★★★☆</span><span>自适应布局</span><span>骨架屏</span><span>需接 LLM</span></div>
+        <div class="go">打开演示页 →</div>
+      </div>
+    </a>
+
+    <a class="card" href="pages/y2k.html">
+      <div class="prev p4">
+        <span class="pill">Y2K</span>
+        <span class="ch">NIMBUS</span>
+      </div>
+      <div class="body">
+        <div class="no">STYLE 04</div>
+        <h2>复古回潮</h2>
+        <div class="en">Retro / Y2K</div>
+        <p class="desc">glossy 塑料外壳 + chrome 金属渐变字 + 透视网格 + 星芒闪点 + 早期系统窗体。潮流拉满，但评审口味两极分化。</p>
+        <div class="tags"><span>毕设适配 ★★★☆☆</span><span>chrome 字</span><span>渐变窗体</span><span>像素微文案</span></div>
+        <div class="go">打开演示页 →</div>
+      </div>
+    </a>
+
+  </div>
+
+  <footer>
+    配套文档：<a href="UI设计风格调研.md">UI设计风格调研.md</a>（17 个风格明细 + 参考站点 + 选题建议）·
+    <a href="UI视觉构成要素体系.md">UI视觉构成要素体系.md</a>（六层架构 · 字体 / 布局 / 色彩 / 质感 / 动效 / 感知术语全景）
+  </footer>
+
+</div>
+</body>
+</html>

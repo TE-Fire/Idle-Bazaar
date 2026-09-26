@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M5 消息（会话列表）</title>
+<link rel="stylesheet" href="mini.css">
+<style>
+/* 本页局部：三分区切换（纯 CSS） */
+.sg{display:none;}
+.lists .list{display:none;}
+#s1:checked ~ .seg label[for="s1"],
+#s2:checked ~ .seg label[for="s2"],
+#s3:checked ~ .seg label[for="s3"]{color:var(--c-brand);font-weight:600;}
+#s1:checked ~ .seg label[for="s1"]::after,
+#s2:checked ~ .seg label[for="s2"]::after,
+#s3:checked ~ .seg label[for="s3"]::after{
+  content:"";position:absolute;bottom:0;left:50%;transform:translateX(-50%);
+  width:24px;height:2px;border-radius:1px;background:var(--c-brand);
+}
+#s1:checked ~ .lists .l1{display:block;}
+#s2:checked ~ .lists .l2{display:block;}
+#s3:checked ~ .lists .l3{display:block;}
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M5 消息</span>
+    <b>三分区是硬规则：</b>私信 / 系统通知 / 交易通知分开。Vinted 的教训就是系统通知与私信混在同一收件匣，用户要在「您的商品已售出」里捞对话。未读：私信红点+数字，系统通知只数字。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="title">消息</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <input class="sg" type="radio" name="sg" id="s1" checked>
+      <input class="sg" type="radio" name="sg" id="s2">
+      <input class="sg" type="radio" name="sg" id="s3">
+
+      <div class="seg">
+        <label for="s1">私信<span class="badge">2</span></label>
+        <label for="s2">系统通知<span class="badge">1</span></label>
+        <label for="s3">交易通知<span class="badge">3</span></label>
+      </div>
+
+      <div class="lists">
+        <!-- ① 私信 -->
+        <div class="list l1">
+          <div class="msglist">
+            <div class="mrow">
+              <div class="av" style="background:#FF8A33;">刘</div>
+              <div class="mid">
+                <div class="top"><span class="nm">阿刘</span><span class="tm">刚刚</span></div>
+                <div class="last">[议价] 1,480 的话我这边可以出</div>
+              </div>
+              <span class="rd"></span>
+            </div>
+            <div class="mrow">
+              <div class="av" style="background:#3C6DD8;">陈</div>
+              <div class="mid">
+                <div class="top"><span class="nm">陈学长</span><span class="tm">3 分钟前</span></div>
+                <div class="last">资料还在的，明天下午图书馆门口？</div>
+              </div>
+              <span class="rd"></span>
+            </div>
+            <div class="mrow">
+              <div class="av" style="background:#0FA968;">王</div>
+              <div class="mid">
+                <div class="top"><span class="nm">骑车的小王</span><span class="tm">昨天</span></div>
+                <div class="last">好的，那就周六上午东区体育馆见</div>
+              </div>
+              <span class="rd hide"></span>
+            </div>
+            <div class="mrow">
+              <div class="av" style="background:#7C4DFF;">周</div>
+              <div class="mid">
+                <div class="top"><span class="nm">Zhou</span><span class="tm">昨天</span></div>
+                <div class="last">[图片] 真题内页</div>
+              </div>
+              <span class="rd hide"></span>
+            </div>
+          </div>
+          <div class="mini" style="padding:12px;text-align:center;">— 只显示最近 30 天的会话 —</div>
+        </div>
+
+        <!-- ② 系统通知 -->
+        <div class="list l2">
+          <div class="notice gray">
+            <span class="fl">!</span>
+            <div><b>未接入微信订阅消息。</b>本区为站内消息中心，推送以站内红点/角标模拟；后续若申请到订阅消息模板，由服务端下发后在此同源展示，UI 不需改版。</div>
+          </div>
+          <div class="msglist">
+            <div class="mrow sys">
+              <div class="av">审</div>
+              <div class="mid">
+                <div class="top"><span class="nm">审核结果</span><span class="tm">2 小时前</span></div>
+                <div class="last">你发布的「米家台灯 1S」已通过审核，已上架</div>
+              </div>
+              <span class="rd"></span>
+            </div>
+            <div class="mrow sys">
+              <div class="av">审</div>
+              <div class="mid">
+                <div class="top"><span class="nm">审核结果</span><span class="tm">昨天</span></div>
+                <div class="last">「毕业甩卖 电饭煲」未通过：图片非实拍，请重新上传</div>
+              </div>
+              <span class="rd hide"></span>
+            </div>
+            <div class="mrow sys">
+              <div class="av">告</div>
+              <div class="mid">
+                <div class="top"><span class="nm">平台公告</span><span class="tm">9-24</span></div>
+                <div class="last">毕业季免审核通道开启：教材教辅类目即时上架</div>
+              </div>
+              <span class="rd hide"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ 交易通知 -->
+        <div class="list l3">
+          <div class="msglist">
+            <div class="mrow trans">
+              <div class="av">单</div>
+              <div class="mid">
+                <div class="top"><span class="nm">面交提醒</span><span class="tm">10 分钟前</span></div>
+                <div class="last">订单 #20260926：1 小时后西区食堂南门见面</div>
+              </div>
+              <span class="rd"></span>
+            </div>
+            <div class="mrow trans">
+              <div class="av">单</div>
+              <div class="mid">
+                <div class="top"><span class="nm">订单状态</span><span class="tm">1 小时前</span></div>
+                <div class="last">#20260925 买家已付款，等待你确认面交时间</div>
+              </div>
+              <span class="rd"></span>
+            </div>
+            <div class="mrow trans">
+              <div class="av">单</div>
+              <div class="mid">
+                <div class="top"><span class="nm">订单状态</span><span class="tm">昨天</span></div>
+                <div class="last">#20260924 已完成，双方互评后可提升信用等级</div>
+              </div>
+              <span class="rd"></span>
+            </div>
+          </div>
+          <div class="mini" style="padding:12px;line-height:1.8;">
+            推送节奏约定：面交前 1 小时 + 到点各推一次，不再更多（避免通知疲劳）。
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab home"><span class="ico"></span>首页</div>
+      <div class="tab"><span class="ico"></span>分类</div>
+      <div class="pub"><span class="plus">＋</span><span class="lb">发布</span></div>
+      <div class="tab msg on"><span class="ico dot"></span>消息</div>
+      <div class="tab me"><span class="ico"></span>我的</div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">交互</span>
+    点上方三个分区标签可切换（纯 CSS，无 JS）。会话按最近消息倒序，交易中的会话置顶。
+  </div>
+
+</div>
+</body>
+</html>

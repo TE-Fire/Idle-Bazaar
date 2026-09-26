@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M6 我的</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M6 我的</span>
+    <b>信用分不暴露具体分数</b>，只显示等级（高/中/低）+ 三格进度条，避免攀比与刷分；分数仅管理端可见并用于搜索权重与人工审核判定。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="title">我的</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <!-- 头部 -->
+      <div class="uhead">
+        <div class="r1">
+          <div class="av">我</div>
+          <div style="flex:1;">
+            <div class="nm">林小满 <span style="font-size:var(--f-xs);background:rgba(255,255,255,.25);border-radius:var(--r-sm);padding:1px 6px;">学号已认证</span></div>
+            <div class="sub">计算机学院 · 大三 · 西区</div>
+          </div>
+          <div style="font-size:var(--f-sm);opacity:.9;">设置 ›</div>
+        </div>
+        <div class="stats">
+          <div><b>3</b><span>在售</span></div>
+          <div><b>12</b><span>已卖出</span></div>
+          <div><b>8</b><span>已买到</span></div>
+          <div><b>27</b><span>收藏</span></div>
+        </div>
+      </div>
+
+      <!-- 信用 -->
+      <div class="card" style="margin:-16px 12px 0;position:relative;padding:var(--s-3);display:flex;align-items:center;gap:var(--s-3);">
+        <div style="flex:1;">
+          <div style="font-size:var(--f-base);font-weight:600;">我的信用</div>
+          <div class="mini" style="margin-top:2px;">按时面交、无违约记录可提升</div>
+        </div>
+        <div class="credit">
+          <span class="bar"><i class="on"></i><i class="on"></i><i class="on"></i></span>
+          <span class="lv high">信用高</span>
+        </div>
+      </div>
+
+      <!-- 交易 -->
+      <div class="field" style="margin-top:20px;">
+        <div class="cellrow"><span class="lb">我发布的</span><span class="vv">3 件在售</span><span class="arrow"></span></div>
+        <div class="cellrow"><span class="lb">我卖出的</span><span class="vv">12 笔</span><span class="arrow"></span></div>
+        <div class="cellrow"><span class="lb">我买到的</span><span class="vv">8 笔</span><span class="arrow"></span></div>
+        <div class="cellrow"><span class="lb">我的收藏</span><span class="vv">27 件</span><span class="arrow"></span></div>
+      </div>
+
+      <!-- 认证 -->
+      <div class="field" style="margin-top:8px;">
+        <div class="cellrow"><span class="lb">学号认证</span><span class="vv" style="color:var(--c-ok);font-weight:600;">已认证</span><span class="arrow"></span></div>
+        <div class="cellrow"><span class="lb">常用面交点</span><span class="vv">西区食堂南门</span><span class="arrow"></span></div>
+        <div class="cellrow"><span class="lb">我的评价</span><span class="vv">4.9 分 · 20 条</span><span class="arrow"></span></div>
+      </div>
+
+      <!-- 待办提醒 -->
+      <div class="card" style="margin:8px 12px;">
+        <div class="sec-t" style="padding-bottom:4px;">待办<span>有 2 项需要处理</span></div>
+        <div class="cellrow" style="border-top:1px solid var(--c-border);">
+          <span class="lb">1 笔订单待确认收货</span><span class="vv" style="color:var(--c-brand);">去处理</span><span class="arrow"></span>
+        </div>
+        <div class="cellrow">
+          <span class="lb">1 件商品审核未通过</span><span class="vv" style="color:var(--c-err);">看原因</span><span class="arrow"></span>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:8px;">
+        <div class="cellrow"><span class="lb">校园面交须知</span><span class="arrow"></span></div>
+        <div class="cellrow"><span class="lb">关于与帮助</span><span class="arrow"></span></div>
+      </div>
+
+      <div class="mini" style="padding:12px 12px 24px;text-align:center;">跳蚤校园 · 校内二手交易平台</div>
+    </div>
+
+    <div class="tabbar">
+      <div class="tab home"><span class="ico"></span>首页</div>
+      <div class="tab"><span class="ico"></span>分类</div>
+      <div class="pub"><span class="plus">＋</span><span class="lb">发布</span></div>
+      <div class="tab msg"><span class="ico dot"></span>消息</div>
+      <div class="tab me on"><span class="ico"></span>我的</div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    ①「待办区」把审核结果与订单动作前置，避免用户点多层才找到（Vinted 个人档案要点好几层的坑）；②认证入口常驻，未认证用户在搜索权重上降权但<b>不禁止发布</b>；③学号不对外展示，只展示「已认证」+ 学院。
+  </div>
+
+</div>
+</body>
+</html>

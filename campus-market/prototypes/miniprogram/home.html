@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M1 首页信息流</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M1 首页</span>
+    <b>首屏即内容：</b>搜索框吸顶但不抢占首屏，第 3 秒内可见 ≥4 件商品。金刚区两行 10 个、<b>统一单色描边</b>，仅选中项填充橙（不给每个图标不同颜色）。瀑布流两列不等高允许，同列对齐。
+  </div>
+
+  <div class="phone">
+    <!-- 状态栏 -->
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <!-- 系统导航栏：搜索框 + 消息 -->
+    <div class="navhome">
+      <div class="sbox"><span class="mag"></span>搜「考研数学」试试</div>
+      <div class="bell"><i></i><b>3</b></div>
+    </div>
+
+    <div class="page">
+      <!-- 金刚区 5×2 -->
+      <div class="kk">
+        <div class="kk-item on"><div class="kk-ico"><i class="book"></i></div><div class="kk-lb">教材教辅</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="phone"></i></div><div class="kk-lb">数码电子</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="cup"></i></div><div class="kk-lb">生活用品</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="bag"></i></div><div class="kk-lb">服饰鞋包</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="ball"></i></div><div class="kk-lb">运动户外</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="note"></i></div><div class="kk-lb">笔记资料</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="music"></i></div><div class="kk-lb">乐器</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="pc"></i></div><div class="kk-lb">电脑外设</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="bike"></i></div><div class="kk-lb">代步车</div></div>
+        <div class="kk-item"><div class="kk-ico"><i class="more"></i></div><div class="kk-lb">全部分类</div></div>
+      </div>
+
+      <!-- 兴趣频道 -->
+      <div class="chips">
+        <div class="chip on">推荐</div>
+        <div class="chip">毕业季甩卖</div>
+        <div class="chip">考研资料</div>
+        <div class="chip">女生闲置</div>
+        <div class="chip">同院优先</div>
+      </div>
+
+      <!-- 双列瀑布流 -->
+      <div class="wf">
+        <!-- 左列 -->
+        <div class="col">
+          <div class="wcard">
+            <div class="wimg tall"><div class="ph p5">教材</div><span class="badge dark">急出</span></div>
+            <div class="body">
+              <div class="wtitle">考研数学一全套 张宇+李永乐 全新未拆封</div>
+              <div class="prow"><span class="pnow">¥35</span><span class="pold">¥128</span></div>
+              <div class="metarow"><span class="cond a">A 全新未拆</span>中区</div>
+              <div class="srow"><span class="avatar">陈</span><span class="nm">陈学长</span><span class="verified">已认证</span></div>
+            </div>
+          </div>
+
+          <div class="wcard">
+            <div class="wimg wide"><div class="ph p6">风扇</div></div>
+            <div class="body">
+              <div class="wtitle">毕业甩卖 落地扇 风力正常 自提</div>
+              <div class="prow"><span class="pnow">¥25</span><span class="pold">¥89</span></div>
+              <div class="metarow"><span class="cond c">C 轻微使用</span>南苑</div>
+              <div class="srow"><span class="avatar">李</span><span class="nm">大四老李</span></div>
+            </div>
+          </div>
+
+          <div class="wcard">
+            <div class="wimg tall"><div class="ph p8">自行车</div><span class="badge">可议价</span></div>
+            <div class="body">
+              <div class="wtitle">捷安特 ATX 山地车 骑了一年 刹车新换</div>
+              <div class="prow"><span class="pnow">¥680</span><span class="pold">¥1,598</span></div>
+              <div class="metarow"><span class="cond c">C 轻微使用</span>东区</div>
+              <div class="srow"><span class="avatar">王</span><span class="nm">骑车的小王</span><span class="verified">已认证</span></div>
+            </div>
+          </div>
+
+          <div class="wcard">
+            <div class="wimg wide"><div class="ph p1">台灯</div></div>
+            <div class="body">
+              <div class="wtitle">米家台灯 1S 白色 带原包装</div>
+              <div class="prow"><span class="pnow">¥30</span><span class="pold">¥169</span></div>
+              <div class="metarow"><span class="cond a">A 全新未拆</span>中区</div>
+              <div class="srow"><span class="avatar">张</span><span class="nm">张同学</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右列 -->
+        <div class="col">
+          <div class="wcard">
+            <div class="wimg wide"><div class="ph p2">iPad</div></div>
+            <div class="body">
+              <div class="wtitle">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+              <div class="prow"><span class="pnow">¥1,580</span><span class="pold">¥2,499</span></div>
+              <div class="metarow"><span class="cond b">B 几乎全新</span>西区</div>
+              <div class="srow"><span class="avatar">刘</span><span class="nm">阿刘</span><span class="verified">已认证</span></div>
+            </div>
+          </div>
+
+          <div class="wcard">
+            <div class="wimg tall"><div class="ph p4">雅思</div><span class="badge dark">12 人想要</span></div>
+            <div class="body">
+              <div class="wtitle">剑桥雅思真题 4-18 全套 只写了两本</div>
+              <div class="prow"><span class="pnow">¥45</span><span class="pold">¥320</span></div>
+              <div class="metarow"><span class="cond a">A 全新未拆</span>中区</div>
+              <div class="srow"><span class="avatar">周</span><span class="nm">Zhou</span><span class="verified">已认证</span></div>
+            </div>
+          </div>
+
+          <div class="wcard">
+            <div class="wimg wide"><div class="ph p3">羽绒服</div></div>
+            <div class="body">
+              <div class="wtitle">冬季加厚羽绒服 M 码 女生 九成新 已洗</div>
+              <div class="prow"><span class="pnow">¥120</span><span class="pold">¥599</span></div>
+              <div class="metarow"><span class="cond b">B 几乎全新</span>南苑</div>
+              <div class="srow"><span class="avatar">林</span><span class="nm">林同学</span></div>
+            </div>
+          </div>
+
+          <div class="wcard">
+            <div class="wimg tall"><div class="ph p7">吉他</div><span class="badge">可议价</span></div>
+            <div class="body">
+              <div class="wtitle">入门电吉他 + 音箱 一起出 送拨片</div>
+              <div class="prow"><span class="pnow">¥380</span><span class="pold">¥899</span></div>
+              <div class="metarow"><span class="cond d">D 明显使用</span>东区</div>
+              <div class="srow"><span class="avatar">赵</span><span class="nm">乐队老赵</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mini" style="text-align:center;padding:0 0 24px;">正在加载更多…</div>
+    </div>
+
+    <!-- 悬浮发布按钮 -->
+    <div class="fab">＋</div>
+
+    <!-- TabBar -->
+    <div class="tabbar">
+      <div class="tab home on"><span class="ico"></span>首页</div>
+      <div class="tab"><span class="ico"></span>分类</div>
+      <div class="pub"><span class="plus">＋</span><span class="lb">发布</span></div>
+      <div class="tab msg"><span class="ico dot"></span>消息</div>
+      <div class="tab me"><span class="ico"></span>我的</div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    ①图片占卡片 ≥60%，文字只留标题+价格+成色；②底部「加载更多」明确文案，禁止无限转圈；③悬浮发布按钮距底 20pt + 安全区，滚动时隐藏、停止 300ms 后淡入；④超过 100 条必须虚拟列表。
+  </div>
+
+</div>
+</body>
+</html>

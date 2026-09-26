@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M3 发布闲置</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M3 发布</span>
+    <b>移动端发布是「临时补一件」，不是批量出 20 本书。</b>一屏不超过 5 个字段，其余收进更多选项；底部引导需要批量发布的用户去 Web 端。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="back"></span>
+      <span class="title">发布闲置</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <!-- 图片 -->
+      <div class="card">
+        <div class="upgrid">
+          <div class="cell main"><div class="ph p2" style="width:100%;height:100%;font-size:10px;">主图</div><span class="del">×</span></div>
+          <div class="cell"><div class="ph p6" style="width:100%;height:100%;font-size:10px;">图2</div><span class="del">×</span></div>
+          <div class="cell"><div class="ph p8" style="width:100%;height:100%;font-size:10px;">图3</div><span class="del">×</span></div>
+          <div class="cell add">＋</div>
+        </div>
+        <div class="hint">最多 9 张，第一张为主图；长按可拖动排序。建议实拍，网图会被审核驳回。</div>
+      </div>
+
+      <!-- 核心字段（一屏 5 个） -->
+      <div class="field" style="margin-top:8px;">
+        <div class="frow"><span class="lb">标题</span><span class="val"><input class="input" value="iPad 9 64G WiFi 版 无磕碰"></span></div>
+        <div class="frow"><span class="lb">分类</span><span class="val">数码电子 / 平板电脑</span><span class="arrow"></span></div>
+        <div class="frow"><span class="lb">价格</span><span class="val" style="display:flex;align-items:center;gap:6px;"><span style="color:var(--c-price);font-weight:700;">¥</span><input class="input" value="1580" style="width:110px;"></span></div>
+        <div class="frow col" style="align-items:stretch;">
+          <span class="lb" style="min-width:auto;">成色</span>
+          <div class="picks">
+            <div class="pick">A<small>全新未拆</small></div>
+            <div class="pick on">B<small>几乎全新</small></div>
+            <div class="pick">C<small>轻微使用</small></div>
+            <div class="pick">D<small>明显使用</small></div>
+          </div>
+        </div>
+        <div class="frow"><span class="lb">校区</span><span class="val">西区</span><span class="arrow"></span></div>
+      </div>
+
+      <!-- 更多选项 -->
+      <div class="field" style="margin-top:8px;">
+        <div class="frow"><span class="lb">面交点</span><span class="val">西区食堂南门</span><span class="arrow"></span></div>
+        <div class="frow"><span class="lb">原价</span><span class="val ph-t">选填，填写后显示删除线</span></div>
+        <div class="frow"><span class="lb">可议价</span><span class="val" style="text-align:right;color:var(--c-brand);">已开启</span><span class="arrow"></span></div>
+        <div class="frow col" style="align-items:stretch;">
+          <span class="lb" style="min-width:auto;">描述</span>
+          <textarea class="input">去年入学买的，记笔记看网课用，全程贴膜带壳，无划痕无磕碰，电池 92%。附赠充电器和保护壳，只走校内面交。</textarea>
+        </div>
+      </div>
+
+      <div class="notice">
+        <span class="fl">!</span>
+        <div>提交后进入<b>待审核</b>，不直接上架。审核通常 2 小时内完成；改价格或改成色需重新审核，只改描述免审。</div>
+      </div>
+
+      <div class="notice gray">
+        <span class="fl">i</span>
+        <div>要一次发布很多件（比如毕业季出 20 本书）？<b>用电脑打开 Web 端</b>，支持拖拽批量传图、实时预览和 Ctrl+Enter 提交。</div>
+      </div>
+
+      <div class="mini" style="padding:0 12px 24px;">
+        校验规则：图片 ≥1 张；标题 5–50 字；价格 &gt; 0；分类、成色、校区必填。描述可空提交后补。
+      </div>
+    </div>
+
+    <div class="actionbar">
+      <div class="btn" style="flex:0 0 110px;">存草稿</div>
+      <div class="grow"><div class="btn pri">提交审核</div></div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    ①主图必选，否则无法提交；②成色 A–D 由后台字典下发，前端不硬编码；③发布即送审是先审后发的校园信任机制；④不自动写入「分类猜测/成色建议」，用户确认后才生效。
+  </div>
+
+</div>
+</body>
+</html>

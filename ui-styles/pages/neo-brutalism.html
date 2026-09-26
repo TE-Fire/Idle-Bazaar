@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus · Neo-Brutalism 新粗野主义</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --paper: #FFFDF5;
+    --ink: #0B0B0B;
+    --yellow: #FFE01B;
+    --pink: #FF7BAC;
+    --blue: #4D9FFF;
+    --green: #00D394;
+  }
+  body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background-color: var(--paper);
+    background-image: radial-gradient(#0B0B0B 1px, transparent 1px);
+    background-size: 22px 22px;
+    color: var(--ink);
+    padding: 32px 24px 64px;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  .topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 28px;
+  }
+  .back {
+    display: inline-block; border: 3px solid var(--ink);
+    background: var(--green); padding: 8px 16px;
+    font-weight: 700; font-size: 14px; text-decoration: none; color: var(--ink);
+    box-shadow: 5px 5px 0 var(--ink);
+  }
+  .back:hover { transform: translate(3px, 3px); box-shadow: 2px 2px 0 var(--ink); }
+  .tagline { font-weight: 700; font-size: 13px; letter-spacing: .04em; }
+
+  .shell {
+    display: grid; grid-template-columns: 250px 1fr; gap: 0;
+    border: 3px solid var(--ink); box-shadow: 10px 10px 0 var(--ink);
+    background: #fff;
+  }
+
+  .side { border-right: 3px solid var(--ink); padding: 24px 18px; background: var(--yellow); }
+  .logo {
+    font-size: 30px; font-weight: 800; letter-spacing: -.02em;
+    border-bottom: 3px solid var(--ink); padding-bottom: 16px; margin-bottom: 20px;
+  }
+  .logo span { display: block; font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+  .nav a {
+    display: block; padding: 10px 12px; margin-bottom: 10px;
+    border: 3px solid var(--ink); background: #fff;
+    font-weight: 700; font-size: 15px; text-decoration: none; color: var(--ink);
+  }
+  .nav a.active { background: var(--pink); box-shadow: 4px 4px 0 var(--ink); }
+  .nav a:hover { background: var(--blue); }
+  .side .me {
+    margin-top: 26px; border: 3px solid var(--ink); background: #fff;
+    padding: 12px; font-size: 13px; font-weight: 700;
+  }
+  .me b { display: block; font-size: 15px; }
+
+  .main { padding: 26px 28px 30px; }
+  h1 { font-size: 34px; font-weight: 800; letter-spacing: -.02em; line-height: 1.15; }
+  h1 em { font-style: normal; background: var(--yellow); padding: 0 6px; border: 3px solid var(--ink); }
+  .sub { margin-top: 12px; font-size: 14px; font-weight: 600; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 24px 0; }
+  .stat {
+    border: 3px solid var(--ink); box-shadow: 5px 5px 0 var(--ink);
+    padding: 14px 16px; background: #fff;
+  }
+  .stat:nth-child(2) { background: var(--blue); }
+  .stat:nth-child(3) { background: var(--green); }
+  .stat .n { font-size: 30px; font-weight: 800; line-height: 1.1; }
+  .stat .l { font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+
+  .cols { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+  .panel { border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); background: #fff; padding: 18px; }
+  .panel h2 {
+    font-size: 17px; font-weight: 800; letter-spacing: -.01em;
+    border-bottom: 3px solid var(--ink); padding-bottom: 10px; margin-bottom: 14px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .chip {
+    font-size: 11px; font-weight: 800; border: 2px solid var(--ink);
+    background: var(--yellow); padding: 2px 8px;
+  }
+
+  .task {
+    display: flex; align-items: center; gap: 12px;
+    border: 2px solid var(--ink); padding: 10px 12px; margin-bottom: 10px; background: #fff;
+  }
+  .task:hover { background: #F2F0E6; }
+  .task .bar { flex: 1; height: 12px; border: 2px solid var(--ink); background: #fff; }
+  .task .bar i { display: block; height: 100%; background: var(--ink); }
+  .task .pct { font-size: 13px; font-weight: 800; width: 42px; text-align: right; }
+  .task .nm { font-size: 14px; font-weight: 700; width: 168px; }
+
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+  .av {
+    width: 40px; height: 40px; border: 3px solid var(--ink); display: grid; place-items: center;
+    font-weight: 800; font-size: 14px;
+  }
+  .who div { font-size: 13px; font-weight: 700; }
+  .who div small { display: block; font-weight: 600; font-size: 11px; }
+
+  .feed { font-size: 13px; font-weight: 600; border-top: 2px dashed var(--ink); padding-top: 12px; margin-top: 16px; }
+  .feed p { margin-bottom: 8px; }
+  .feed b { background: var(--pink); padding: 0 4px; }
+
+  .cmd {
+    margin-top: 20px; display: flex; gap: 12px; align-items: stretch;
+    border: 3px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); background: #fff; padding: 12px;
+  }
+  .cmd input {
+    flex: 1; border: 0; outline: 0; font-size: 15px; font-weight: 700;
+    font-family: inherit; color: var(--ink); background: transparent;
+  }
+  .cmd button {
+    border: 3px solid var(--ink); background: var(--yellow); font: inherit; font-weight: 800;
+    padding: 8px 22px; cursor: pointer;
+  }
+  .cmd button:hover { background: var(--pink); }
+
+  .note {
+    margin-top: 26px; border: 3px solid var(--ink); background: #fff; padding: 18px 20px;
+    box-shadow: 6px 6px 0 var(--ink);
+  }
+  .note h3 { font-size: 15px; font-weight: 800; margin-bottom: 10px; }
+  .note ul { margin-left: 18px; font-size: 13px; font-weight: 600; }
+  .note li { margin-bottom: 6px; }
+  code {
+    font-family: Consolas, monospace; background: var(--yellow);
+    border: 2px solid var(--ink); padding: 1px 6px; font-size: 12px;
+  }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; }
+    .side { border-right: 0; border-bottom: 3px solid var(--ink); }
+    .cols { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <a class="back" href="../index.html">← 返回目录</a>
+    <div class="tagline">STYLE 01 / NEO-BRUTALISM 新粗野主义</div>
+  </div>
+
+  <div class="shell">
+    <aside class="side">
+      <div class="logo">NIMBUS<span>团队协作看板</span></div>
+      <nav class="nav">
+        <a href="#" class="active">概览</a>
+        <a href="#">项目</a>
+        <a href="#">日程</a>
+        <a href="#">团队</a>
+        <a href="#">设置</a>
+      </nav>
+      <div class="me">李明 / 设计组
+        <b>本周 12 项待办</b>
+      </div>
+    </aside>
+
+    <main class="main">
+      <h1>早上好，<em>李明</em>。</h1>
+      <p class="sub">今天是 9 月 25 日 · 你有 3 个 deadlines 在逼近</p>
+
+      <div class="stats">
+        <div class="stat"><div class="n">12</div><div class="l">活跃项目</div></div>
+        <div class="stat"><div class="n">48</div><div class="l">本周任务</div></div>
+        <div class="stat"><div class="n">76%</div><div class="l">完成率</div></div>
+      </div>
+
+      <div class="cols">
+        <section class="panel">
+          <h2>进行中的任务 <span class="chip">本周</span></h2>
+          <div class="task"><span class="nm">设计系统 v3 重构</span><span class="bar"><i style="width:82%"></i></span><span class="pct">82%</span></div>
+          <div class="task"><span class="nm">组件库文档补全</span><span class="bar"><i style="width:56%"></i></span><span class="pct">56%</span></div>
+          <div class="task"><span class="nm">移动端适配核对</span><span class="bar"><i style="width:34%"></i></span><span class="pct">34%</span></div>
+          <div class="task"><span class="nm">无障碍走查</span><span class="bar"><i style="width:18%"></i></span><span class="pct">18%</span></div>
+          <div class="cmd">
+            <input placeholder="输入命令或搜索项目…">
+            <button>执行</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2>团队 <span class="chip">5 人在线</span></h2>
+          <div class="who"><div class="av" style="background:var(--pink)">YL</div><div>杨岚<small>前端 · 正在改稿</small></div></div>
+          <div class="who"><div class="av" style="background:var(--blue)">ZK</div><div>张可<small>视觉 · 会议中</small></div></div>
+          <div class="who"><div class="av" style="background:var(--green)">WJ</div><div>王靖<small>产品 · 空闲</small></div></div>
+          <div class="feed">
+            <p><b>10:24</b> 杨岚 上传了「组件规范_final2」</p>
+            <p><b>09:50</b> 张可 评论了「配色方案 A」</p>
+            <p><b>昨天</b> 设计组完成了 8 项任务</p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="note">
+    <h3>风格实现要点</h3>
+    <ul>
+      <li>结构色：<code>border: 3px solid #000</code> + <code>box-shadow: 6px 6px 0 #000</code>（零模糊的硬阴影）</li>
+      <li>零圆角（<code>border-radius: 0</code>），高饱和平涂色块，常见Combo：黄 #FFE01B / 粉 #FF7BAC / 蓝 #4D9FFF</li>
+      <li>巨号粗体标题 + 网点纸背景（<code>radial-gradient</code> + <code>background-size</code>）</li>
+      <li>天然优势：高对比度是结构性的而非偶然的 → 直接满足 WCAG 2.2；零 GPU 开销；全浏览器渲染一致</li>
+      <li>适合：开发者工具、潮牌、校园/年轻向产品 —— 2024 年起增长最快的流派</li>
+    </ul>
+  </div>
+
+</div>
+</body>
+</html>

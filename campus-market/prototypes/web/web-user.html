@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · Web 端 P9 个人主页</title>
+<link rel="stylesheet" href="web.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk">消息<span class="dot">3</span></a>
+      <a class="lnk">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a>
+    <a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a><a>其他闲置</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell narrow">
+  <div class="main">
+    <div class="crumb"><b>首页</b> / 数码电子 / 平板电脑 / 阿刘的主页</div>
+
+    <div class="uhead">
+      <div class="av">刘</div>
+      <div>
+        <div class="nm">阿刘
+          <span class="tagst pass">学号已认证</span>
+          <span class="credit"><span class="lv high">信用高</span></span>
+        </div>
+        <div class="sub">计算机学院 · 大三 · 中心校区 · 3 天前活跃 · 常用面交点：图书馆一楼中庭</div>
+      </div>
+      <div class="acts">
+        <button class="btn">关注</button>
+        <button class="btn pri">聊一聊</button>
+      </div>
+    </div>
+
+    <div class="stat4">
+      <div><b>27</b><span>成交笔数</span></div>
+      <div><b>98%</b><span>好评率</span></div>
+      <div><b>5</b><span>在售</span></div>
+      <div><b>20</b><span>收到评价</span></div>
+    </div>
+
+    <div style="display:flex;gap:var(--s-5);align-items:flex-start;margin-top:var(--s-5);">
+      <div style="flex:1;min-width:0;">
+
+        <div class="tabs">
+          <a class="on">TA 的在售（5）</a>
+          <a>买家评价（20）</a>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <div class="ph"><div class="pic p2 a" style="width:100%;height:100%;">iPad</div><div class="pic p6 b" style="width:100%;height:100%;">边框</div><span class="tag hot">可议价</span><span class="cmp">＋对比</span></div>
+            <div class="bd">
+              <div class="tt">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+              <div class="pr"><b>¥1580</b><s>¥2499</s></div>
+              <div class="mt"><span class="cond b">B 几乎全新</span>中心校区</div>
+            </div>
+            <div class="ft"><span class="av"></span>阿刘<span class="sch">3 小时前</span></div>
+          </div>
+
+          <div class="card">
+            <div class="ph"><div class="pic p8 a" style="width:100%;height:100%;">耳机</div><div class="pic p3 b" style="width:100%;height:100%;">充电盒</div><span class="cmp">＋对比</span></div>
+            <div class="bd">
+              <div class="tt">AirPods Pro 2 代 在保修内 配件齐全</div>
+              <div class="pr"><b>¥790</b><s>¥1899</s></div>
+              <div class="mt"><span class="cond b">B 几乎全新</span>中心校区</div>
+            </div>
+            <div class="ft"><span class="av"></span>阿刘<span class="sch">2 天前</span></div>
+          </div>
+
+          <div class="card">
+            <div class="ph"><div class="pic p6 a" style="width:100%;height:100%;">键盘</div><div class="pic p4 b" style="width:100%;height:100%;">轴体</div><span class="cmp">＋对比</span></div>
+            <div class="bd">
+              <div class="tt">机械键盘 87 键 红轴 带原包装</div>
+              <div class="pr"><b>¥180</b><s>¥429</s></div>
+              <div class="mt"><span class="cond a">A 全新未拆</span>中心校区</div>
+            </div>
+            <div class="ft"><span class="av"></span>阿刘<span class="sch">4 天前</span></div>
+          </div>
+
+          <div class="card">
+            <div class="ph"><div class="pic p4 a" style="width:100%;height:100%;">教材</div><div class="pic p5 b" style="width:100%;height:100%;">内页</div><span class="cmp">＋对比</span></div>
+            <div class="bd">
+              <div class="tt">算法导论 第三版 中文 几乎没写过</div>
+              <div class="pr"><b>¥45</b><s>¥128</s></div>
+              <div class="mt"><span class="cond a">A 全新未拆</span>中心校区</div>
+            </div>
+            <div class="ft"><span class="av"></span>阿刘<span class="sch">6 天前</span></div>
+          </div>
+        </div>
+
+        <div class="panel" style="margin-top:var(--s-5);">
+          <div class="ph-head">买家评价<span class="sub">20 条 · 好评率 98%</span></div>
+          <div class="ph-body">
+            <div style="padding-bottom:var(--s-3);border-bottom:1px solid var(--c-border);">
+              <div style="display:flex;gap:var(--s-2);align-items:center;font-size:var(--f-sm);color:var(--t-2);">
+                <span class="av" style="width:20px;height:20px;"></span>陈同学<span class="mini" style="margin-left:auto;">09-24 · iPad 9</span>
+              </div>
+              <div style="font-size:var(--f-sm);margin-top:4px;">机器和描述一致，当面验机很爽快，还送了壳，靠谱。</div>
+            </div>
+            <div style="padding:var(--s-3) 0;border-bottom:1px solid var(--c-border);">
+              <div style="display:flex;gap:var(--s-2);align-items:center;font-size:var(--f-sm);color:var(--t-2);">
+                <span class="av" style="width:20px;height:20px;"></span>Zhou<span class="mini" style="margin-left:auto;">09-20 · AirPods Pro 2</span>
+              </div>
+              <div style="font-size:var(--f-sm);margin-top:4px;">沟通很耐心，面交地点说得清楚，全程没废话。</div>
+            </div>
+            <div style="padding-top:var(--s-3);">
+              <div style="display:flex;gap:var(--s-2);align-items:center;font-size:var(--f-sm);color:var(--t-2);">
+                <span class="av" style="width:20px;height:20px;"></span>骑车的小王<span class="mini" style="margin-left:auto;">09-15 · 机械键盘</span>
+              </div>
+              <div style="font-size:var(--f-sm);margin-top:4px;">东西没问题，包装都在，推荐。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 右侧卖家卡 -->
+      <div style="flex:0 0 300px;">
+        <div class="panel">
+          <div class="ph-head">信任信息</div>
+          <div class="ph-body">
+            <dl class="kv">
+              <dt>认证</dt><dd><span class="tagst pass">学号已认证</span></dd>
+              <dt>学院</dt><dd>计算机学院 · 大三</dd>
+              <dt>信用</dt><dd><span class="credit"><span class="lv high">信用高</span></span></dd>
+              <dt>成交</dt><dd>27 笔 · 好评率 98%</dd>
+              <dt>面交点</dt><dd>图书馆一楼中庭</dd>
+              <dt>注册</dt><dd>2024-09 入学注册</dd>
+            </dl>
+            <div class="mini" style="margin-top:var(--s-3);">
+              学号等实名信息<b>不对外展示</b>，只公开「已认证」与学院；信用只显示等级，不显示分数。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <div>
+    <b>P9 个人主页。</b>买家决策前的最后一步是「看卖家是谁」：认证、学院、成交、好评、信用五项前置到首屏。
+  </div>
+  <span class="x">原型 · 纯 HTML/CSS</span>
+</div>
+
+</body>
+</html>

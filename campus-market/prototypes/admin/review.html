@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A5 审核队列 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="too-small">管理端仅适配桌面浏览器（≥1024px，推荐 ≥1280px）。请使用电脑访问。</div>
+
+<div class="layout">
+  <aside class="sider">
+    <div class="logo"><span class="mark">校</span><span class="name">校园二手 · 管理后台</span></div>
+    <nav class="menu">
+      <div class="grp">运营</div>
+      <a class="mi" href="dashboard.html" data-perm="dashboard.view"><span class="ico">▦</span><span class="txt">数据看板</span></a>
+      <a class="mi" href="items.html" data-perm="item.view"><span class="ico">◫</span><span class="txt">商品管理</span></a>
+      <a class="mi" href="users.html" data-perm="user.view"><span class="ico">◉</span><span class="txt">用户管理</span></a>
+      <a class="mi on" href="review.html" data-perm="review.view"><span class="ico">◧</span><span class="txt">审核队列</span><span class="badge">27</span></a>
+      <a class="mi" href="orders.html" data-perm="order.view"><span class="ico">◑</span><span class="txt">订单管理</span></a>
+      <div class="grp">配置与数据</div>
+      <a class="mi" href="content.html" data-perm="content.view"><span class="ico">◐</span><span class="txt">内容管理</span></a>
+      <a class="mi" href="report.html" data-perm="report.view"><span class="ico">◈</span><span class="txt">数据报表</span></a>
+      <a class="mi" href="settings.html" data-perm="settings.view"><span class="ico">⚙</span><span class="txt">系统设置</span></a>
+    </nav>
+    <div class="sider-foot"><button class="fold">« 收起菜单</button></div>
+  </aside>
+
+  <div class="main">
+    <header class="header">
+      <div class="crumb">首页 / <span class="cur">审核队列</span></div>
+      <div class="hd-right">
+        <div class="hsearch">⌕ 搜索商品 / 用户 / 订单</div>
+        <div class="hicon">🔔<span class="dot"></span></div>
+        <div class="who"><span class="av">李</span><span>李审核<br><span class="rl js-role-name">审核员</span></span></div>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="notice info">
+        队列按<b>权重分</b>降序排列，不按进入时间——按时间等于让风险最高的单子排在最后。权重分 = 举报次数×3 + 图片风险分×2 + 卖家信用扣减 + 价格异常分 − 等待衰减补偿（每满 12h +1）。
+      </div>
+
+      <div class="card">
+        <div class="card-hd" style="border-bottom:0;">
+          <div class="seg" id="tabs">
+            <button class="on" data-tab="t1">商品审核 <b>18</b></button>
+            <button data-tab="t2">举报处理 <b>6</b></button>
+            <button data-tab="t3">申诉复审 <b>3</b></button>
+          </div>
+          <div class="right">
+            <span class="sub">连续审核：处置后自动跳下一条（J / K 切换）</span>
+            <button class="btn sm" data-perm="review.judge">批量通过</button>
+          </div>
+        </div>
+
+        <!-- 筛选栏 -->
+        <div class="filters">
+          <div class="fi"><label>关键词</label><input class="inp" placeholder="标题 / 商品 ID / 卖家"></div>
+          <div class="fi"><label>分类</label><select class="sel"><option>全部</option><option>教材教辅</option><option>数码电子</option></select></div>
+          <div class="fi"><label>风险</label><select class="sel"><option>全部</option><option>高风险（≥8 分）</option><option>价格异常</option><option>图片风险</option></select></div>
+          <div class="fi"><label>等待时长</label><select class="sel"><option>全部</option><option>已超时（&gt;24h）</option><option>临期（&gt;20h）</option></select></div>
+          <div class="fi"><label>提交时间</label><input class="date" value="2026-09-20 ~ 2026-09-26"></div>
+          <div class="right"><button class="btn">重置</button><button class="btn pri">查询</button></div>
+        </div>
+
+        <!-- T1 商品审核 -->
+        <div class="pane" id="t1">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th style="width:36px;"><input type="checkbox"></th>
+                  <th style="width:64px;">权重分</th>
+                  <th>商品</th>
+                  <th style="width:110px;">卖家</th>
+                  <th style="width:96px;">分类</th>
+                  <th style="width:96px;" class="num">价格</th>
+                  <th style="width:150px;">风险标记</th>
+                  <th style="width:120px;">等待时长</th>
+                  <th style="width:88px;">状态</th>
+                  <th style="width:200px;" class="num">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b style="color:var(--st-fail);">17.4</b></td>
+                  <td><div class="cell-main"><span class="thumb p1"></span><span class="ttl">iPad Pro 11 寸 2024 款 128G WiFi 版</span></div></td>
+                  <td><div class="two-l"><span>U10293 · 王同学</span><span class="s">信用 72 · 未认证</span></div></td>
+                  <td>数码电子</td>
+                  <td class="num">¥320</td>
+                  <td><span class="tag fail">价格异常</span> <span class="tag pending">图片风险 82</span></td>
+                  <td><span style="color:var(--st-fail);font-weight:500;">9h 12m</span><br><span class="two-l"><span class="s">临期</span></span></td>
+                  <td><span class="tag pending">待审核</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dItem">审核</button><button class="btn link" data-perm="review.judge">通过</button><button class="btn link dn" data-perm="review.forceoff">强制下架</button></div></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b style="color:var(--st-fail);">14.0</b></td>
+                  <td><div class="cell-main"><span class="thumb p2"></span><span class="ttl">高等数学（第七版）上下册 + 习题全解</span></div></td>
+                  <td><div class="two-l"><span>U10077 · 刘同学</span><span class="s">信用 118 · 已认证</span></div></td>
+                  <td>教材教辅</td>
+                  <td class="num">¥45</td>
+                  <td><span class="tag fail">被举报 ×2</span></td>
+                  <td><span style="color:var(--st-pending);font-weight:500;">26h 40m</span><br><span class="s" style="color:var(--st-fail);">已超时</span></td>
+                  <td><span class="tag pending">待审核</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dItem">审核</button><button class="btn link" data-perm="review.judge">通过</button><button class="btn link dn" data-perm="review.forceoff">强制下架</button></div></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td><b style="color:var(--st-pending);">9.6</b></td>
+                  <td><div class="cell-main"><span class="thumb p3"></span><span class="ttl">宜家折叠书桌 120×60 白色 带抽屉</span></div></td>
+                  <td><div class="two-l"><span>U10512 · 陈同学</span><span class="s">信用 96 · 已认证</span></div></td>
+                  <td>生活用品</td>
+                  <td class="num">¥120</td>
+                  <td><span class="tag pending">图片风险 61</span></td>
+                  <td>3h 05m</td>
+                  <td><span class="tag pending">待审核</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dItem">审核</button><button class="btn link" data-perm="review.judge">通过</button><button class="btn link dn" data-perm="review.forceoff">强制下架</button></div></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td>6.2</td>
+                  <td><div class="cell-main"><span class="thumb p4"></span><span class="ttl">考研数学笔记 手抄 三本 含真题整理</span></div></td>
+                  <td><div class="two-l"><span>U10338 · 赵同学</span><span class="s">信用 104 · 已认证</span></div></td>
+                  <td>图书笔记</td>
+                  <td class="num">¥68</td>
+                  <td><span class="tag plain">无</span></td>
+                  <td>1h 22m</td>
+                  <td><span class="tag pending">待审核</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dItem">审核</button><button class="btn link" data-perm="review.judge">通过</button><button class="btn link dn" data-perm="review.forceoff">强制下架</button></div></td>
+                </tr>
+                <tr>
+                  <td><input type="checkbox"></td>
+                  <td>4.0</td>
+                  <td><div class="cell-main"><span class="thumb p5"></span><span class="ttl">Nike 运动鞋 42 码 九成新 男女同款</span></div></td>
+                  <td><div class="two-l"><span>U10645 · 孙同学</span><span class="s">信用 100 · 已认证</span></div></td>
+                  <td>服饰鞋包</td>
+                  <td class="num">¥180</td>
+                  <td><span class="tag plain">无</span></td>
+                  <td>48m</td>
+                  <td><span class="tag pending">待审核</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dItem">审核</button><button class="btn link" data-perm="review.judge">通过</button><button class="btn link dn" data-perm="review.forceoff">强制下架</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">共 18 条　每页 20 条<div class="right"><button class="pg on">1</button><button class="pg">2</button><button class="pg">›</button></div></div>
+        </div>
+
+        <!-- T2 举报 -->
+        <div class="pane" id="t2" style="display:none;">
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th style="width:64px;">权重分</th><th>被举报对象</th><th style="width:120px;">举报原因</th>
+                  <th style="width:100px;">举报人</th><th style="width:150px;">凭证</th>
+                  <th style="width:120px;">等待时长</th><th style="width:88px;">状态</th><th style="width:200px;" class="num">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b style="color:var(--st-fail);">15.3</b></td>
+                  <td><div class="cell-main"><span class="thumb p2"></span><span class="ttl">高等数学（第七版）上下册</span></div></td>
+                  <td>疑似网图盗用</td>
+                  <td>U10155</td>
+                  <td><span class="tag plain">聊天记录</span> <span class="tag plain">对比图 ×2</span></td>
+                  <td><span style="color:var(--st-fail);">25h 10m</span></td>
+                  <td><span class="tag pending">待受理</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dReport">受理</button><button class="btn link" data-perm="review.judge">判不成立</button><button class="btn link dn" data-perm="review.forceoff">判成立</button></div></td>
+                </tr>
+                <tr>
+                  <td><b style="color:var(--st-pending);">11.8</b></td>
+                  <td><div class="cell-main"><span class="thumb p6"></span><span class="ttl">电动车 48V 二手 校内代步</span></div></td>
+                  <td>校外人员引流</td>
+                  <td>U10288</td>
+                  <td><span class="tag plain">截图 ×3</span></td>
+                  <td>12h 46m</td>
+                  <td><span class="tag run">处理中</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dReport">受理</button><button class="btn link" data-perm="review.judge">判不成立</button><button class="btn link dn" data-perm="review.forceoff">判成立</button></div></td>
+                </tr>
+                <tr>
+                  <td>7.5</td>
+                  <td><div class="cell-main"><span class="thumb p1"></span><span class="ttl">机械键盘 87 键 茶轴</span></div></td>
+                  <td>成色描述不符</td>
+                  <td>U10401</td>
+                  <td><span class="tag plain">实物图</span></td>
+                  <td>2h 08m</td>
+                  <td><span class="tag pending">待受理</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dReport">受理</button><button class="btn link" data-perm="review.judge">判不成立</button><button class="btn link dn" data-perm="review.forceoff">判成立</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">共 6 条<div class="right"><button class="pg on">1</button></div></div>
+        </div>
+
+        <!-- T3 申诉 -->
+        <div class="pane" id="t3" style="display:none;">
+          <div class="notice warn" style="margin:var(--s-4);">
+            换人复审原则：原处置人不得复审自己的单。系统对同一 <code>review_id</code> 的复审请求做处置人比对，命中则强制转派。
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th style="width:64px;">优先级</th><th>申诉对象</th><th style="width:110px;">原处置</th>
+                  <th style="width:110px;">原处置人</th><th style="width:150px;">新凭证</th>
+                  <th style="width:120px;">剩余时效</th><th style="width:88px;">状态</th><th style="width:200px;" class="num">操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="tag fail">最高</span></td>
+                  <td><div class="cell-main"><span class="thumb p2"></span><span class="ttl">高等数学（第七版）上下册</span></div></td>
+                  <td><span class="tag fail">强制下架</span></td>
+                  <td>李审核</td>
+                  <td><span class="tag plain">购书凭证</span> <span class="tag plain">实物图</span></td>
+                  <td><span style="color:var(--st-fail);">剩 4h 20m</span></td>
+                  <td><span class="tag pending">待复审</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dReport">复审</button><button class="btn link" data-perm="review.appeal">维持</button><button class="btn link" data-perm="review.appeal">撤销</button></div></td>
+                </tr>
+                <tr>
+                  <td><span class="tag fail">最高</span></td>
+                  <td><div class="cell-main"><span class="thumb p3"></span><span class="ttl">宜家折叠书桌 120×60</span></div></td>
+                  <td><span class="tag fail">已驳回</span></td>
+                  <td>李审核</td>
+                  <td><span class="tag plain">补充实拍</span></td>
+                  <td>剩 21h 05m</td>
+                  <td><span class="tag pending">待复审</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dReport">复审</button><button class="btn link" data-perm="review.appeal">维持</button><button class="btn link" data-perm="review.appeal">撤销</button></div></td>
+                </tr>
+                <tr>
+                  <td><span class="tag fail">最高</span></td>
+                  <td><div class="cell-main"><span class="thumb p5"></span><span class="ttl">Nike 运动鞋 42 码</span></div></td>
+                  <td><span class="tag fail">扣分 −10</span></td>
+                  <td>王运营</td>
+                  <td><span class="tag plain">聊天记录</span></td>
+                  <td>剩 33h 50m</td>
+                  <td><span class="tag pending">待复审</span></td>
+                  <td><div class="ops"><button class="btn link" data-open="dReport">复审</button><button class="btn link" data-perm="review.appeal">维持</button><button class="btn link" data-perm="review.appeal">撤销</button></div></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">共 3 条<div class="right"><button class="pg on">1</button></div></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-bd" style="font-size:var(--f-xs);color:var(--text-3);line-height:1.8;">
+          <b style="color:var(--text-2);">时效口径</b>　商品审核 SLA：首审响应 ≤ 2 小时达标、P95 ≤ 6 小时、超 24 小时记积压红牌；申诉承诺 48 小时内给出复审结论。
+          表格中「等待时长」列直接标出临期与超时，保证审核员第一眼看到该先处理谁——这是 SLA 落到操作层的唯一入口。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Drawer：商品审核 ─────────────────────────────────── -->
+<div class="drawer-mask" id="dItem" style="display:none;">
+  <div class="drawer">
+    <div class="drawer-hd"><h3>商品审核</h3><span class="tag pending">待审核</span><button class="x" data-close>×</button></div>
+    <div class="drawer-bd">
+      <div class="notice err" style="margin-bottom:var(--s-2);">
+        价格异常：该商品标价 ¥320，同类目近 30 日成交均价 ¥2,860，偏离 8.9 倍。请重点核实是否为引流虚假商品。
+      </div>
+
+      <div class="sec-t">① 图片（4 张）</div>
+      <div class="pics">
+        <div class="pic p1"></div><div class="pic p2"></div><div class="pic p3"></div><div class="pic p4"></div>
+      </div>
+      <div class="quote">图片风险分 <b>82</b>（违禁图识别给出 0–100）：检测到疑似二维码区域 1 处、疑似网络图 2 张。建议放大核验是否有联系方式引流。</div>
+
+      <div class="sec-t">② 标题与描述</div>
+      <dl class="kv">
+        <dt>标题</dt><dd>iPad Pro 11 寸 2024 款 128G WiFi 版</dd>
+        <dt>成色</dt><dd><span class="tag g-b">B 轻微使用痕迹</span></dd>
+        <dt>校区</dt><dd>东校区</dd>
+        <dt>面交点</dt><dd>图书馆一楼中庭（08:00–22:00）</dd>
+        <dt>描述</dt><dd>去年入学买的，屏幕无划痕，电池健康 92%。配件齐全，可当面验机。支持校内面交，校外勿扰。</dd>
+      </dl>
+      <div class="quote">命中关键词检查：<b>「校外勿扰」</b> 属于正常表述；未检出校外引流、违禁品词。</div>
+
+      <div class="sec-t">③ 价格</div>
+      <dl class="kv">
+        <dt>标价</dt><dd style="color:var(--st-fail);font-weight:600;">¥320 <span style="font-weight:400;color:var(--text-3);">（同类目均价 ¥2,860）</span></dd>
+        <dt>原价</dt><dd>¥6,799</dd>
+      </dl>
+
+      <div class="sec-t">④ 分类与成色</div>
+      <div class="quote">分类「数码电子」匹配；成色 B 与描述「屏幕无划痕、电池 92%」基本一致。</div>
+
+      <div class="sec-t">卖家信息</div>
+      <dl class="kv">
+        <dt>账号</dt><dd>U10293 · 王同学 · 计算机学院</dd>
+        <dt>认证</dt><dd><span class="tag off">未认证</span></dd>
+        <dt>信用分</dt><dd>72 <span style="color:var(--text-3);">（低于 80，本次已加权）</span></dd>
+        <dt>在售 / 成交</dt><dd>14 件 / 2 笔</dd>
+      </dl>
+      <div class="warnbox">该账号于 09-26 03:12–03:40 连续发布 14 件同类商品，命中<b>疑似刷量</b>规则，建议与价格异常合并判断。</div>
+
+      <div class="sec-t">处置留痕</div>
+      <div class="tl">
+        <div class="it"><span class="t">09-26 02:58</span><span class="c">商品提交，进入审核队列</span></div>
+        <div class="it"><span class="t">09-26 03:41</span><span class="c">疑似刷量规则命中，权重分 +3</span></div>
+        <div class="it"><span class="t">09-26 08:02</span><span class="c">用户 U10455 举报「价格异常」，权重分 +3</span></div>
+        <div class="it"><span class="t">09-26 12:10</span><span class="c">当前等待 9h 12m，权重分 17.4，队列第 1 位</span></div>
+      </div>
+    </div>
+    <div class="drawer-ft">
+      <span style="font-size:var(--f-xs);color:var(--text-3);">连续审核：处置后自动跳下一条 · J 下一条 / K 上一条</span>
+      <div class="right">
+        <button class="btn" data-close>跳过</button>
+        <button class="btn danger" data-perm="review.forceoff">强制下架</button>
+        <button class="btn" data-perm="review.judge">驳回（选原因）</button>
+        <button class="btn pri" data-perm="review.judge">通过</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Drawer：举报 / 申诉受理 ──────────────────────────── -->
+<div class="drawer-mask" id="dReport" style="display:none;">
+  <div class="drawer">
+    <div class="drawer-hd"><h3>举报受理</h3><span class="tag run">处理中</span><button class="x" data-close>×</button></div>
+    <div class="drawer-bd">
+      <div class="sec-t">举报内容</div>
+      <dl class="kv">
+        <dt>举报人</dt><dd>U10155 · 已认证</dd>
+        <dt>原因</dt><dd>疑似网图盗用</dd>
+        <dt>说明</dt><dd>该卖家图片与某电商平台商品页完全一致，且拒绝提供实物拍摄。</dd>
+        <dt>凭证</dt><dd>聊天记录片段 ×1、对比图 ×2</dd>
+      </dl>
+
+      <div class="sec-t">被举报方陈述</div>
+      <div class="quote">「图片是去年买的时候保存的官图，实物图我重新拍了，只是还没替换。可以当面验货。」</div>
+
+      <div class="sec-t">取证材料</div>
+      <div class="pics">
+        <div class="pic p2"></div><div class="pic p5"></div><div class="pic p6"></div>
+      </div>
+
+      <div class="sec-t">处置建议</div>
+      <div class="notice info">系统建议：<b>成立-轻</b>（警告 + 下架整改）。依据：图片确为网络图，但卖家已补充实物图且信用分 118 无历史违规。</div>
+
+      <div class="sec-t">处置后的申诉通道</div>
+      <div class="quote">被处置方可申诉一次，申诉队列优先级高于普通审核，且原处置人不得复审。</div>
+    </div>
+    <div class="drawer-ft">
+      <span style="font-size:var(--f-xs);color:var(--text-3);">裁决后双方各收到通知：举报人看结果，被举报人看理由</span>
+      <div class="right">
+        <button class="btn" data-close>取消</button>
+        <button class="btn" data-perm="review.judge">判不成立</button>
+        <button class="btn danger" data-perm="review.forceoff">判成立并处置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+document.querySelectorAll('#tabs button').forEach(function (b) {
+  b.addEventListener('click', function () {
+    document.querySelectorAll('#tabs button').forEach(function (x) { x.classList.remove('on'); });
+    b.classList.add('on');
+    document.querySelectorAll('.pane').forEach(function (p) { p.style.display = 'none'; });
+    document.getElementById(b.dataset.tab).style.display = '';
+  });
+});
+</script>
+</body>
+</html>

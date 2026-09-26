@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A1 登录 · 管理端</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body class="login-page">
+
+<div class="login-card">
+  <h1>校园二手交易平台 · 管理后台</h1>
+  <div class="sub">A1 登录 ｜ 仅桌面端，≥1280px 可用</div>
+
+  <form onsubmit="return false;">
+    <div class="field" style="margin-bottom:var(--s-3);">
+      <label for="u">管理员账号</label>
+      <input class="inp wide" id="u" placeholder="请输入账号" value="admin_zhang">
+    </div>
+    <div class="field" style="margin-bottom:var(--s-3);">
+      <label for="p">密码</label>
+      <input class="inp wide" id="p" type="password" placeholder="请输入密码" value="········">
+    </div>
+    <div class="field" style="margin-bottom:var(--s-2);">
+      <label for="c">图形验证码</label>
+      <div class="capbox">
+        <input class="inp" id="c" placeholder="右侧 4 位字符" style="flex:1;min-width:0;">
+        <div class="code" title="点击刷新">7K2Q</div>
+      </div>
+    </div>
+    <div class="notice info" style="margin-top:var(--s-3);">
+      登录成功后按角色分流：菜单与操作按钮按权限矩阵渲染，无权限项不渲染（不是置灰）。
+    </div>
+    <button class="btn pri" type="button" onclick="loginAs(document.querySelector('.acc.on').dataset.role)">登 录</button>
+  </form>
+
+  <div style="margin-top:var(--s-4);font-size:var(--f-xs);color:var(--text-3);text-align:center;">
+    忘记密码请联系系统管理员 ｜ 所有写操作均记入操作日志
+  </div>
+</div>
+
+<div class="accounts">
+  <h4>演示账号（点击切换，决定登录后可见范围）</h4>
+  <button class="acc on" data-role="super"    onclick="pick(this)"><span class="n">admin_zhang</span><span class="d">超级管理员 · 全部权限</span></button>
+  <button class="acc"    data-role="reviewer" onclick="pick(this)"><span class="n">review_li</span><span class="d">审核员 · 仅审核域可写</span></button>
+  <button class="acc"    data-role="operator" onclick="pick(this)"><span class="n">ops_wang</span><span class="d">运营 · 商品/用户/订单/内容</span></button>
+  <button class="acc"    data-role="viewer"   onclick="pick(this)"><span class="n">view_zhao</span><span class="d">只读 · 答辩巡盘账号</span></button>
+
+  <div style="margin-top:var(--s-3);padding-top:var(--s-3);border-top:1px solid var(--border);line-height:1.7;color:var(--text-3);">
+    <b style="color:var(--text-2);">隔离口径</b><br>
+    以「权限点」而非「页面」为最小粒度：<br>
+    <code>review.judge</code> 与 <code>user.ban</code> 互斥，<br>
+    审核员可裁决商品但不可封禁账号。<br>
+    前端隐藏 + 后端同矩阵校验，双保险。
+  </div>
+</div>
+
+<script src="admin.js"></script>
+<script>
+function pick(el){
+  document.querySelectorAll('.acc').forEach(function(a){a.classList.remove('on');});
+  el.classList.add('on');
+}
+</script>
+</body>
+</html>

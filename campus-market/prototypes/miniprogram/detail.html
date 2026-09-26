@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · 小程序 M2 商品详情</title>
+<link rel="stylesheet" href="mini.css">
+</head>
+<body>
+<div class="stage">
+
+  <div class="note">
+    <span class="tag">M2 详情</span>
+    <b>半熟人信任一眼可见：</b>学号认证、同校、面交点三项必须在首屏可见。底部固定操作条 50pt + 安全区，左侧收藏/聊一聊，右侧主行动「我想要」占 60%。
+  </div>
+
+  <div class="phone">
+    <div class="statusbar">
+      <span>9:41</span>
+      <span class="icons"><i class="ic"></i><i class="ic"></i><i class="ic bat"></i></span>
+    </div>
+
+    <div class="navsub">
+      <span class="back"></span>
+      <span class="title">商品详情</span>
+      <span class="capsule"><span class="dot"></span><span class="more"></span><span class="close"></span></span>
+    </div>
+
+    <div class="page">
+      <!-- 图集 -->
+      <div style="position:relative;">
+        <div style="height:300px;"><div class="ph p2" style="width:100%;height:100%;">iPad · 实拍图 1/5</div></div>
+        <span class="badge dark" style="left:12px;top:12px;">可议价</span>
+        <span style="position:absolute;right:12px;bottom:12px;background:rgba(35,35,42,.6);color:#fff;font-size:11px;border-radius:10px;padding:2px 8px;">1 / 5</span>
+      </div>
+
+      <!-- 价格盒 -->
+      <div class="card" style="border-radius:0;padding:var(--s-4) var(--s-3);">
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:26px;font-weight:700;color:var(--c-price);line-height:1.1;">¥1,580</span>
+          <span style="font-size:var(--f-sm);color:var(--t-3);text-decoration:line-through;">¥2,499</span>
+          <span class="cond b" style="margin-left:auto;">B 几乎全新</span>
+        </div>
+        <div style="font-size:var(--f-md);font-weight:600;margin-top:8px;line-height:1.5;">
+          iPad 9 64G WiFi 版 无磕碰 电池健康 92%
+        </div>
+        <div style="display:flex;gap:6px;margin-top:8px;">
+          <span style="font-size:var(--f-xs);color:var(--c-brand-text);background:var(--c-brand-bg);border-radius:var(--r-sm);padding:2px 6px;">可议价</span>
+          <span style="font-size:var(--f-xs);color:var(--t-2);background:var(--c-bg);border-radius:var(--r-sm);padding:2px 6px;">校内面交</span>
+          <span style="font-size:var(--f-xs);color:var(--t-2);background:var(--c-bg);border-radius:var(--r-sm);padding:2px 6px;">同院优先</span>
+        </div>
+        <div class="mini" style="margin-top:8px;">3.2 万浏览 · 12 人想要 · 3 小时前发布 · 西区</div>
+      </div>
+
+      <!-- 参数 -->
+      <div class="field" style="margin-top:8px;">
+        <div class="frow"><span class="lb">分类</span><span class="val">数码电子 / 平板电脑</span></div>
+        <div class="frow"><span class="lb">成色</span><span class="val">B 级 · 几乎全新（无划痕，功能正常）</span></div>
+        <div class="frow"><span class="lb">校区</span><span class="val">西区 · 3 号宿舍楼</span></div>
+        <div class="frow"><span class="lb">面交点</span><span class="val">西区食堂南门<span class="arrow" style="margin-left:6px;"></span></span></div>
+        <div class="frow"><span class="lb">数量</span><span class="val">1 件</span></div>
+      </div>
+
+      <!-- 卖家 -->
+      <div class="card" style="margin-top:8px;padding:var(--s-4) var(--s-3);display:flex;align-items:center;gap:var(--s-3);">
+        <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#FF8A33,#FF6A00);display:grid;place-items:center;color:#fff;font-size:var(--f-md);">刘</div>
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="font-size:var(--f-base);font-weight:600;">阿刘</span>
+            <span class="verified">学号已认证</span>
+          </div>
+          <div class="mini" style="margin-top:2px;">计算机学院 · 大三 · 成交 27 笔</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="credit"><span class="lv high">信用高</span></div>
+          <div class="mini" style="margin-top:4px;">进店 ›</div>
+        </div>
+      </div>
+
+      <!-- 描述 -->
+      <div class="card" style="margin-top:8px;padding:var(--s-4) var(--s-3);">
+        <div style="font-size:var(--f-base);font-weight:600;">商品描述</div>
+        <div style="font-size:var(--f-sm);color:var(--t-2);line-height:1.8;margin-top:6px;">
+          去年入学买的，主要用于记笔记和看网课，保护得很好，全程贴膜带壳，屏幕无划痕，边框无磕碰。电池健康 92%，随机器附赠原装充电器和第三方保护壳。<br><br>
+          考研结束出给需要的学弟学妹，价格可小刀，大刀勿扰。只走校内面交，当面验机，满意再付款。
+        </div>
+      </div>
+
+      <!-- 面交点：静态校园示意（可扩展为 wx.openLocation） -->
+      <div class="card" style="margin-top:8px;">
+        <div class="mapbox">
+          <div class="road h"></div><div class="road v"></div>
+          <div class="blk" style="left:8%;top:12%;width:26%;height:22%;"></div>
+          <div class="blk" style="left:52%;top:14%;width:34%;height:26%;"></div>
+          <div class="blk" style="left:12%;top:62%;width:30%;height:24%;"></div>
+          <div class="blk" style="left:56%;top:58%;width:32%;height:28%;"></div>
+          <div class="pin" style="left:60%;top:40%;"></div>
+          <div class="lbl">西区食堂南门 · 距你 320m</div>
+        </div>
+        <div class="mapbar">
+          <div class="txt">西区食堂南门（校内有监控）<small>开放时段 08:00–22:00 · 本周 46 笔在此成交</small></div>
+          <div class="btn sm">导航</div>
+        </div>
+      </div>
+
+      <div class="notice gray" style="margin-top:8px;">
+        <span class="fl">!</span>
+        <div><b>原型说明：</b>面交地图为静态校园示意图，未调起第三方地图。组件已按「地图容器 + 导航按钮」拆分，后续接入时只需把 <b>导航</b> 换成 <b>wx.openLocation</b> 调用，版式不变。</div>
+      </div>
+
+      <div class="notice warn" style="margin-top:0;">
+        <span class="fl">!</span>
+        <div><b>校园面交须知：</b>① 请在监控覆盖的校内面交点交易；② 当面验货，满意再确认收货；③ 当场拒收不计违约；④ 任何要求站外付款的都是诈骗。</div>
+      </div>
+
+      <div class="mini" style="padding:12px 12px 24px;text-align:center;">— 已经到底了 —</div>
+    </div>
+
+    <!-- 底部操作条 -->
+    <div class="actionbar">
+      <div class="iconbtn">收藏</div>
+      <div class="grow">
+        <div class="btn">聊一聊</div>
+        <div class="btn pri">我想要</div>
+      </div>
+    </div>
+    <div class="safebar"><div class="bar"></div></div>
+  </div>
+
+  <div class="note">
+    <span class="tag">判据</span>
+    ①成色 A–D 与 Web 端、管理端同一套编码；②信用分<b>不暴露具体分数</b>，只显示等级（高/中/低）；③「我想要」→ 确认订单（面交点 + 时间）→ 模拟支付 → 待面交，待付款 30 分钟超时自动取消。
+  </div>
+
+</div>
+</body>
+</html>

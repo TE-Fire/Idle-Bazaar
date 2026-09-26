@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>原型总目录 · 校园二手交易平台</title>
+<link rel="stylesheet" href="admin/admin.css">
+</head>
+<body>
+
+<div class="dir">
+  <h1>校园二手交易平台 · 三端原型总目录</h1>
+  <p class="lead">
+    原型按端分目录存放：<code>web/</code>（用户 Web 端）、<code>miniprogram/</code>（微信小程序）、<code>admin/</code>（管理后台）。
+    每端有独立入口页与共用样式表。视觉依据 <code>design/</code> 三份规范，业务依据 <code>business/</code> 三份流程文档。
+  </p>
+
+  <div class="sec">
+    <h2>三端</h2>
+    <div class="cards">
+      <a class="pcard" href="web/web-index.html">
+        <div class="h"><span class="code">Web</span><span class="t">用户 Web 端（P1–P9）</span></div>
+        <div class="d">大屏网格电商型（闲鱼网页版 / eBay）。黄 <code>#FFD100</code> + 黑字。<b>发布 + 比价端</b>：拖拽多图批量发布、最多 4 件横评、常驻筛选、双视图。</div>
+        <div class="k">9 页 · 共用 <code>web/web.css</code></div>
+      </a>
+      <a class="pcard" href="miniprogram/index.html">
+        <div class="h"><span class="code">小程序</span><span class="t">移动端微信小程序（M1–M10）</span></div>
+        <div class="d">社区信息流型（闲鱼 / Carousell）。橙 <code>#FF6A00</code> + 白字。<b>逛 + 聊 + 交割端</b>：双列瀑布流、IM 三分区、面交约定卡、扫码核销、学号认证。</div>
+        <div class="k">9 页 · 共用 <code>miniprogram/mini.css</code> · 1pt = 2rpx</div>
+      </a>
+      <a class="pcard" href="admin/index.html">
+        <div class="h"><span class="code">管理端</span><span class="t">管理后台 Web（A1–A9）</span></div>
+        <div class="d">分析台 Light Card（Ant Design Pro）。蓝 <code>#1677FF</code>。<b>查 + 判 + 配端</b>：看板巡盘、审核裁决、字典配置；是全平台状态机的唯一权威。</div>
+        <div class="k">9 页 · 共用 <code>admin/admin.css</code> + <code>admin.js</code>（权限隔离）</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="tips">
+    <b>三端主色不统一是刻意的</b>——角色化色彩策略：用户端暖色（逛的场景）、管理端蓝色（查的场景），使用者角色与任务不同。
+    Primitive Token 三端共用，Semantic 主色各端覆盖；状态色语义（待审核橙 / 通过绿 / 拒绝红 / 停用灰）与成色评级 A–D 全端一致，由管理端字典下发。
+  </div>
+</div>
+
+</body>
+</html>

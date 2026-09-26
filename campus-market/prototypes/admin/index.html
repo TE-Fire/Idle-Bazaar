@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理端原型目录 · 校园二手交易平台</title>
+<link rel="stylesheet" href="admin.css">
+</head>
+<body>
+
+<div class="dir">
+  <h1>管理端 Web 原型（A1–A9）</h1>
+  <p class="lead">
+    方向：<b>Y 分析台 Light Card</b>（Ant Design Pro 风格）· 主色蓝 <code>#1677FF</code> · 仅适配 ≥1280px，不做移动端。
+    视觉依据 <code>design/03-管理端Web-UI设计规范.md</code>，业务依据 <code>business/03-管理端-业务与流程.md</code>。
+    样式与权限逻辑分别收在 <code>admin.css</code> / <code>admin.js</code>，页面内不写死色值。
+  </p>
+
+  <div class="sec">
+    <h2>入口</h2>
+    <div class="cards">
+      <a class="pcard" href="login.html">
+        <div class="h"><span class="code">A1</span><span class="t">登录与角色分流</span></div>
+        <div class="d">账号 + 密码 + 图形验证码。四个演示账号对应四种角色，登录后菜单与按钮<b>按权限点真实渲染</b>，无权限项不出现。</div>
+        <div class="k">关键：<b>权限隔离真实实现</b>（前端渲染 + 后端同矩阵校验）</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>P0 · 核心处置</h2>
+    <div class="cards">
+      <a class="pcard" href="dashboard.html">
+        <div class="h"><span class="code">A2</span><span class="t">数据看板</span></div>
+        <div class="d">KPI×4 → <b>审核时效 SLA</b> → 趋势 → 构成 → TOP-N → 待处置队列 → 异常预警。共 5 张图表（规范上限）。</div>
+        <div class="k">新增：<b>SLA 指标卡</b>（平均首审 / 达标率 / P95 / 积压 / 单条处置）+ 近 14 日首审时长柱图</div>
+      </a>
+      <a class="pcard" href="review.html">
+        <div class="h"><span class="code">A5</span><span class="t">审核队列</span></div>
+        <div class="d">商品审核 / 举报 / 申诉三 Tab。<b>按权重分排序</b>而非时间；Drawer 内完成四项判读，支持连续审核（J / K）。</div>
+        <div class="k">关键：<b>等待时长列标出临期与超时</b>，SLA 落到操作层</div>
+      </a>
+      <a class="pcard" href="items.html">
+        <div class="h"><span class="code">A3</span><span class="t">商品管理</span></div>
+        <div class="d">表格 + 筛选 + 批量下架 / 删除 + 详情 Drawer（含状态流转时间轴）。</div>
+        <div class="k">边界：<b>无置顶推广</b>、<b>不代卖家改价改描述</b></div>
+      </a>
+      <a class="pcard" href="users.html">
+        <div class="h"><span class="code">A4</span><span class="t">用户管理</span></div>
+        <div class="d">全部用户 + 学号认证审核。认证为低频高责任动作，<b>不做批量通过</b>；信用分仅本端可见。</div>
+        <div class="k">关键：姓名 / 学号 / 学院三项核对 + 常见驳回原因预设</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>P1 · 订单、配置与数据</h2>
+    <div class="cards">
+      <a class="pcard" href="orders.html">
+        <div class="h"><span class="code">A6</span><span class="t">订单管理</span></div>
+        <div class="d">六状态 Tab + 订单详情 + <b>纠纷介入 Drawer</b>。</div>
+        <div class="k">关键：取证看<b>商品快照</b>而非当前商品；当面拒收不计违约</div>
+      </a>
+      <a class="pcard" href="content.html">
+        <div class="h"><span class="code">A7</span><span class="t">内容管理</span></div>
+        <div class="d">四张字典：分类树 / 成色等级 A–D / 面交点 / 学院与校区。<b>全端一致性的源头</b>，后台下发，三端不得硬编码。</div>
+      </a>
+      <a class="pcard" href="report.html">
+        <div class="h"><span class="code">A8</span><span class="t">数据报表</span></div>
+        <div class="d">校园独有四张图：学期时间轴对比 / 学院×品类热力矩阵 / 校内面交所热力 / 二手循环率（减碳）+ 审核员 SLA 明细。</div>
+        <div class="k">关键：<b>减碳系数标注为估算假设</b>，附系数表与三条局限</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h2>P2 · 系统</h2>
+    <div class="cards">
+      <a class="pcard" href="settings.html">
+        <div class="h"><span class="code">A9</span><span class="t">系统设置</span></div>
+        <div class="d">管理员账号 / <b>角色权限矩阵</b> / SLA 阈值配置 / 操作日志。仅超级管理员可见。</div>
+        <div class="k">关键：<code>review.judge</code> 与 <code>user.ban</code> 互斥</div>
+      </a>
+    </div>
+  </div>
+
+  <div class="tips">
+    <b>本次三项未决问题的落地</b><br>
+    ① <b>权限隔离真实实现</b>：以「权限点」为最小粒度（16 个），四种角色各自持有子集；前端按 <code>data-perm</code> 渲染菜单与按钮，无权限的菜单项直接不渲染、按钮置灰加锁；
+    页面顶部角色条实时显示「本页已按角色隐藏/锁定 N 个操作」；同一张矩阵在后端做接口鉴权，前端隐藏只是体验层。用右上角「切换角色」可逐角色验证。<br>
+    ② <b>审核时效 SLA</b>：定为两级指标——响应时效（首审 ≤ 2h 达标、P95 ≤ 6h、达标率 ≥ 95%、超 24h 记积压红牌）与操作效率（单条平均处置 ≤ 30s），两者不可混用；
+    看板新增 SLA 卡、审核队列「等待时长」列标临期/超时、报表新增分审核员明细、设置页可调阈值。<br>
+    ③ <b>减碳系数</b>：明确标注为<b>估算假设</b>而非实测。报表页循环率卡片内嵌警告条，并提供「系数与假设」弹窗（系数表 + 计算公式 + 三条已知局限 + 改进方向）。<br>
+    <br>
+    <b>演示建议</b>　用 <code>login.html</code> 分别以「审核员 / 只读」登录，对比审核队列页的操作列与左侧菜单，权限差异一眼可见。
+  </div>
+</div>
+
+</body>
+</html>

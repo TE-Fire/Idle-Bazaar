@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>跳蚤校园 · Web 端 P7 我的</title>
+<link rel="stylesheet" href="web.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="nav-in">
+    <div class="logo"><span class="mark">蚤</span>跳蚤校园</div>
+    <div class="campus">当前校区 <b>中心校区 ▾</b></div>
+    <form class="search" onsubmit="return false">
+      <span class="sel">全部分类 ▾</span>
+      <input placeholder="高等数学 / iPad / 山地车 / 宿舍桌">
+      <button>搜索</button>
+    </form>
+    <div class="nav-acts">
+      <button class="btn-pub">＋ 发布闲置</button>
+      <a class="lnk">消息<span class="dot">3</span></a>
+      <a class="lnk on">我的</a>
+      <span class="avatar"></span>
+    </div>
+  </div>
+</div>
+
+<div class="cat">
+  <div class="cat-in">
+    <a class="on">首页</a><a>教材教辅</a><a>数码电子</a><a>自行车</a><a>宿舍家具</a>
+    <a>服饰鞋包</a><a>运动器材</a><a>乐器</a><a>票务卡券</a><a>其他闲置</a>
+    <div class="right"><span>我的收藏</span><span>浏览历史</span><span>校园面交点</span></div>
+  </div>
+</div>
+
+<div class="shell narrow">
+  <div class="main">
+    <div class="crumb"><b>首页</b> / 我的</div>
+
+    <!-- 头部 -->
+    <div class="uhead">
+      <div class="av">满</div>
+      <div>
+        <div class="nm">林小满
+          <span class="tagst pass">学号已认证</span>
+          <span class="credit"><span class="lv high">信用高</span></span>
+        </div>
+        <div class="sub">计算机学院 · 大三 · 中心校区 · 常用面交点：图书馆一楼中庭</div>
+      </div>
+      <div class="acts">
+        <button class="btn">设置</button>
+        <button class="btn pri">＋ 发布闲置</button>
+      </div>
+    </div>
+
+    <div class="stat4">
+      <div><b>3</b><span>在售</span></div>
+      <div><b>12</b><span>已卖出</span></div>
+      <div><b>8</b><span>已买到</span></div>
+      <div><b>27</b><span>收藏</span></div>
+    </div>
+
+    <!-- 待办 -->
+    <div class="panel" style="margin-top:var(--s-4);">
+      <div class="ph-head">待办<span class="sub">2 项需要处理</span></div>
+      <div class="ph-body">
+        <dl class="kv">
+          <dt>待确认</dt><dd>订单 #20260926 已到约定时间，<a style="color:var(--c-price);font-weight:600;">去确认收货 ›</a></dd>
+          <dt>审核</dt><dd>「毕业甩卖 电饭煲」未通过：图片非实拍，<a style="color:var(--c-price);font-weight:600;">看原因并修改 ›</a></dd>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="tabs" style="margin-top:var(--s-6);">
+      <a class="on">我发布的（3）</a>
+      <a>我卖出的（12）</a>
+      <a>我买到的（8）</a>
+      <a>我的收藏（27）</a>
+    </div>
+
+    <div class="toolbar">
+      <span class="n">共 <b>3</b> 件</span>
+      <span class="sp"></span>
+      <select class="sel"><span>全部状态</span></select>
+      <select class="sel">发布时间</select>
+    </div>
+
+    <!-- 我发布的：卡片带管理操作 -->
+    <div class="grid">
+      <div class="card">
+        <div class="ph">
+          <div class="pic p2 a" style="width:100%;height:100%;">iPad</div>
+          <div class="pic p6 b" style="width:100%;height:100%;">边框</div>
+          <span class="tag">在售</span>
+        </div>
+        <div class="bd">
+          <div class="tt">iPad 9 64G WiFi 版 无磕碰 电池 92%</div>
+          <div class="pr"><b>¥1580</b><s>¥2499</s></div>
+          <div class="mt"><span class="cond b">B 几乎全新</span>中心校区 · 12 人想要</div>
+        </div>
+        <div class="ft">
+          <a style="color:var(--t-2);">编辑</a>
+          <a style="color:var(--t-2);">下架</a>
+          <span class="sch">3 小时前</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ph">
+          <div class="pic p5 a" style="width:100%;height:100%;">教材</div>
+          <div class="pic p3 b" style="width:100%;height:100%;">内页</div>
+          <span class="tag">在售</span>
+        </div>
+        <div class="bd">
+          <div class="tt">考研数学一全套 张宇+李永乐 全新未拆</div>
+          <div class="pr"><b>¥35</b><s>¥128</s></div>
+          <div class="mt"><span class="cond a">A 全新未拆</span>中心校区 · 31 人想要</div>
+        </div>
+        <div class="ft">
+          <a style="color:var(--t-2);">编辑</a>
+          <a style="color:var(--t-2);">下架</a>
+          <span class="sch">昨天</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="ph">
+          <div class="pic p7 a" style="width:100%;height:100%;">电饭煲</div>
+          <div class="pic p6 b" style="width:100%;height:100%;">实拍</div>
+          <span class="tag hot">审核未过</span>
+        </div>
+        <div class="bd">
+          <div class="tt">毕业甩卖 电饭煲 3L 内胆完好</div>
+          <div class="pr"><b>¥45</b></div>
+          <div class="mt" style="color:var(--c-err);">原因：图片非实拍，请重新上传</div>
+        </div>
+        <div class="ft">
+          <a style="color:var(--c-price);font-weight:600;">修改重提</a>
+          <a style="color:var(--t-2);">删除</a>
+          <span class="sch">2 小时前</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-top:var(--s-6);">
+      <div class="ph-head">说明</div>
+      <div class="ph-body">
+        <div class="mini">
+          · 商品管理只有<b>编辑 / 下架 / 删除</b>三种操作，<b>无置顶与付费推广</b>——校园平台靠学区与成色做排序，不引入商业化曝光位。<br>
+          · 信用只显示等级（高 / 中 / 低），不对外展示具体分数。<br>
+          · 「已预定」状态已取消：拍下不锁货，付款成功后商品才转为已售出。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="demonote">
+  <div>
+    <b>P7 我的。</b>待办区前置（审核结果 / 待确认订单），避免像 Vinted 那样要点好几层才看到关键信息。
+  </div>
+  <span class="x">原型 · 纯 HTML/CSS</span>
+</div>
+
+</body>
+</html>

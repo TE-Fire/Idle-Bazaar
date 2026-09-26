@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nimbus · AI-Native UI 生成式界面</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #F7F7FB;
+    --card: #FFFFFF;
+    --line: #E7E7F0;
+    --ink: #171725;
+    --mute: #75758C;
+    --accent: #6D4AFF;
+    --accent2: #00B8A9;
+  }
+  body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--ink);
+    padding: 32px 24px 64px; line-height: 1.6;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 22px; }
+  .back {
+    text-decoration: none; color: var(--ink); font-size: 14px; font-weight: 600;
+    padding: 9px 16px; border-radius: 10px; background: #fff; border: 1px solid var(--line);
+  }
+  .back:hover { border-color: var(--accent); color: var(--accent); }
+  .tagline { font-size: 12.5px; letter-spacing: .1em; color: var(--mute); font-weight: 600; }
+
+  /* ── 无 JS 的"自适应密度"开关 ───────────────── */
+  #dense { position: absolute; opacity: 0; pointer-events: none; }
+  .switch {
+    display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;
+    background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px 6px 8px;
+    font-size: 13px; font-weight: 600;
+  }
+  .switch .track { width: 36px; height: 20px; border-radius: 999px; background: #DCDCE8; position: relative; }
+  .switch .track::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25);
+  }
+  #dense:checked ~ .wrap .switch .track { background: var(--accent); }
+  #dense:checked ~ .wrap .switch .track::after { left: 18px; }
+  #dense:checked ~ .wrap .switch .lbl::after { content: "高频模式"; }
+  .switch .lbl::after { content: "完整视图"; }
+
+  /* 勾选后：低频模块自动折叠，高频卡片放大并前置 */
+  #dense:checked ~ .wrap .low { display: none; }
+  #dense:checked ~ .wrap .grid { grid-template-columns: 1fr; }
+  #dense:checked ~ .wrap .card.primary { order: -1; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
+
+  .shell { display: grid; grid-template-columns: 232px 1fr; gap: 16px; align-items: start; }
+  .side { padding: 22px 18px; position: sticky; top: 24px; }
+  .logo { font-size: 22px; font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(109,74,255,.15); }
+  .logo span { display: block; font-size: 11.5px; color: var(--mute); font-weight: 500; letter-spacing: .08em; margin-top: 2px; }
+  .nav a {
+    display: block; padding: 9px 12px; border-radius: 10px; margin-top: 6px;
+    color: var(--ink); text-decoration: none; font-size: 14px; font-weight: 500;
+  }
+  .nav a.active { background: #F0EDFF; color: var(--accent); font-weight: 700; }
+  .nav a:hover { background: #F3F3F8; }
+
+  .main { display: flex; flex-direction: column; gap: 16px; }
+
+  .hero {
+    background: linear-gradient(120deg, #1B1740, #3B2A8C 55%, #0D8A80);
+    color: #fff; border-radius: 18px; padding: 24px 26px;
+  }
+  .hero h1 { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+  .hero p { font-size: 13.5px; color: rgba(255,255,255,.78); margin-top: 8px; }
+  .prompt {
+    margin-top: 18px; display: flex; gap: 10px; align-items: center;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25); border-radius: 14px; padding: 10px 12px;
+  }
+  .prompt input {
+    flex: 1; border: 0; outline: 0; background: transparent; color: #fff; font-family: inherit; font-size: 15px;
+  }
+  .prompt input::placeholder { color: rgba(255,255,255,.55); }
+  .prompt button {
+    border: 0; background: #fff; color: #1B1740; font: inherit; font-weight: 700; font-size: 13px;
+    padding: 8px 18px; border-radius: 10px; cursor: pointer;
+  }
+  .caret { width: 2px; height: 18px; background: #7CE7D8; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .trace { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .step {
+    font-size: 12px; padding: 5px 11px; border-radius: 999px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.22); color: rgba(255,255,255,.9);
+  }
+  .step.ok { background: rgba(0,184,169,.32); border-color: rgba(0,184,169,.6); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card h2 { font-size: 15px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .gen {
+    font-size: 11px; font-weight: 600; color: var(--accent); background: #F0EDFF;
+    border: 1px solid #DDD6FF; padding: 2px 9px; border-radius: 999px;
+  }
+
+  .task { display: flex; align-items: center; gap: 12px; margin-bottom: 11px; }
+  .task .nm { font-size: 14px; width: 150px; }
+  .task .bar { flex: 1; height: 7px; border-radius: 20px; background: #EFEFF6; overflow: hidden; }
+  .task .bar i { display: block; height: 100%; border-radius: 20px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .task .pct { font-size: 12.5px; width: 38px; text-align: right; color: var(--mute); }
+
+  .sk { height: 11px; border-radius: 8px; margin-bottom: 10px; background: linear-gradient(90deg, #EFEFF6 25%, #F8F8FC 50%, #EFEFF6 75%); background-size: 400% 100%; animation: sh 1.4s infinite linear; }
+  @keyframes sh { from { background-position: 400% 0; } to { background-position: 0 0; } }
+  .sk.w70 { width: 70%; } .sk.w90 { width: 90%; } .sk.w50 { width: 50%; } .sk.w35 { width: 35%; }
+
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .av { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #fff; }
+  .who div { font-size: 13px; }
+  .who div small { display: block; font-size: 11px; color: var(--mute); }
+
+  .feed { font-size: 13px; border-top: 1px solid var(--line); padding-top: 12px; margin-top: 14px; color: var(--mute); }
+  .feed p { margin-bottom: 7px; }
+  .feed b { color: var(--ink); font-weight: 700; }
+
+  .note { padding: 20px 22px; margin-top: 18px; }
+  .note h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+  .note ul { margin-left: 18px; font-size: 13px; color: #3B3B52; }
+  .note li { margin-bottom: 7px; }
+  code { font-family: Consolas, monospace; font-size: 12px; padding: 2px 7px; border-radius: 6px; background: #F2F1FB; border: 1px solid var(--line); }
+
+  @media (max-width: 900px) {
+    .shell, .grid { grid-template-columns: 1fr; }
+    .side { position: static; }
+  }
+</style>
+</head>
+<body>
+
+<input type="checkbox" id="dense">
+
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="../index.html">← 返回目录</a>
+    <label class="switch" for="dense"><span class="track"></span><span class="lbl"></span></label>
+    <div class="tagline">STYLE 03 / AI-NATIVE UI 生成式界面</div>
+  </div>
+
+  <div class="shell">
+    <aside class="side card">
+      <div class="logo"><span class="dot"></span>Nimbus<span>团队协作看板</span></div>
+      <nav class="nav">
+        <a href="#" class="active">概览</a>
+        <a href="#">项目</a>
+        <a href="#">日程</a>
+        <a href="#">团队</a>
+        <a href="#">设置</a>
+      </nav>
+      <p class="feed">AI 摘要 · 今日
+        <b style="color:var(--accent)">3 项</b>任务逾期风险，建议优先处理「无障碍走查」。
+      </p>
+    </aside>
+
+    <main class="main">
+      <section class="hero">
+        <h1>早上好，李明。</h1>
+        <p>今天是 9 月 25 日 · 我根据你的日程重排了今天的看板</p>
+        <form class="prompt" onsubmit="return false;">
+          <input value="把本周逾期的任务整理成一张表" >
+          <span class="caret"></span>
+          <button>生成</button>
+        </form>
+        <div class="trace">
+          <span class="step ok">解析意图</span>
+          <span class="step ok">检索 12 个项目</span>
+          <span class="step ok">筛选逾期项</span>
+          <span class="step">生成表格组件…</span>
+        </div>
+      </section>
+
+      <div class="grid">
+        <section class="card primary">
+          <h2>本周逾期任务（AI 生成）<span class="gen">GenUI</span></h2>
+          <div class="task"><span class="nm">无障碍走查</span><span class="bar"><i style="width:18%"></i></span><span class="pct">超 2d</span></div>
+          <div class="task"><span class="nm">移动端适配核对</span><span class="bar"><i style="width:34%"></i></span><span class="pct">超 1d</span></div>
+          <div class="task"><span class="nm">组件库文档补全</span><span class="bar"><i style="width:56%"></i></span><span class="pct">今日</span></div>
+          <div class="task"><span class="nm">设计系统 v3 重构</span><span class="bar"><i style="width:82%"></i></span><span class="pct">正常</span></div>
+        </section>
+
+        <section class="card low">
+          <h2>正在生成推荐方案<span class="gen">streaming</span></h2>
+          <div class="sk w90"></div>
+          <div class="sk w70"></div>
+          <div class="sk w50"></div>
+          <div class="sk w35"></div>
+        </section>
+
+        <section class="card low">
+          <h2>团队 <span class="gen">5 人在线</span></h2>
+          <div class="who"><div class="av" style="background:#6D4AFF">YL</div><div>杨岚<small>前端 · 正在改稿</small></div></div>
+          <div class="who"><div class="av" style="background:#00B8A9">ZK</div><div>张可<small>视觉 · 会议中</small></div></div>
+          <div class="who"><div class="av" style="background:#F0A03C">WJ</div><div>王靖<small>产品 · 空闲</small></div></div>
+        </section>
+
+        <section class="card low">
+          <h2>动态摘要 <span class="gen">auto</span></h2>
+          <div class="feed" style="border:0;padding-top:0;margin-top:0">
+            <p><b>10:24</b> 杨岚 上传了「组件规范_final2」</p>
+            <p><b>09:50</b> 张可 评论了「配色方案 A」</p>
+            <p><b>昨天</b> 设计组完成了 8 项任务</p>
+          </div>
+        </section>
+      </div>
+
+      <div class="note card">
+        <h3>风格实现要点</h3>
+        <ul>
+          <li>三个层次：<b>生成式界面</b>（按意图实时拼装组件）→ <b>自适应布局</b>（高频前置 / 低频折叠）→ <b>代理式体验</b>（从操作转向委托）</li>
+          <li>本页「自适应」用纯 CSS 复刻：<code>#dense:checked ~ .wrap .low { display:none }</code> —— 点右上角开关看布局自动重组</li>
+          <li>生成状态必须有视觉语言：流式光标 + 骨架屏 shimmer（<code>@keyframes</code> 移动 <code>background-position</code>）+ 意图链路 chips</li>
+          <li>设计师角色转变：从"画界面"到"设计规则" —— 定义品牌规范、交互边界、组件生成约束</li>
+          <li>毕设风险：AI 部分容易吃掉评审焦点；若选题为此，需把 LLM 调用与非 AI 对照组都做出来才站得住</li>
+        </ul>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
