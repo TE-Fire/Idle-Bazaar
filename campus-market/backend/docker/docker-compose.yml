@@ -2,9 +2,15 @@
 # 用法：在本文件所在目录执行
 #   docker compose up -d
 #   docker compose ps          # 看健康状态
-#   docker compose down -v     # 连数据一起清掉重来
+#   docker compose logs -f mysql   # 首次启动要等 MySQL 初始化，可用这条看进度
 #
-# 注意：本机的 MySQL 8.0.43 服务如果占用了 3306，先停掉它，或把下面的端口改成 3307:3306
+# 端口与数据目录写在同目录的 .env 里（变量插值），改那里即可：
+#   DATA_ROOT  数据落盘根目录，默认 D:/docker/campus-market
+#   本机已装 MySQL 占 3306、Redis 占 6379，故宿主机端口默认偏移到 3307 / 6380
+#
+# 数据用的是 bind mount（直接落在 D 盘），不是命名卷。因此：
+#   - `docker compose down -v` 删不掉宿主机数据，要重来必须手动删 DATA_ROOT 下的目录
+#   - MySQL 首次启动会自动执行 db/ 下的 .sql（仅在数据目录为空时跑一次，见下面 mysql.volumes）
 
 services:
   # ── MySQL 8 ─────────────────────────────────────────────
@@ -16,35 +22,54 @@ services:
     command:
       - --ngram_token_size=2
       - --character-set-server=utf8mb4
-      - --collation-server=utf8mb4_general_ci
+      # 与 MySQL 8 默认值一致，也对齐 db/schema.sql 的库级排序规则。
+      # 之前写成 utf8mb4_general_ci 是手动降级到旧规则，会造成 server 与库不一致，虽然单库用不报错
+      - --collation-server=utf8mb4_0900_ai_ci
       - --default-time-zone=+08:00
       - --lower_case_table_names=1
+      # 本地开发省内存：性能视图用不上，关掉约省 80~120MB
+      - --performance-schema=OFF
     environment:
       MYSQL_ROOT_PASSWORD: "Campus@2026"
       MYSQL_DATABASE: campus_market
       TZ: Asia/Shanghai
     ports:
-      - "3306:3306"
+      - "${MYSQL_PORT}:3306"
     volumes:
-      - cm-mysql-data:/var/lib/mysql
-      - ./initdb:/docker-entrypoint-initdb.d
+      - ${DATA_ROOT}/mysql/data:/var/lib/mysql
+      # 把仓库里的建表脚本所在目录挂进初始化目录，首次启动时自动执行。
+      #
+      # 路径推算：本文件位于 backend/docker/，要上两级才是项目根 ../../db。
+      # 曾写成 ../db（→ backend/db，不存在）——Docker Desktop 遇到不存在的挂载源不报错，
+      # 会悄悄建一个空目录顶替，症状是「库建了但表一张没有」，排查时看 mounting source 根本查不出，
+      # 只能进容器 ls 才发现文件变成了目录。改挂载后用 file / file.txt 之类的方式核对一次。
+      #
+      # 挂载整个目录而不是单个文件：MySQL entrypoint 只处理 *.sql / *.sh / *.sql.gz，
+      # 目录里的 md 文档会被打印一行 ignoring 后跳过，无害；好处是以后往 db/ 加 .sql 自动生效。
+      - ../../db:/docker-entrypoint-initdb.d
     healthcheck:
+      # mysqladmin 会打印一句密码明文警告，属正常现象
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-pCampus@2026"]
       interval: 10s
       timeout: 5s
-      retries: 12
+      retries: 30
+      # 宽松这是因为：数据目录落在 NTFS 上，首次初始化 + 跑完 schema.sql 通常要 1~3 分钟，
+      # 判死太快会显示 unhealthy。健康检查失败不会杀容器，只是状态标记。
+      start_period: 60s
 
   # ── Redis 7 ─────────────────────────────────────────────
   redis:
-    image: redis:7-alpine
+    # 本机已有 redis:7.2.3（debian 版，含 redis-cli，healthcheck 用得上），
+    # 刻意不用 7-alpine：alpine 版要重新拉，且 musl 下 redis-cli 行为略有差异
+    image: redis:7.2.3
     container_name: cm-redis
     command: redis-server --requirepass "Campus@2026" --appendonly yes
     environment:
       TZ: Asia/Shanghai
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:6379"
     volumes:
-      - cm-redis-data:/data
+      - ${DATA_ROOT}/redis/data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "Campus@2026", "ping"]
       interval: 10s
@@ -73,7 +98,7 @@ services:
       TZ: Asia/Shanghai
     volumes:
       - ./broker.conf:/opt/rocketmq/conf/broker.conf
-      - cm-rmq-broker-store:/home/rocketmq/store
+      - ${DATA_ROOT}/rocketmq/store:/home/rocketmq/store
     depends_on:
       - rmq-namesrv
     ports:
@@ -81,21 +106,40 @@ services:
       - "10911:10911"
       - "10912:10912"
 
-  # 控制台（可选，用来看 topic、延迟消息是否投递成功；不需要可注释掉）
+  # 控制台（内存紧张时可不开）：看 topic 列表、延迟消息是否投递成功。
+  # 挂了 profiles 之后，`docker compose up -d` 不会拉起它；
+  # 需要排查 MQ 时再单独起：
+  #   docker compose --profile debug up -d rmq-dashboard
+  #   docker compose --profile debug stop rmq-dashboard   # 用完停掉，内存立刻还回来
+  #
+  # 不开控制台时，用下面两条命令代替：
+  #   docker compose exec rmq-broker sh mqadmin topicList -n cm-rmq-namesrv:9876
+  #   docker compose exec rmq-broker sh mqadmin consumerProgress -n cm-rmq-namesrv:9876
+  #
+  # 复用本机 apacherocketmq/rocketmq-dashboard:2.0.0（注意事项：官方新版在
+  # apache/rocketmq-dashboard，要再拉 1.1GB；2.0.0 若连不上 5.3.1 的 namesrv 再换回去）
   rmq-dashboard:
-    image: apache/rocketmq-dashboard:latest
-    container_name: cm-rmq-dashboard
+    image: apacherocketmq/rocketmq-dashboard:2.0.0
+    # 原版 JVM 在容器里按宿主机内存的 1/4 取上限，机器内存越大它越放肆，这里钉死
     environment:
-      JAVA_OPTS: "-Drocketmq.namesrv.addr=cm-rmq-namesrv:9876 -Dserver.port=8089"
+      JAVA_OPTS: >-
+        -Xmx512m -Xms256m
+        -Drocketmq.namesrv.addr=cm-rmq-namesrv:9876
+        -Dserver.port=8089
+    profiles:
+      - debug
+    container_name: cm-rmq-dashboard
     depends_on:
       - rmq-namesrv
     ports:
       - "8089:8089"
 
   # ── MinIO ───────────────────────────────────────────────
-  # 官方镜像已从 Docker Hub 迁到 quay.io，拉不动时把 image 换成 bitnami/minio:latest
+  # 复用本机已有的 minio/minio:RELEASE.2023-09-30T07-02-29Z。
+  # Docker Hub 上的 minio/minio 已停维护并迁往 quay.io，但本地镜像仍能直接用；
+  # 这里故意钉死具体 tag 而不用 latest —— latest 每次 up 都可能悄悄换成新版本
   minio:
-    image: quay.io/minio/minio:latest
+    image: minio/minio:RELEASE.2023-09-30T07-02-29Z
     container_name: cm-minio
     command: server /data --console-address ":9001"
     environment:
@@ -106,15 +150,14 @@ services:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - cm-minio-data:/data
+      - ${DATA_ROOT}/minio/data:/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
       interval: 15s
       timeout: 5s
       retries: 10
 
-volumes:
-  cm-mysql-data:
-  cm-redis-data:
-  cm-rmq-broker-store:
-  cm-minio-data:
+# 原先用命名卷（cm-mysql-data 等），数据落在 Docker Desktop 的虚拟磁盘里，备份与迁移都要
+# 进 WSL。现改为 bind mount 直接落 D 盘，与本机其他中间件的存放习惯一致。
+# 若之前用命名卷起过，需要迁移时执行：
+#   docker run --rm -v cm-mysql-data:/from -v //d/docker/campus-market/mysql/data:/to alpine sh -c "cp -av /from/. /to/"
