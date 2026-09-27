@@ -16,10 +16,12 @@ desktop.ini
 $RECYCLE.BIN/
 
 # ── VSCode ─────────────────────────────────────────────────
+# 默认全忽略；只放行「对协作者有意义」的三份：settings/extensions/tasks
+# launch.json 不入库：它与本机环境绑定（mainClass、cwd、envFile 指向本地
+# 不存在的 .env），每人一份，提交只会互相覆盖
 .vscode/*
 !.vscode/settings.json
 !.vscode/extensions.json
-!.vscode/launch.json
 !.vscode/tasks.json
 .vscode-test/
 .history/
