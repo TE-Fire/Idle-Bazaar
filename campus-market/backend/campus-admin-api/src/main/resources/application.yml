@@ -14,10 +14,13 @@ spring:
   application:
     name: campus-market
   profiles:
+    # 保持 demo：application-dev.yml 已 gitignore、不入库，默认激活 dev 会让
+    # clone 下来的人缺数据源配置而启动失败。本机开发请在 IDEA 的 Run Configuration
+    # 里配 VM options -Dspring.profiles.active=dev（配一次即可，长期生效）。
     active: demo
   threads:
     virtual:
-      enabled: false      # JDK 21 虚拟线程：评估后不启用，见 tech/01 2.1
+      enabled: false # JDK 21 虚拟线程：评估后不启用，见 tech/01 2.1
   jackson:
     default-property-inclusion: non_null
   servlet:
@@ -53,11 +56,11 @@ knife4j:
     language: zh_cn
 springdoc:
   group-configs:
-    - group: '学生端'
-      paths-to-match: '/api/**'
-    - group: '管理端'
-      paths-to-match: '/admin/**'
+    - group: "学生端"
+      paths-to-match: "/api/**"
+    - group: "管理端"
+      paths-to-match: "/admin/**"
 
 logging:
   pattern:
-    console: '%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n'
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{36} - %msg%n"
