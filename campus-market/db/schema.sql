@@ -191,7 +191,7 @@ CREATE TABLE favorite (
   create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted     bigint   NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
-  UNIQUE KEY uk_user_item (user_id, item_id, deleted) COMMENT '带deleted，支持取消后重新收藏',
+  UNIQUE KEY uk_user_item (user_id, item_id, deleted) COMMENT 'B类删除：取消写时间戳，重新收藏复用同一行置0（见 db/01 删除的两类实现）',
   KEY idx_item (item_id)
 ) ENGINE=InnoDB COMMENT='收藏';
 
