@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  campus-market · 本地开发日志配置
+
+  命名必须是 logback-spring.xml 而不是 logback.xml：
+  前者由 Spring Boot 接管，才能用 <springProfile> 按环境区分；
+  后者会在 Spring 启动前就被 logback 自己加载，届时 profile 还未知。
+
+  设计取舍：
+  1. 控制台行为完全不动，沿用 Spring Boot 自带的 console-appender，
+     所以 application.yml 里的 logging.pattern.console（含 traceId）继续生效。
+  2. 文件只在 dev 下启用 —— 这是本机开发用的，生产另有部署方接入的采集方案。
+  3. 文件用 ThresholdFilter 卡在 INFO：application-dev.yml 把 com.campus 调到了
+     debug（SQL、参数都在里面，量很大），全量落盘会迅速吃满磁盘，
+     所以文件只要 info 及以上，debug 的留给控制台。
+-->
+<configuration>
+
+    <!-- Spring Boot 自带的转换规则与 console appender 定义 -->
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <!-- 日志根目录：相对「进程工作目录」。IDE 里默认是模块根 campus-admin-api/，
+         命令行在哪个目录执行 java -jar 就落在哪里。 -->
+    <property name="LOG_HOME" value="logs"/>
+    <property name="APP_NAME" value="campus-market"/>
+
+    <!-- 文件用的 pattern：比控制台长一些（%logger{50}），因为落盘后不缺横向空间 -->
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{traceId}] %-5level %logger{50} - %msg%n"/>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_HOME}/${APP_NAME}.log</file>
+
+        <!-- 同时按「天」和「体积」滚动，先到先触发 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_HOME}/archived/${APP_NAME}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>2GB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>${FILE_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+
+        <!-- 只收 INFO 及以上；DEBUG 的 SQL 日志不落盘 -->
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>INFO</level>
+        </filter>
+    </appender>
+
+    <!-- 本地开发：控制台 + 文件。
+         这里不动任何 logger 级别：SQL 要不要看由 application-dev.yml 的
+         logging.level 决定（当前 com.campus=debug，即控制台看 SQL、文件不落盘）。 -->
+    <springProfile name="dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+        </root>
+    </springProfile>
+
+    <!-- 其它环境：只走控制台，保持 Spring Boot 默认行为 -->
+    <springProfile name="!dev">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+
+</configuration>
