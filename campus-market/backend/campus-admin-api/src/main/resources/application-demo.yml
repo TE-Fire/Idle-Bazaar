@@ -41,7 +41,13 @@ minio:
 
 campus:
   captcha:
-    enabled: false        # 演示关闭验证码，登录只需账号密码
+    enabled: false        # 演示关闭验证码，登录只需账号密码（要演示防刷就改 true）
+  mail:
+    # **不发真实邮件**：本文件入库，任何授权码都不允许写进来。
+    # 关闭后注册/找回密码照常走完，验证码只打进后端日志，演示时从控制台读即可。
+    # 想演示真发信：复制本文件为 application-dev.yml（已 gitignore）后填 spring.mail.*。
+    enabled: false
+    from:
 
 logging:
   level:
