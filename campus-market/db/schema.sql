@@ -16,6 +16,13 @@ CREATE DATABASE IF NOT EXISTS campus_market
   DEFAULT COLLATE utf8mb4_0900_ai_ci;
 USE campus_market;
 
+-- 必须显式声明连接字符集：MySQL 官方镜像执行 /docker-entrypoint-initdb.d 下的脚本时，
+-- mysql 客户端的默认字符集**不是 utf8mb4**，中文会被按字节计数——
+-- '轻微使用痕迹' 6 个字 = 18 字节，直接撞上 name varchar(16) 报 ERROR 1406，
+-- 脚本就地中断（initdb 不加 --force），结果是「表建好了、种子数据一条没灌进去」。
+-- 加这一行后，无论用什么客户端执行都不会再踩这个坑。
+SET NAMES utf8mb4;
+
 -- ════════════════════════════════════════════════════════════
 -- 一、字典（5 张，全端下发的唯一源头）
 -- ════════════════════════════════════════════════════════════
