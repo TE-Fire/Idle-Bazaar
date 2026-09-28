@@ -9,7 +9,7 @@
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
-import { findItem } from '@/mock/items'
+import { findItem } from '@campus/mock'
 import { useCompareStore } from '@/stores/compare'
 import { ElMessage } from 'element-plus'
 

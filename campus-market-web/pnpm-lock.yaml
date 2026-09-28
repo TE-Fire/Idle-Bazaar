@@ -72,6 +72,9 @@ importers:
       '@campus/api':
         specifier: workspace:*
         version: link:../../packages/api
+      '@campus/mock':
+        specifier: workspace:*
+        version: link:../../packages/mock
       '@campus/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -121,6 +124,12 @@ importers:
       axios:
         specifier: ^1.20.0
         version: 1.20.0
+
+  packages/mock:
+    dependencies:
+      '@campus/shared':
+        specifier: file:../shared
+        version: link:../shared
 
   packages/shared: {}
 

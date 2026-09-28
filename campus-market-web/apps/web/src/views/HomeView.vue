@@ -7,7 +7,8 @@
  *
  * <p>结果为空时给「放宽条件的建议」，不能只显示"暂无数据"（F-W1 判据）。
  *
- * <p>数据来自 `mock/items.ts`：学生端接口未实现，等 `/api/item/list` 就位后只换数据源。
+ * <p>数据来自 `@campus/mock`（与小程序同一批）：学生端接口未实现，
+ * 等 `/api/item/list` 就位后只换数据源。
  */
 
 import { computed, ref, watch } from 'vue'
@@ -20,7 +21,7 @@ import {
   type Campus,
   type ConditionGrade
 } from '@campus/shared'
-import { mockItems } from '@/mock/items'
+import { mockItems } from '@campus/mock'
 import ProductCard from '@/components/ProductCard.vue'
 import FilterGroup from '@/components/FilterGroup.vue'
 
@@ -46,6 +47,16 @@ const negotiableOnly = ref(false)
 const deliveryOnly = ref(false)
 const timeRange = ref<TimeRange>('')
 
+/**
+ * 视图状态必须声明在下面的 watch **之前**：那个 watch 是 `immediate: true`，
+ * setup 执行到它时回调会当场跑一次，此时若 `page` 还在 TDZ 就抛
+ * "Cannot access 'page' before initialization" —— 整个页面白屏，控制台只有这一行。
+ */
+const sort = ref<SortKey>('default')
+const view = ref<ViewMode>('grid')
+const page = ref(1)
+const pageSize = 12
+
 /** 顶栏搜索与分类条是 URL 驱动的，换 URL 要同步进筛选状态 */
 watch(
   () => [route.query.q, route.query.cat],
@@ -56,11 +67,6 @@ watch(
   },
   { immediate: true }
 )
-
-const sort = ref<SortKey>('default')
-const view = ref<ViewMode>('grid')
-const page = ref(1)
-const pageSize = 12
 
 /* ── 结果集 ─────────────────────────────────────────────── */
 

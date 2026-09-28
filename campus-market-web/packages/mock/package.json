@@ -1,0 +1,15 @@
+{
+  "name": "@campus/mock",
+  "version": "0.1.0",
+  "private": true,
+  "description": "骨架期共享 mock 数据：用户端与小程序用同一批商品，避免两端截图对不上",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@campus/shared": "file:../shared"
+  }
+}

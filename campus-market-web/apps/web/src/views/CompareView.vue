@@ -12,7 +12,7 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
-import { findItem } from '@/mock/items'
+import { findItem } from '@campus/mock'
 import { useCompareStore } from '@/stores/compare'
 
 const route = useRoute()

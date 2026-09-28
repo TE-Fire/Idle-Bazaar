@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@campus/api": "workspace:*",
+    "@campus/mock": "workspace:*",
     "@campus/shared": "workspace:*",
     "@campus/tokens": "workspace:*",
     "@element-plus/icons-vue": "^2.3.1",
