@@ -107,7 +107,8 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 
 ## 七、已知待办
 
-- [ ] 图形验证码下发接口（登录校验逻辑已就绪，`campus.captcha.enabled` 打开后需要配套接口）
+- [x] ~~图形验证码下发接口~~ **已完成**（2026-09-29）：`GET /admin/auth/captcha` 返回 key + PNG base64，
+      登录 / 注册 / 找回密码三处共用；同批新增注册、找回密码、超管分配角色接口。详见 `tech/01` 5.7
 - [ ] `@OpLog` 注解与 AOP（操作日志落 `sys_operation_log`，见 `tech/01` 5.4）
 - [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3）
 - [ ] MinIO 真正接入（实现类已就绪，改 `minio.enabled=true`）
