@@ -61,7 +61,12 @@ pnpm dev:mp-weixin    # 产出 dist/dev/mp-weixin，用微信开发者工具打�
 | `readonly` | READONLY 只读 | 4 |
 
 统一密码 `Campus@2026`（后端 `AdminAccountInitializer.DEMO_PASSWORD`）。
-dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
+四个演示账号的邮箱分别是 `3037749727~3037749730@qq.com`（`db/schema.sql` 升级脚本里同步写入）。
+
+**图形验证码**：登录 / 注册 / 找回密码三页共用 `components/CaptchaField.vue`。
+后端 `campus.captcha.enabled=false` 时，下发接口返回 `disabled=true`，组件收到后
+**自己隐藏**（本地联调不想每次都输四位码）；答辩前把它改成 `true` 即可。
+`campus.mail.enabled=false` 同理：验证码不真发邮件，只打进后端日志，联调时从控制台取。
 
 ## 三条硬约定
 
@@ -69,6 +74,9 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 2. **ID 一律 `string`**：后端雪花 ID 已全局转字符串，定义成 `number` 会精度丢失。
 3. **权限点三方同名**：`@campus/shared` 的 `PERM_CODES` == 后端 `PermCodes.java` ==
    数据库 `admin_role_perm.perm_code` == 原型 `data-perm`。改一处必须同步四处。
+4. **页面路由不得以 `/admin`、`/api` 开头**：vite 代理键是前缀匹配，
+   `/admins` 这种路径会被当成后端接口转发（实测返回 1003）。管理端页面走
+   `/dashboard`、`/settings/**` 这类。
 
 ## 当前进度（tech/02 第十章落地顺序）
 
@@ -80,6 +88,10 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 - [x] ⑤ `apps/mini` 骨架（uni-app 独立工程）：M1 首页瀑布 / M2 详情 / M3 发布 / M4 分类 /
       M5 消息 / M6 我的。`pnpm build:h5` 已通过（产物 `apps/mini/dist/build/h5`）；
       小程序端跑 `pnpm dev:mp-weixin`，用微信开发者工具打开 `dist/dev/mp-weixin`。
+- [x] ⑥ A0 注册页 `/register` + A10 找回密码页 `/forgot` + A1 登录页接图形验证码
+      （`packages/api` 的 `authApi` 补齐 5 个接口）
+- [x] ⑦ A9 管理员账号页 `/settings/admins`：给注册产生的待分配账号分配角色
+      （`adminApi.pending/roles/assignRole`；角色下拉由后端剔除 SUPER，菜单按 `settings.edit` 过滤）
 
 ### 用户端与小程序的数据来源
 

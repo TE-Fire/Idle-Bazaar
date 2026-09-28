@@ -17,6 +17,16 @@ public enum UserErrorCode implements IErrorCode {
     USER_CREDIT_TOO_LOW(4003, "信用分过低，该操作暂不可用"),
     ADMIN_ACCOUNT_LOCKED(4004, "连续失败次数过多，账号已锁定 10 分钟"),
     ADMIN_BAD_CREDENTIAL(4005, "账号或密码错误"),
+
+    /* ── 注册 / 找回密码（2026-09-29 新增，流程见 business/03 F-A0 / F-A10）── */
+    ADMIN_PENDING_ROLE(4006, "账号待超级管理员分配角色，暂不能登录"),
+    EMAIL_INVALID(4007, "仅支持 QQ 邮箱（@qq.com / @foxmail.com）"),
+    EMAIL_ALREADY_REGISTERED(4008, "该邮箱已注册，可直接登录或找回密码"),
+    MAIL_CODE_INVALID(4009, "邮箱验证码不正确或已过期"),
+    MAIL_CODE_TOO_FREQUENT(4010, "发送过于频繁，请 60 秒后再试"),
+    PASSWORD_SAME_AS_OLD(4011, "新密码不能与旧密码相同"),
+    CAPTCHA_INVALID(4012, "图形验证码不正确或已过期"),
+    ROLE_SUPER_FORBIDDEN(4013, "超级管理员只能由开发者创建，不支持分配"),
     ;
 
     @Override

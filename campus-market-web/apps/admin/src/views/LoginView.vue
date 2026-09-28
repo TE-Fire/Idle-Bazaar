@@ -2,9 +2,12 @@
 /**
  * A1 登录页（原型 prototypes/admin/login.html，design/03 第五章）
  *
- * <p>图形验证码：后端 `campus.captcha.enabled` 在 dev 下是 false，下发接口也还没写，
- * 所以这里**先不画验证码输入**。等后端补上 `/admin/auth/captcha` 再按原型加回来，
- * 入参字段 captchaKey / captchaCode 已在 @campus/api 里预留。
+ * <p>图形验证码：登录 / 注册 / 找回三页共用 `CaptchaField` 组件。
+ * 后端 `campus.captcha.enabled=false` 时接口会返回 `disabled=true`，
+ * 组件收到后通知这里把自己隐藏——本地联调不必每次都输四位验证码。
+ *
+ * <p>⚠️ 登录失败后必须**换一张**验证码：后端是「校验通过即删」的一次性码，
+ * 密码输错时那张图已经作废，不刷新的话第二次提交必然卡在验证码上。
  *
  * <p>演示账号四个角色同密码（后端 AdminAccountInitializer.DEMO_PASSWORD），
  * 一键填充是为了答辩时快速切换角色验证权限隔离。
@@ -15,14 +18,22 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { LockOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { DEMO_PASSWORD } from '@campus/shared'
+import CaptchaField from '@/components/CaptchaField.vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
 
-const form = reactive({ username: 'super', password: DEMO_PASSWORD })
+const form = reactive({
+  username: 'super',
+  password: DEMO_PASSWORD,
+  captchaKey: '',
+  captchaCode: ''
+})
 const loading = ref(false)
+const captchaOn = ref(true)
+const captchaRef = ref<InstanceType<typeof CaptchaField> | null>(null)
 
 /** 四个角色一键切换，用于验证「审核员不能封禁用户」这类互斥 */
 const DEMO_ACCOUNTS = [
@@ -41,6 +52,7 @@ const onSubmit = async (): Promise<void> => {
     void router.push(redirect)
   } catch {
     // 失败提示由请求层统一 toast（含 traceId），这里不再重复弹
+    void captchaRef.value?.refresh()
   } finally {
     loading.value = false
   }
@@ -68,10 +80,26 @@ const onSubmit = async (): Promise<void> => {
           </a-input-password>
         </a-form-item>
 
+        <a-form-item v-if="captchaOn" name="captchaCode">
+          <CaptchaField
+            ref="captchaRef"
+            v-model:code="form.captchaCode"
+            v-model:key="form.captchaKey"
+            @disabled="captchaOn = false"
+            @submit="onSubmit"
+          />
+        </a-form-item>
+
         <a-form-item>
           <a-button type="primary" html-type="submit" block :loading="loading">登 录</a-button>
         </a-form-item>
       </a-form>
+
+      <div class="login__links">
+        <router-link to="/register">注册新账号</router-link>
+        <a-divider type="vertical" />
+        <router-link to="/forgot">忘记密码</router-link>
+      </div>
 
       <a-divider plain>演示账号（密码统一 {{ DEMO_PASSWORD }}）</a-divider>
       <a-space wrap>
@@ -117,5 +145,11 @@ const onSubmit = async (): Promise<void> => {
   margin-top: var(--cm-space-1);
   font-size: var(--cm-font-size-sm);
   color: var(--cm-color-text-3);
+}
+
+.login__links {
+  text-align: center;
+  font-size: var(--cm-font-size-sm);
+  margin-bottom: var(--cm-space-4);
 }
 </style>

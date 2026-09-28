@@ -2,9 +2,15 @@ package com.campus.admin.controller;
 
 import com.campus.common.result.Result;
 import com.campus.core.satoken.StpAdminUtil;
+import com.campus.core.service.AdminAccountService;
 import com.campus.core.service.AdminAuthService;
+import com.campus.core.service.CaptchaService;
 import com.campus.core.service.dto.AdminLoginReq;
 import com.campus.core.service.dto.AdminLoginVO;
+import com.campus.core.service.dto.AdminRegisterReq;
+import com.campus.core.service.dto.AdminResetReq;
+import com.campus.core.service.dto.AdminSendCodeReq;
+import com.campus.core.service.dto.CaptchaVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -29,11 +35,53 @@ import java.util.Map;
 public class AuthController {
 
     private final AdminAuthService adminAuthService;
+    private final AdminAccountService adminAccountService;
+    private final CaptchaService captchaService;
 
     @Operation(summary = "登录", description = "账号 + 密码（+ 图形验证码）。失败 5 次锁定 10 分钟。")
     @PostMapping("/login")
     public Result<AdminLoginVO> login(@Valid @RequestBody AdminLoginReq req) {
         return Result.ok(adminAuthService.login(req));
+    }
+
+    /* ── 注册 / 找回密码（business/03 F-A0 / F-A10）───────────── */
+
+    @Operation(summary = "图形验证码", description = "登录 / 注册 / 找回密码三处共用；一次性，5 分钟有效")
+    @GetMapping("/captcha")
+    public Result<CaptchaVO> captcha() {
+        CaptchaVO vo = captchaService.generate();
+        vo.setDisabled(!captchaService.isEnabled());
+        return Result.ok(vo);
+    }
+
+    @Operation(summary = "注册 · 发邮箱验证码",
+            description = "邮箱已注册会直接报错（注册是公开入口，用户填了别人的邮箱需要立刻知道）")
+    @PostMapping("/register/send-code")
+    public Result<Void> sendRegisterCode(@Valid @RequestBody AdminSendCodeReq req) {
+        adminAccountService.sendRegisterCode(req);
+        return Result.ok();
+    }
+
+    @Operation(summary = "注册", description = "QQ 邮箱 + 邮箱验证码 + 图形验证码。注册后为「待分配角色」，需超管分配后才能登录")
+    @PostMapping("/register")
+    public Result<Void> register(@Valid @RequestBody AdminRegisterReq req) {
+        adminAccountService.register(req);
+        return Result.ok();
+    }
+
+    @Operation(summary = "找回密码 · 发邮箱验证码",
+            description = "邮箱未注册时也返回成功——否则该接口可用于枚举管理员邮箱")
+    @PostMapping("/forgot/send-code")
+    public Result<Void> sendResetCode(@Valid @RequestBody AdminSendCodeReq req) {
+        adminAccountService.sendResetCode(req);
+        return Result.ok();
+    }
+
+    @Operation(summary = "找回密码 · 重置", description = "校验邮箱验证码后重置密码，并强制下线该账号所有会话")
+    @PostMapping("/forgot/reset")
+    public Result<Void> resetPassword(@Valid @RequestBody AdminResetReq req) {
+        adminAccountService.resetPassword(req);
+        return Result.ok();
     }
 
     @Operation(summary = "退出登录")

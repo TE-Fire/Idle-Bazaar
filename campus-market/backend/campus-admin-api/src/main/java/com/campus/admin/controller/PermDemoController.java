@@ -3,6 +3,7 @@ package com.campus.admin.controller;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.campus.common.constant.PermCodes;
 import com.campus.common.result.Result;
+import com.campus.core.satoken.StpAdminUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -27,14 +28,14 @@ public class PermDemoController {
 
     @Operation(summary = "需要 review.judge（审核员及以上）")
     @GetMapping("/review")
-    @SaCheckPermission(PermCodes.REVIEW_JUDGE)
+    @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.REVIEW_JUDGE)
     public Result<Map<String, Object>> review() {
         return Result.ok(Map.of("passed", "review.judge"));
     }
 
     @Operation(summary = "需要 user.ban（仅超级管理员）")
     @GetMapping("/ban")
-    @SaCheckPermission(PermCodes.USER_BAN)
+    @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.USER_BAN)
     public Result<Map<String, Object>> ban() {
         return Result.ok(Map.of("passed", "user.ban"));
     }

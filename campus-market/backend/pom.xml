@@ -151,6 +151,11 @@
           <version>3.13.0</version>
         <configuration>
           <release>${java.version}</release>
+          <!-- 保留方法参数名：Spring MVC 的 @PathVariable/@RequestParam 才能省略
+               value 直接按形参名绑定。本工程没有继承 spring-boot-starter-parent
+               （parent 会自动置为 true），不写这行就会在运行时抛
+               "Name for argument of type [java.lang.Long] not specified"。 -->
+          <parameters>true</parameters>
           <annotationProcessorPaths>
             <path>
               <groupId>org.projectlombok</groupId>

@@ -2,7 +2,6 @@ package com.campus.core.service;
 
 import com.campus.common.asserts.BizAssert;
 import com.campus.common.constant.PermCodes;
-import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.entity.AdminRole;
 import com.campus.core.entity.AdminUser;
 import com.campus.core.errcode.UserErrorCode;
@@ -15,8 +14,6 @@ import com.campus.core.service.dto.AdminLoginReq;
 import com.campus.core.service.dto.AdminLoginVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,17 +34,13 @@ public class AdminAuthService {
 
     private static final int MAX_FAIL = 5;
     private static final int LOCK_MINUTES = 10;
-    private static final String CAPTCHA_KEY_PREFIX = "cm:captcha:";
 
     private final AdminUserMapper adminUserMapper;
     private final AdminRoleMapper adminRoleMapper;
     private final AdminRolePermMapper adminRolePermMapper;
-    private final StringRedisTemplate stringRedisTemplate;
+    private final CaptchaService captchaService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
-    @Value("${campus.captcha.enabled:true}")
-    private boolean captchaEnabled;
 
     @Transactional(rollbackFor = Exception.class)
     public AdminLoginVO login(AdminLoginReq req) {
@@ -56,6 +49,10 @@ public class AdminAuthService {
         AdminUser admin = adminUserMapper.selectByUsername(req.getUsername());
         BizAssert.isTrue(admin != null && admin.getStatus() != null && admin.getStatus() != 0,
                 UserErrorCode.ADMIN_BAD_CREDENTIAL);
+
+        // status=2 待分配角色：不与「密码错误」混为一谈——注册完登录被拦是设计，
+        // 若提示成密码错误，用户会以为自己注册失败（business/03 已决 2026-09-29）
+        BizAssert.isTrue(admin.getStatus() != 2, UserErrorCode.ADMIN_PENDING_ROLE);
 
         // 锁定期内直接拒绝，不再比对密码（避免爆破）
         BizAssert.isTrue(admin.getLockUntil() == null || LocalDateTime.now().isAfter(admin.getLockUntil()),
@@ -98,24 +95,12 @@ public class AdminAuthService {
         return vo;
     }
 
-    /** 图形验证码（A1 需求）；开关关闭时跳过，便于本地联调 */
+    /**
+     * 图形验证码（A1 需求）：直接复用 {@link CaptchaService}，不再自己读 Redis。
+     * 登录页与注册/找回页共用一套 key 前缀与「一次性」语义，避免两处实现漂移。
+     */
     private void checkCaptcha(AdminLoginReq req) {
-        if (!captchaEnabled) {
-            return;
-        }
-        if (isBlank(req.getCaptchaKey()) || isBlank(req.getCaptchaCode())) {
-            throw CommonErrorCode.PARAM_ERROR.ex();
-        }
-        String cached = stringRedisTemplate.opsForValue().get(CAPTCHA_KEY_PREFIX + req.getCaptchaKey());
-        BizAssert.notNull(cached, CommonErrorCode.PARAM_ERROR, "验证码已失效，请刷新");
-        // 一次性：校验通过立即删除
-        stringRedisTemplate.delete(CAPTCHA_KEY_PREFIX + req.getCaptchaKey());
-        BizAssert.isTrue(cached.equalsIgnoreCase(req.getCaptchaCode()),
-                CommonErrorCode.PARAM_ERROR, "验证码不正确");
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.isBlank();
+        captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
     }
 
     /** 演示用：判断当前登录人是否持有某权限点（实际校验走注解） */

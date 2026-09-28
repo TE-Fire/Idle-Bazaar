@@ -64,5 +64,11 @@
       <groupId>cn.hutool</groupId>
       <artifactId>hutool-core</artifactId>
     </dependency>
+    <!-- 邮件：注册 / 找回密码发验证码。未配 spring.mail.host 时不创建 JavaMailSender，
+         MailService 里用 @Autowired(required = false) 兜住，本地不配也能启动 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-mail</artifactId>
+    </dependency>
   </dependencies>
 </project>

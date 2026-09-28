@@ -14,7 +14,8 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  TeamOutlined
 } from '@ant-design/icons-vue'
 import { Modal } from 'ant-design-vue'
 import { ROLE_META, type PermCode, type RoleCode } from '@campus/shared'
@@ -29,6 +30,7 @@ const collapsed = ref(false)
 /** 菜单图标：与路由 name 对应，新增页面时在这里补一个 */
 const ICONS: Record<string, Component> = {
   dashboard: DashboardOutlined,
+  admins: TeamOutlined,
   'perm-matrix': SafetyCertificateOutlined
 }
 

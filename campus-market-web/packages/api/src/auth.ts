@@ -30,12 +30,64 @@ export interface AdminInfo {
   permCodes: string[]
 }
 
+/* ── 注册 / 找回密码（business/03 F-A0 / F-A10）───────────── */
+
+export interface CaptchaVO {
+  /** 提交表单时原样带回；验证码文本本身永不下发到前端 */
+  captchaKey: string
+  /** PNG base64，不含 data: 前缀，前端自行拼接 */
+  captchaImage: string
+  /** 后端开关关闭时为 true：此时不显示验证码输入框，也不必带参 */
+  disabled?: boolean
+}
+
+export interface AdminRegisterReq {
+  email: string
+  /** 邮箱收到的 6 位数字验证码 */
+  mailCode: string
+  password: string
+  realName?: string
+  captchaKey?: string
+  captchaCode?: string
+}
+
+export interface AdminSendCodeReq {
+  email: string
+  captchaKey?: string
+  captchaCode?: string
+}
+
+export interface AdminResetReq {
+  email: string
+  mailCode: string
+  password: string
+}
+
 export const authApi = {
   /** 登录：账号 + 密码（+ 图形验证码）。失败 5 次锁定 10 分钟 */
   login: (req: AdminLoginReq) =>
     request<AdminLoginVO>({ url: '/admin/auth/login', method: 'POST', data: req }),
 
   logout: () => request<void>({ url: '/admin/auth/logout', method: 'POST' }),
+
+  /** 图形验证码：登录 / 注册 / 找回密码三处共用，一次性 */
+  captcha: () => request<CaptchaVO>({ url: '/admin/auth/captcha' }),
+
+  /** 注册第一步：给邮箱发码。邮箱已注册会直接报 4008 */
+  sendRegisterCode: (req: AdminSendCodeReq) =>
+    request<void>({ url: '/admin/auth/register/send-code', method: 'POST', data: req }),
+
+  /** 注册第二步：提交后为「待分配角色」，需超管分配后才能登录 */
+  register: (req: AdminRegisterReq) =>
+    request<void>({ url: '/admin/auth/register', method: 'POST', data: req }),
+
+  /** 找回密码第一步。邮箱未注册**同样返回成功**——后端防邮箱枚举 */
+  sendResetCode: (req: AdminSendCodeReq) =>
+    request<void>({ url: '/admin/auth/forgot/send-code', method: 'POST', data: req }),
+
+  /** 找回密码第二步：成功后该账号所有会话被踢下线 */
+  resetPassword: (req: AdminResetReq) =>
+    request<void>({ url: '/admin/auth/forgot/reset', method: 'POST', data: req }),
 
   /** 当前登录人信息，用于刷新令牌与权限点 */
   info: () => request<AdminInfo>({ url: '/admin/auth/info' }),

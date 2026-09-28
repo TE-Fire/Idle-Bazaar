@@ -34,6 +34,20 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '登录', public: true, hideInMenu: true }
   },
   {
+    // A0 注册：注册后为「待分配角色」，由超管分配后才能登录（business/03 F-A0）
+    path: '/register',
+    name: 'register',
+    component: () => import('@/views/RegisterView.vue'),
+    meta: { title: '注册', public: true, hideInMenu: true }
+  },
+  {
+    // A10 找回密码：邮箱验证码两步（business/03 F-A10）
+    path: '/forgot',
+    name: 'forgot',
+    component: () => import('@/views/ForgotView.vue'),
+    meta: { title: '找回密码', public: true, hideInMenu: true }
+  },
+  {
     path: '/',
     component: BasicLayout,
     redirect: '/dashboard',
@@ -43,6 +57,15 @@ const routes: RouteRecordRaw[] = [
         name: 'dashboard',
         component: () => import('@/views/DashboardView.vue'),
         meta: { title: '数据看板', perm: PERM_CODES.DASHBOARD_VIEW }
+      },
+      {
+        // A9 管理员账号：给注册产生的待分配账号分配角色（business/03 F-A0 下半段）
+        // ⚠️ 路径不能写成 'admins'：vite 代理前缀 /admin 是**前缀匹配**，
+        //    /admins 会被当成后端接口转发出去（实测返回 1003「资源不存在」）。
+        path: 'settings/admins',
+        name: 'admins',
+        component: () => import('@/views/AdminUsersView.vue'),
+        meta: { title: '管理员账号', perm: PERM_CODES.SETTINGS_EDIT }
       },
       {
         // A9 权限矩阵的骨架版：真实接口 /admin/auth/perm-codes，先验证隔离再扩展成矩阵

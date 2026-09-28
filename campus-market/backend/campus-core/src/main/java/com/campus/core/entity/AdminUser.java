@@ -27,6 +27,12 @@ public class AdminUser {
 
     private String username;
 
+    /**
+     * 邮箱（注册 / 找回密码用，QQ 系：@qq.com、@foxmail.com）。
+     * 唯一索引 uk_email(email, deleted)，所以查邮箱时必须显式带 deleted=0。
+     */
+    private String email;
+
     /** BCrypt 哈希，不存明文 */
     private String passwordHash;
 
@@ -34,7 +40,7 @@ public class AdminUser {
 
     private Long roleId;
 
-    /** 1 启用 / 0 停用 */
+    /** 1 启用 / 0 停用 / 2 待分配角色（注册产生，登录被拦） */
     private Integer status;
 
     /** 连续失败次数，5 次锁 10 分钟 */

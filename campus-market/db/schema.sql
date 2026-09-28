@@ -414,10 +414,11 @@ CREATE TABLE admin_role_perm (
 CREATE TABLE admin_user (
   id            bigint      NOT NULL COMMENT '雪花ID',
   username      varchar(32) NOT NULL COMMENT '登录账号',
+  email         varchar(64) DEFAULT NULL COMMENT '邮箱（注册 / 找回密码用，QQ 系：@qq.com、@foxmail.com）',
   password_hash varchar(128) NOT NULL COMMENT '密码哈希（不存明文）',
   real_name     varchar(32) DEFAULT NULL COMMENT '姓名',
   role_id       bigint      NOT NULL COMMENT '角色',
-  status        tinyint     NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
+  status        tinyint     NOT NULL DEFAULT 1 COMMENT '1启用 0停用 2待分配角色（注册后、超管分配前，不可登录）',
   fail_count    int         NOT NULL DEFAULT 0 COMMENT '连续失败次数（5次锁10分钟）',
   lock_until    datetime    DEFAULT NULL COMMENT '锁定到期',
   last_login_at datetime    DEFAULT NULL COMMENT '最近登录',
@@ -426,8 +427,18 @@ CREATE TABLE admin_user (
   deleted       bigint      NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uk_username (username, deleted),
+  UNIQUE KEY uk_email (email, deleted),
   KEY idx_role (role_id)
 ) ENGINE=InnoDB COMMENT='管理员';
+
+-- ── 已有库升级（2026-09-29 追加，全新安装不需要执行）──────────────
+-- ALTER TABLE admin_user ADD COLUMN email varchar(64) DEFAULT NULL COMMENT '邮箱' AFTER username;
+-- ALTER TABLE admin_user ADD UNIQUE KEY uk_email (email, deleted);
+-- 演示账号补邮箱（唯一索引下四个账号必须各不相同）：
+-- UPDATE admin_user SET email='3037749727@qq.com' WHERE username='super';
+-- UPDATE admin_user SET email='3037749728@qq.com' WHERE username='reviewer';
+-- UPDATE admin_user SET email='3037749729@qq.com' WHERE username='operator';
+-- UPDATE admin_user SET email='3037749730@qq.com' WHERE username='readonly';
 
 CREATE TABLE sys_operation_log (
   id           bigint       NOT NULL COMMENT '雪花ID',

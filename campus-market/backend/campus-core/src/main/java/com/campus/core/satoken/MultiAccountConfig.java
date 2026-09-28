@@ -1,5 +1,6 @@
 package com.campus.core.satoken;
 
+import cn.dev33.satoken.SaManager;
 import cn.dev33.satoken.config.SaTokenConfig;
 import cn.dev33.satoken.stp.StpLogic;
 import jakarta.annotation.PostConstruct;
@@ -20,10 +21,18 @@ import org.springframework.context.annotation.Configuration;
  * Parameter 0 of method setStpLogic in cn.dev33.satoken.spring.SaBeanInject
  * required a single bean, but 2 were found: stpLogicUser, stpLogicAdmin
  * </pre>
- * 报错里提示的 -parameters 编译参数是干扰项——Spring Boot parent 默认已开启，
+ * 报错里提示的 -parameters 编译参数是干扰项（本工程已在根 pom 的 maven-compiler-plugin
+ * 里显式加了 {@code <parameters>true</parameters>}，因为它没有继承 spring-boot-starter-parent），
  * 真正原因是类型注入歧义，标 @Primary 也只是掩盖（会把另一个账号体系挤出全局注册）。
  * 业务侧一律通过 {@link StpUserUtil} / {@link StpAdminUtil} 静态工具访问，
  * 工具类内部自持 StpLogic，不依赖容器注入，因此按官方多账号 demo 的做法：手动 new，静态绑定。
+ *
+ * <p>【必须同时 putStpLogic】只给工具类 setStpLogic **不够**：方法上的
+ * {@code @SaCheckPermission(type = "admin")} 是由 SaInterceptor 转交
+ * {@code SaManager.getStpLogic("admin")} 执行的，而 SaManager 的 stpLogicMap 里
+ * 只有它自己 createStpLogic 出来的实例——不注册进去，注解校验就会拿到一个
+ * tokenName=satoken 的默认 StpLogic，永远读不到管理端的 satoken-admin，表现是
+ * 「明明登录了却返回 1001 未登录」。两套逻辑必须指向同一个对象。
  */
 @Configuration
 public class MultiAccountConfig {
@@ -34,9 +43,14 @@ public class MultiAccountConfig {
     @PostConstruct
     public void registerStpLogics() {
         // 学生端：7 天，允许并发登录（isShare=false 保证每次登录新 token，便于按设备踢下线）
-        StpUserUtil.setStpLogic(buildLogic(StpUserUtil.TYPE, USER_TOKEN_NAME, 60 * 60 * 24 * 7));
+        StpLogic userLogic = buildLogic(StpUserUtil.TYPE, USER_TOKEN_NAME, 60 * 60 * 24 * 7);
+        StpUserUtil.setStpLogic(userLogic);
+        SaManager.putStpLogic(userLogic);
+
         // 管理端：2 小时，允许并发（保留会话列表便于审计）
-        StpAdminUtil.setStpLogic(buildLogic(StpAdminUtil.TYPE, ADMIN_TOKEN_NAME, 60 * 60 * 2));
+        StpLogic adminLogic = buildLogic(StpAdminUtil.TYPE, ADMIN_TOKEN_NAME, 60 * 60 * 2);
+        StpAdminUtil.setStpLogic(adminLogic);
+        SaManager.putStpLogic(adminLogic);
     }
 
     private StpLogic buildLogic(String type, String tokenName, int timeoutSeconds) {
