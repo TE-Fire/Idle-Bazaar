@@ -1,0 +1,38 @@
+{
+  "color": {
+    "brand": "#FFD100",
+    "brand-dark": "#E8BC00",
+    "price": "#FF5000",
+    "bg": "#F5F5F6",
+    "surface": "#FFFFFF",
+    "border": "#E8E8EC",
+    "border-strong": "#DCDCE2",
+    "text": {
+      "1": "#1F1F26",
+      "2": "#5E5E68",
+      "3": "#9A9AA4"
+    },
+    "ok": "#0FA968",
+    "warn": "#FF8F1F",
+    "err": "#E5484D"
+  },
+  "fontSize": {
+    "xl": "25px"
+  },
+  "space": {
+    "10": "40px"
+  },
+  "radius": {
+    "xl": "12px"
+  },
+  "shadow": {
+    "1": "0 1px 3px rgba(20,20,30,.06)",
+    "2": "0 4px 14px rgba(20,20,30,.10)"
+  },
+  "layout": {
+    "nav-h": "60px",
+    "cat-h": "44px",
+    "side-w": "240px",
+    "content-max": "1280px"
+  }
+}

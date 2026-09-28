@@ -1,0 +1,6 @@
+packages:
+  # 应用：用户 Web 端黄 #FFD100（design/01）、管理后台蓝 #1677FF（design/03）
+  # 小程序（uni-app）走独立工程 apps/mini，暂不纳入 workspace —— 见 tech/02 第三章
+  - 'apps/*'
+  # 共享层：设计令牌、接口类型、业务常量、规范配置
+  - 'packages/*'

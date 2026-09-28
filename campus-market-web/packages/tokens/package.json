@@ -1,0 +1,27 @@
+{
+  "name": "@campus/tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "校园二手交易平台 · 设计令牌唯一来源：primitive + 三端 semantic → css/scss/uni.scss/json",
+  "type": "module",
+  "main": "dist/web.json",
+  "exports": {
+    ".": "./dist/web.json",
+    "./web.css": "./dist/web.css",
+    "./admin.css": "./dist/admin.css",
+    "./mini.css": "./dist/mini.css",
+    "./web.scss": "./dist/web.scss",
+    "./admin.scss": "./dist/admin.scss",
+    "./mini.scss": "./dist/mini.scss",
+    "./uni.scss": "./dist/uni.scss",
+    "./web.json": "./dist/web.json",
+    "./admin.json": "./dist/admin.json",
+    "./mini.json": "./dist/mini.json"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  }
+}

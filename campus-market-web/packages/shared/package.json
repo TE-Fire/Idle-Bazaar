@@ -1,0 +1,14 @@
+{
+  "name": "@campus/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "三端共享的业务常量：权限点、角色码、状态机枚举。纯 TS 源码，不参与构建，由 Vite 直接消费",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./perm-codes": "./src/perm-codes.ts",
+    "./role": "./src/role.ts"
+  }
+}

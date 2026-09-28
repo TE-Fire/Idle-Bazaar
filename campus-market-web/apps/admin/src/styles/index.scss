@@ -1,0 +1,41 @@
+/**
+ * 全局基础样式
+ *
+ * 规则：这里只写「组件库不提供」的东西（页面底色、卡片骨架、滚动条）。
+ * 任何色值都必须走 var(--cm-*)，禁止写死——令牌是唯一源头（tech/02 §5）。
+ * Sass 用 @use，不要用已废弃的 @import。
+ */
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-size: var(--cm-font-size-base);
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-bg);
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 内容区卡片：白底 + 1px 边框 + 8px 圆角 + 极浅阴影（design/03 三章） */
+.cm-card {
+  background: var(--cm-color-surface);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-lg);
+  box-shadow: var(--cm-shadow-1);
+}
+
+/* 卡片标题区 16px padding，与内容区之间 1px 分隔线 */
+.cm-card__title {
+  padding: var(--cm-space-4);
+  border-bottom: 1px solid var(--cm-color-border);
+  font-size: var(--cm-font-size-md);
+  font-weight: 600;
+}
+
+.cm-card__body {
+  padding: var(--cm-space-4);
+}

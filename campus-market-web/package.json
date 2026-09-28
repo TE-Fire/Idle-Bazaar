@@ -1,0 +1,20 @@
+{
+  "name": "campus-market-web",
+  "private": true,
+  "version": "0.1.0",
+  "description": "校园二手交易平台 · 前端（pnpm workspace：用户 Web 端 / 管理后台 / 小程序）",
+  "packageManager": "pnpm@10.33.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "tokens": "pnpm --filter @campus/tokens build",
+    "dev:admin": "pnpm tokens && pnpm --filter @campus/admin dev",
+    "dev:web": "pnpm tokens && pnpm --filter @campus/web dev",
+    "build": "pnpm tokens && pnpm -r build",
+    "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}

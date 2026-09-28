@@ -1,0 +1,32 @@
+{
+  "name": "@campus/admin",
+  "version": "0.1.0",
+  "private": true,
+  "description": "管理后台（蓝 #1677FF）—— 对应 design/03，UI 库 Ant Design Vue",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@ant-design/icons-vue": "^7.0.1",
+    "@campus/api": "workspace:*",
+    "@campus/shared": "workspace:*",
+    "@campus/tokens": "workspace:*",
+    "ant-design-vue": "^4.2.6",
+    "axios": "^1.20.0",
+    "pinia": "^4.0.3",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "sass": "^1.105.0",
+    "typescript": "~5.9.3",
+    "vite": "^8.3.1",
+    "vue-tsc": "^3.3.11"
+  }
+}

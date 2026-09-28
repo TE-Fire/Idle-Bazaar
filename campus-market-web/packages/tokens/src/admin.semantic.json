@@ -1,0 +1,36 @@
+{
+  "color": {
+    "brand": "#1677FF",
+    "brand-hover": "#4096FF",
+    "brand-bg": "#E6F0FF",
+    "brand-border": "#91CAFF",
+    "bg": "#F0F2F5",
+    "surface": "#FFFFFF",
+    "border": "#E5E7EB",
+    "border-ctrl": "#D9D9D9",
+    "text": {
+      "1": "#1F1F26",
+      "2": "#5E5E68",
+      "3": "#9A9AA4"
+    },
+    "st-pending": "#FF8F1F",
+    "st-pass": "#0FA968",
+    "st-fail": "#E5484D",
+    "st-off": "#9A9AA4",
+    "st-run": "#1677FF"
+  },
+  "fontSize": {
+    "xl": "30px"
+  },
+  "shadow": {
+    "1": "0 1px 2px rgba(20,20,30,.06)",
+    "2": "0 2px 8px rgba(20,20,30,.08)"
+  },
+  "layout": {
+    "sider-w": "208px",
+    "sider-w-collapsed": "48px",
+    "header-h": "48px",
+    "content-pad": "24px",
+    "chart-h": "300px"
+  }
+}
