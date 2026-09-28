@@ -16,12 +16,16 @@ import './styles/index.scss'
 
 import App from './App.vue'
 import router from './router'
+import { setupEcharts } from '@/charts/echarts'
 import { perm } from '@/directives/perm'
 import { configureApi, clearToken } from '@campus/api'
 import { useUserStore } from '@/stores/user'
 
 const app = createApp(App)
 app.use(createPinia())
+
+// 按需引入的 ECharts 模块必须先注册，视图里才能用 <VChart>
+setupEcharts()
 
 /* 请求层的副作用在这里注入：@campus/api 本身不认识任何 UI 库 */
 configureApi({

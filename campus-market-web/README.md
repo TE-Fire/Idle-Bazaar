@@ -55,15 +55,30 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 ## 当前进度（tech/02 第十章落地顺序）
 
 - [x] ① `packages/tokens`：三份 JSON 源 + 生成脚本（57/59/59 个令牌）
-- [ ] ② `apps/admin` 骨架：登录 → 布局 → 权限指令 → 一个 Table 页（**进行中**）
-- [ ] ③ A2 看板四张图（ECharts）
+- [x] ② `apps/admin` 骨架：登录 → 布局 → 权限指令 → 权限矩阵 Table 页
+- [x] ③ A2 看板：KPI×4 + 趋势折线 + 品类环图 + 学院×品类热力矩阵 + 循环率/减碳卡 + 待处置队列
+      **（数据来自 `apps/admin/src/mock/dashboard.ts`，后端统计接口未实现）**
 - [ ] ④ `apps/web` 骨架：首页 → 详情 → 发布页
 - [ ] ⑤ `apps/mini` 复用 api 与 Token，按原型逐页搬
+
+### 看板的数据来源
+
+`apps/admin/src/mock/dashboard.ts` 是**写死的确定性数据**（用 LCG 生成，不用
+`Math.random`），这样每次刷新截图一致——论文里贴的图不能每次都变。
+后端 `/admin/dashboard/*` 就绪后：删掉该文件，改用 `packages/api` 里由 OpenAPI
+生成的 `dashboardApi`，视图层只换数据源，图表配置与组件不动。
+
+四张校园牌做了三张（学院×品类热力矩阵、二手循环率面积图、学期粒度趋势）。
+**面交所热力需要校园平面底图**，单独一页做更合适，放到 A8 报表页。
 
 ## 已知与文档的偏差
 
 - **Ant Design Vue 目前是全量引入**（`app.use(Antd)`）。文档要求按需引入
   （`unplugin-vue-components`），但 Vite 8 下插件兼容性需先验证；文档给出的降级方案
-  就是「手动按需 import」，全量引入是更保守的中间态。等首个页面稳定后收敛。
+  就是「手动按需 import」，全量引入是更保守的中间态。代价是主 chunk 1.84MB（gzip 575KB），
+  等页面稳定后收敛。
 - **会话持久化手写 localStorage**，未引 `pinia-plugin-persistedstate`：
   只有三个字段要存，插件是 1 个依赖换 6 行代码，等第二个 store 需要持久化时再引。
+- **ECharts 锁 5.6.0 + vue-echarts 7.0.3**：vue-echarts 8 起 peer 变成 `echarts ^6`，
+  与文档锁定的 5.x 冲突，暂不升级（echarts 6 已发布，但默认主题与部分配置有变化，
+  升之前要先过一遍 design/03 的图表规范）。

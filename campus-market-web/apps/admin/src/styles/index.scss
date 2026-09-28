@@ -18,6 +18,8 @@ body {
   color: var(--cm-color-text-1);
   background: var(--cm-color-bg);
   font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* design/03：全局等宽数字，保证表格与 KPI 的列对齐 */
+  font-variant-numeric: tabular-nums;
 }
 
 /* 内容区卡片：白底 + 1px 边框 + 8px 圆角 + 极浅阴影（design/03 三章） */
