@@ -1,0 +1,12 @@
+/**
+ * 全局样式变量（uni-app 会把本文件自动注入每个 scss 页面，**不需要手动 import**）
+ *
+ * <p>这里只放变量、不放 CSS 规则——放规则会被注入 N 遍（每个页面一份）。
+ * 令牌来自 `@campus/tokens/uni.scss`（`pnpm tokens` 生成，尺寸已 ×2 转 rpx），
+ * 所以页面里写 `font-size: $cm-font-size-base` 拿到的就是 28rpx。
+ *
+ * <p>用相对路径而不是包名：uni-app 的 sass 对 node_modules 里的 scss 解析不稳，
+ * 而令牌产物就在同一仓库里，相对路径更可靠。
+ */
+
+@import '../../../packages/tokens/dist/uni.scss';

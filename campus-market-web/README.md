@@ -9,29 +9,41 @@
 ```
 apps/
 ├─ admin/        管理后台（蓝 #1677FF，Ant Design Vue）design/03   ← 已建骨架 + A2 看板
-└─ web/          用户 Web 端（黄 #FFD100，Element Plus）design/01   ← 已建骨架（P1–P4）
+├─ web/          用户 Web 端（黄 #FFD100，Element Plus）design/01   ← 已建骨架（P1–P4）
+└─ mini/         小程序（橙 #FF6A00，uni-app）design/02            ← 已建骨架（M1–M6）★独立工程
 packages/
 ├─ tokens/       设计令牌唯一源头 → css / scss / uni.scss / json
 ├─ api/          Axios 实例 + Result 解包 + 接口声明（UI 无关）
 ├─ shared/       权限点常量、角色码、商品枚举与模型、格式化工具（与后端同名）
 │                 perm-codes / role / item / format
+├─ mock/         骨架期共享 mock 数据（Web 与小程序同一批商品，截图才对得上）
 └─ eslint-config/ 统一规范（待建）
 ```
 
-小程序（uni-app，橙 #FF6A00）是**独立工程**，放在 `apps/mini` 但不纳入 workspace
-——uni-app 有自己的构建链（HBuilderX / `@dcloudio/vite-plugin-uni`），
-塞进 pnpm workspace 会与 Vite 版本打架。它共享的是 `packages/tokens` 的产物与类型，不是源码工程。
+小程序（uni-app，橙 #FF6A00）是**独立工程**：放在 `apps/mini`，但在
+`pnpm-workspace.yaml` 里显式排除（`- '!apps/mini'`）。原因是
+`@dcloudio/vite-plugin-uni` 的 peer 锁 **vite 5.2.8**，而 admin / web 用 Vite 8，
+同一棵依赖树里装两个 vite 会让构建链打架。它共享的是 `packages/*` 的产物与类型，
+不是源码工程——依赖用 `file:` 协议引入，`pnpm install --ignore-workspace` 独立安装。
 
 ## 快速开始
 
 ```bash
-pnpm install          # 首次
+pnpm install          # 首次（web + admin）
 pnpm tokens           # 生成设计令牌产物（dev 脚本已自动串好）
 pnpm dev:admin        # 管理后台 http://localhost:5173
 pnpm dev:web          # 用户 Web 端 http://localhost:5174
+
+# 小程序是独立工程，要在 apps/mini 下单独装一次
+cd apps/mini && pnpm install --ignore-workspace
+pnpm dev:h5           # http://localhost:5175 用浏览器看
+pnpm dev:mp-weixin    # 产出 dist/dev/mp-weixin，用微信开发者工具打开
 ```
 
 两端端口错开（5173 / 5174），可以同时起。
+
+> 小程序的 `--ignore-workspace` 不能省：pnpm 会向上找到根 workspace，
+> 不带这个参数它会把根 workspace 装一遍而**不装 mini 自己的依赖**。
 
 后端需先起来（`campus-admin-api`，默认 8080）。Vite 已配代理：
 `/admin/**` 与 `/api/**` 同源转发到 `http://localhost:8080`，浏览器侧无跨域。
@@ -65,12 +77,15 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 - [x] ③ A2 看板：KPI×4 + 趋势折线 + 品类环图 + 学院×品类热力矩阵 + 循环率/减碳卡 + 待处置队列
       **（数据来自 `apps/admin/src/mock/dashboard.ts`，后端统计接口未实现）**
 - [x] ④ `apps/web` 骨架：首页·列表（P1）+ 详情（P2）+ 发布（P3）+ 对比（P4）
-- [ ] ⑤ `apps/mini` 复用 api 与 Token，按原型逐页搬
+- [x] ⑤ `apps/mini` 骨架（uni-app 独立工程）：M1 首页瀑布 / M2 详情 / M3 发布 / M4 分类 /
+      M5 消息 / M6 我的。`pnpm build:h5` 已通过（产物 `apps/mini/dist/build/h5`）；
+      小程序端跑 `pnpm dev:mp-weixin`，用微信开发者工具打开 `dist/dev/mp-weixin`。
 
-### 用户端的数据来源
+### 用户端与小程序的数据来源
 
-同看板：`apps/web/src/mock/items.ts` 是**确定性 mock**（LCG 生成 36 件，基准时间
-写死 2026-09-28），后端 `/api/item/*` 就绪后删掉它，改由 `packages/api` 供数。
+同看板：`packages/mock` 是**确定性 mock**（LCG 生成 36 件，基准时间写死 2026-09-28），
+Web 端与小程序**共用这一批**，否则同一件商品在两端价格不同，论文截图一对比就露馅。
+后端 `/api/item/*` 就绪后删掉它，改由 `packages/api` 供数。
 学生端的商品 / 订单 / 会话接口**目前一个都没实现**（`campus-user-api` 只有
 `/api/health`），所以用户端还没有登录页与路由守卫——`main.ts` 的 `onUnauthorized`
 只弹提示不跳转，等 `/api/auth/*` 就位后再补。
@@ -108,3 +123,11 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 - **`web.semantic.json` 补了 `brand-bg` / `brand-border`**（`#FFF8DB` / `#F2DFA0`）：
   design/01 §4.4 的「已选条件 chip」需要黄底 + 黄边，但令牌源里原本只有 `brand` 与
   `brand-dark`，配色取自 design/01 §2.1 的 `--yellow-100/200`。
+- **小程序端 `pages.json` 里的色值只能写死**（tabBar 的 `#FF6A00` 等）：它是 JSON 配置，
+  拿不到 CSS 变量/令牌。值与 `mini.semantic.json` 同源，**改主色时这处要手工同步**。
+- **小程序端 Vue 锁 `^3.4.21`、vite 锁 `5.2.8`、TS 4.9 + vue-tsc 1.x**：全部跟着
+  uni-app 官方模板 `uni-preset-vue#vite-ts`（`3.0.0-5020420260813003`）——
+  `@dcloudio/vite-plugin-uni` 的 peer 就是 vite 5.2.8，往上抬会直接构建失败。
+  与 Web / 管理端的 Vue 3.5 + Vite 8 不一致，这是 uni-app 的约束，不是疏漏。
+- **TabBar 暂无图标**：规范要 81×81 png 两套（选中/未选），手里没图，
+  先用纯文字 tabBar（`iconPath` 在小程序里可省略）。有图后补上即可。

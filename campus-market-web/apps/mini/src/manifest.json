@@ -1,0 +1,25 @@
+{
+  "name": "campus-market-mini",
+  "appid": "",
+  "description": "校园二手交易平台 · 移动端小程序",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false
+    },
+    "usingComponents": true
+  },
+  "h5": {
+    "title": "校园二手",
+    "router": {
+      "base": "/"
+    }
+  },
+  "uniStatistics": {
+    "enable": false
+  },
+  "vueVersion": "3"
+}
