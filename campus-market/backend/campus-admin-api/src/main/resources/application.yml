@@ -58,11 +58,17 @@ knife4j:
   setting:
     language: zh_cn
 springdoc:
+  # 两个分组都有接口：管理端 7 个（/admin/auth、/admin/demo），学生端 1 个（/api/health）。
+  # 启动类是 scanBasePackages = "com.campus"，admin-api 的 pom 又依赖了 campus-user-api，
+  # 所以两端 Controller 都会被注册到这里——不用拆两个进程。
+  #
+  # 注意：springdoc 内部按分组名字典序排下拉框（学 < 管），写配置顺序改不了默认选中项，
+  # 所以打开文档页默认停在「学生端」。要看管理端点左上角下拉切换。
   group-configs:
-    - group: "学生端"
-      paths-to-match: "/api/**"
     - group: "管理端"
       paths-to-match: "/admin/**"
+    - group: "学生端"
+      paths-to-match: "/api/**"
 
 logging:
   pattern:

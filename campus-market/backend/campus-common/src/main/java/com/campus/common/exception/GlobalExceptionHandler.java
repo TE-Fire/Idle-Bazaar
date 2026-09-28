@@ -57,6 +57,19 @@ public class GlobalExceptionHandler {
         return Result.fail(CommonErrorCode.FORBIDDEN.getCode(), CommonErrorCode.FORBIDDEN.getMsg()).trace();
     }
 
+    /**
+     * 静态资源不存在：浏览器打开任何页面都会自动请求 /favicon.ico，
+     * 项目没放这个文件，Spring Boot 3.2 起找不到静态资源会抛
+     * NoResourceFoundException（旧版本是静默 404）。它若无专属 handler
+     * 就会落进下面的 Exception 兜底，每次开页面都刷一条 ERROR + 全栈，
+     * 日志很快被污染。404 语义，warn 一行即可，不打印堆栈。
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public Result<?> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException e) {
+        log.warn("[404] {}", e.getMessage());
+        return Result.fail(CommonErrorCode.NOT_FOUND.getCode(), CommonErrorCode.NOT_FOUND.getMsg()).trace();
+    }
+
     /** 兜底：未知异常统一 5000，返回 traceId 供排查，不暴露堆栈 */
     @ExceptionHandler(Exception.class)
     public Result<?> handleException(Exception e) {
