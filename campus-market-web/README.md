@@ -8,12 +8,13 @@
 
 ```
 apps/
-├─ admin/        管理后台（蓝 #1677FF，Ant Design Vue）design/03   ← 当前已建骨架
-└─ web/          用户 Web 端（黄 #FFD100，Element Plus）design/01   ← 待建
+├─ admin/        管理后台（蓝 #1677FF，Ant Design Vue）design/03   ← 已建骨架 + A2 看板
+└─ web/          用户 Web 端（黄 #FFD100，Element Plus）design/01   ← 已建骨架（P1–P4）
 packages/
 ├─ tokens/       设计令牌唯一源头 → css / scss / uni.scss / json
 ├─ api/          Axios 实例 + Result 解包 + 接口声明（UI 无关）
-├─ shared/       权限点常量、角色码、状态机枚举（与后端同名）
+├─ shared/       权限点常量、角色码、商品枚举与模型、格式化工具（与后端同名）
+│                 perm-codes / role / item / format
 └─ eslint-config/ 统一规范（待建）
 ```
 
@@ -27,11 +28,16 @@ packages/
 pnpm install          # 首次
 pnpm tokens           # 生成设计令牌产物（dev 脚本已自动串好）
 pnpm dev:admin        # 管理后台 http://localhost:5173
+pnpm dev:web          # 用户 Web 端 http://localhost:5174
 ```
+
+两端端口错开（5173 / 5174），可以同时起。
 
 后端需先起来（`campus-admin-api`，默认 8080）。Vite 已配代理：
 `/admin/**` 与 `/api/**` 同源转发到 `http://localhost:8080`，浏览器侧无跨域。
-改后端端口：`ADMIN_API_TARGET=http://localhost:8081 pnpm dev:admin`。
+改后端端口：`ADMIN_API_TARGET=http://localhost:8081 pnpm dev:admin`、
+`WEB_API_TARGET=http://localhost:8081 pnpm dev:web`。
+用户 Web 端只代理 `/api`（学生端接口全在这一前缀下）。
 
 ## 登录账号（后端演示种子，四个角色同密码）
 
@@ -58,8 +64,16 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 - [x] ② `apps/admin` 骨架：登录 → 布局 → 权限指令 → 权限矩阵 Table 页
 - [x] ③ A2 看板：KPI×4 + 趋势折线 + 品类环图 + 学院×品类热力矩阵 + 循环率/减碳卡 + 待处置队列
       **（数据来自 `apps/admin/src/mock/dashboard.ts`，后端统计接口未实现）**
-- [ ] ④ `apps/web` 骨架：首页 → 详情 → 发布页
+- [x] ④ `apps/web` 骨架：首页·列表（P1）+ 详情（P2）+ 发布（P3）+ 对比（P4）
 - [ ] ⑤ `apps/mini` 复用 api 与 Token，按原型逐页搬
+
+### 用户端的数据来源
+
+同看板：`apps/web/src/mock/items.ts` 是**确定性 mock**（LCG 生成 36 件，基准时间
+写死 2026-09-28），后端 `/api/item/*` 就绪后删掉它，改由 `packages/api` 供数。
+学生端的商品 / 订单 / 会话接口**目前一个都没实现**（`campus-user-api` 只有
+`/api/health`），所以用户端还没有登录页与路由守卫——`main.ts` 的 `onUnauthorized`
+只弹提示不跳转，等 `/api/auth/*` 就位后再补。
 
 ### 看板的数据来源
 
@@ -82,3 +96,15 @@ dev 下 `campus.captcha.enabled=false`，登录页暂不显示验证码。
 - **ECharts 锁 5.6.0 + vue-echarts 7.0.3**：vue-echarts 8 起 peer 变成 `echarts ^6`，
   与文档锁定的 5.x 冲突，暂不升级（echarts 6 已发布，但默认主题与部分配置有变化，
   升之前要先过一遍 design/03 的图表规范）。
+- **Element Plus 同样全量引入**（`app.use(ElementPlus)`），主 chunk 996KB（gzip 321KB）——
+  比 admin 还大，因为 EP 的 CSS 也全量打进来了。按需引入（`unplugin-vue-components`）
+  等页面稳定后再统一收敛，两端一起做。
+- **商品图用渐变占位**（`GoodsItem.tints`），不是设计决定，只是后端未就绪时的权宜：
+  MinIO 与上传接口就位后 `images` 存真实 URL，`tints` 字段直接删掉。
+  发布页的图片只做本地预览（`URL.createObjectURL`），不上传。
+- **成色配色跟原型 CSS 而不是 `grade-a~d` 令牌**：原型 `.cond` 是 A/B 绿、C 橙、D 灰，
+  而令牌里 `grade-b` 是蓝色。原型是视觉依据，令牌只是数值层，所以以原型为准。
+  若后续要统一到令牌，得先改 `design/01` §4.4。
+- **`web.semantic.json` 补了 `brand-bg` / `brand-border`**（`#FFF8DB` / `#F2DFA0`）：
+  design/01 §4.4 的「已选条件 chip」需要黄底 + 黄边，但令牌源里原本只有 `brand` 与
+  `brand-dark`，配色取自 design/01 §2.1 的 `--yellow-100/200`。

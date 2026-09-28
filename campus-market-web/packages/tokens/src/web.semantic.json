@@ -2,6 +2,8 @@
   "color": {
     "brand": "#FFD100",
     "brand-dark": "#E8BC00",
+    "brand-bg": "#FFF8DB",
+    "brand-border": "#F2DFA0",
     "price": "#FF5000",
     "bg": "#F5F5F6",
     "surface": "#FFFFFF",

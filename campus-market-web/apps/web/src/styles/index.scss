@@ -1,0 +1,111 @@
+/**
+ * 全局基础样式 + Element Plus 主题对齐
+ *
+ * <p>规则同 admin：这里只写「组件库不提供」的东西（页面底色、滚动条、骨架），
+ * 任何色值都必须走 `var(--cm-*)`——令牌是唯一源头（tech/02 §5）。
+ *
+ * <p>Element Plus 的主色必须改成品牌黄，否则按钮/选中态会露出 EP 默认蓝，
+ * 违反 design/01 原则 1「主色只用一次」。EP 的 `light-3~9` 是独立变量（不是
+ * color-mix 计算），所以每一个都要指到令牌上，不能只改 `primary`。
+ */
+
+/* ── 1. Element Plus 主题对齐 ───────────────────────────── */
+
+:root {
+  --el-color-primary: var(--cm-color-brand);
+  --el-color-primary-light-3: var(--cm-color-brand-dark);
+  --el-color-primary-light-5: var(--cm-color-brand-dark);
+  --el-color-primary-light-7: var(--cm-color-brand-dark);
+  --el-color-primary-light-8: var(--cm-color-brand-dark);
+  --el-color-primary-light-9: var(--cm-color-brand-bg);
+  --el-color-primary-dark-2: var(--cm-color-brand-dark);
+  --el-border-radius-base: var(--cm-radius-md);
+  --el-font-size-base: var(--cm-font-size-base);
+  --el-text-color-primary: var(--cm-color-text-1);
+  --el-text-color-regular: var(--cm-color-text-2);
+  --el-border-color: var(--cm-color-border-strong);
+  --el-border-color-light: var(--cm-color-border);
+  --el-fill-color-blank: var(--cm-color-surface);
+  --el-bg-color: var(--cm-color-bg);
+}
+
+/* 黄底必须配深色字（design/01 §4.2：#FFD100 配 #1F1F26 ≈ 12:1，禁止黄底白字） */
+.el-button--primary {
+  color: var(--cm-color-text-1);
+  font-weight: 700;
+}
+
+/* 复选框用原生 accent-color（design/01 §4.3），不要 EP 自绘图形 */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: var(--cm-color-brand);
+  border-color: var(--cm-color-brand-dark);
+}
+
+/* ── 2. 基础重置 ────────────────────────────────────────── */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-size: var(--cm-font-size-base);
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-bg);
+  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* ── 3. 页面骨架（design/01 §3.2）───────────────────────── */
+
+/** 内容区：xl 锁 1280 居中，其余断点 100% + 左右留白 */
+.cm-shell {
+  width: 100%;
+  max-width: var(--cm-layout-content-max);
+  margin: 0 auto;
+  padding: var(--cm-space-5) var(--cm-space-6) 96px;
+}
+
+/** 已选条件 chip：黄底 + 黄边 + 尾部 ×（design/01 §4.4） */
+.cm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cm-space-1);
+  height: 26px;
+  padding: 0 var(--cm-space-2) 0 var(--cm-space-3);
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-brand-bg);
+  border: 1px solid var(--cm-color-brand-border);
+  border-radius: var(--cm-radius-sm);
+  cursor: pointer;
+}
+
+.cm-chip__x {
+  color: var(--cm-color-text-3);
+  font-size: var(--cm-font-size-sm);
+  line-height: 1;
+}
+
+.cm-chip:hover .cm-chip__x {
+  color: var(--cm-color-text-1);
+}
+
+/** 两行截断（卡片标题用，design/01 §4.1 固定高 40px） */
+.cm-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
