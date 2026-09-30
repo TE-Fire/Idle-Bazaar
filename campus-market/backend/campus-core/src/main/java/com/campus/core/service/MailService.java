@@ -8,19 +8,14 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
 /**
- * 邮件发送（business/03 F-A10 找回密码、F-A0 注册）。
+ * 邮件发送（注册 / 找回密码 / 邮箱登录的验证码）。
  *
- * <p>两条设计：
- * <ol>
- *   <li>**开关关闭时只打日志**。本地没配 SMTP 授权码也能跑通全流程，
- *       验证码从控制台看——否则每次调试都要真发一封邮件，QQ 邮箱还会限流。</li>
- *   <li>**注入用 `required = false`**。`spring-boot-starter-mail` 只在配了
- *       `spring.mail.host` 时才创建 `JavaMailSender`，没配就是 null；
- *       硬注入会让应用在本地直接起不来。</li>
- * </ol>
+ * <p>① 开关关闭时只打日志：本地没配 SMTP 授权码也能跑通全流程，验证码从控制台取，
+ * 否则每次调试都要真发一封，QQ 邮箱还会限流。
+ * ② `JavaMailSender` 用 `required = false`：只有配了 `spring.mail.host` 才会创建，
+ * 硬注入会让应用在本地起不来。
  *
- * <p>配置占位见 `application-dev.yml` 的 `campus.mail.*` 与 `spring.mail.*`：
- * **授权码不要写进仓库**，dev 配置已被 gitignore。
+ * <p>授权码不要写进仓库（dev 配置已 gitignore）。
  */
 @Slf4j
 @Service

@@ -4,22 +4,13 @@ import com.campus.common.exception.BizException;
 import com.campus.common.exception.IErrorCode;
 
 /**
- * 业务断言：把「条件不满足 → 抛业务异常」的 if 块压成一行，消灭多分支样板代码。
+ * 业务断言：把「条件不满足 → 抛业务异常」的 if 块压成一行。
  *
- * <p>对比：
- * <pre>
- *   // 以前
- *   if (order == null) { throw BizException.of(OrderErrorCode.ORDER_NOT_FOUND); }
- *   if (!order.isOwner(uid)) { throw BizException.of(OrderErrorCode.ORDER_NOT_OWNER); }
+ * <p>不用 Hutool 的 `cn.hutool.core.lang.Assert`：它抛 IllegalArgumentException / StateException，
+ * 会被兜底成 5000 系统错误，带不了业务错误码。
  *
- *   // 现在
- *   BizAssert.notNull(order, OrderErrorCode.ORDER_NOT_FOUND);
- *   BizAssert.isTrue(order.isOwner(uid), OrderErrorCode.ORDER_NOT_OWNER);
- * </pre>
- *
- * <p>为什么不用 Hutool 的 {@code cn.hutool.core.lang.Assert}：它抛的是
- * IllegalArgumentException / StateException，会被兜底成 5000 系统错误，
- * 无法携带业务错误码；自写 50 行即可与 IErrorCode 契约打通，比改造依赖更省。
+ * <p>`isTrue(cond, ec)` 陈述的是**正常态**（条件为真才继续），与 `if (坏条件) throw` 互为反命题；
+ * 这是 assert 家族（JUnit / Spring Assert）的既有语义，不是本项目自创。
  */
 public final class BizAssert {
 

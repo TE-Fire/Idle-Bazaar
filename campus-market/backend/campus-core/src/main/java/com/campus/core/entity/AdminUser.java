@@ -11,11 +11,10 @@ import lombok.experimental.Accessors;
 import java.time.LocalDateTime;
 
 /**
- * 管理员（管理端 RBAC 的「人」）。
- * 一人一角色：role_id 单列，不需要中间关联表。
+ * 管理员（管理端 RBAC 的「人」）。一人一角色，role_id 单列，不需要中间关联表。
  *
- * <p>{@code @Accessors(chain = true)}：setter 返回 this，多字段构建时写链式，
- * 替代一长串插入式 setXxx；Req/VO 用 Lombok {@code @Builder}，Entity 统一用链式。
+ * <p>`@Accessors(chain = true)`：setter 返回 this，多字段构建写链式；
+ * Req/VO 用 `@Builder`，Entity 统一用链式。
  */
 @Data
 @Accessors(chain = true)

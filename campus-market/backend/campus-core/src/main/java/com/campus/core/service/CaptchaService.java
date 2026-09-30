@@ -25,14 +25,12 @@ import java.util.Base64;
 import java.util.UUID;
 
 /**
- * 图形验证码（business/03 F-A1 补两条：登录 / 注册 / 找回密码三处共用）。
+ * 图形验证码（登录 / 注册 / 找回密码三处共用）。
  *
- * <p>自己画而不用 Hutool 的 {@code hutool-captcha}：项目只引了 `hutool-core`，
- * 为一个 4 位验证码多拉一个带 AWT 依赖的包不划算；且自画能直接控制
- * 「去掉易混字符」这件事——`0/O`、`1/I/l` 混排会让用户反复输错。
+ * <p>自己画而不用 `hutool-captcha`：项目只引了 `hutool-core`，为一个 4 位码多拉一个带 AWT
+ * 的包不划算；且自画能去掉 `0/O`、`1/I/l` 这些易混字符。
  *
- * <p>验证码存 Redis 而不是 session：管理端是多实例无状态部署的前提，
- * 且 Sa-Token 的会话与验证码生命周期本就不该绑在一起（登录前还没有会话）。
+ * <p>存 Redis 而不是 session：管理端要无状态多实例，且登录前还没有会话可绑。
  */
 @Slf4j
 @Service
@@ -54,12 +52,7 @@ public class CaptchaService {
     @Value("${campus.captcha.enabled:true}")
     private boolean captchaEnabled;
 
-    /**
-     * 下发：返回 key + 图片 base64，前端直接用 data:image/png;base64 渲染。
-     *
-     * <p>开关关闭时不下发代码、不画图，只回一个 disabled 标记让前端隐藏输入框——
-     * 若照常生成再让调用方打补丁，等于白写一次 Redis 加一次 AWT 画图。
-     */
+    /** 下发：返回 key + 图片 base64。开关关闭时只回 disabled 标记，不画图不写 Redis */
     public CaptchaVO generate() {
         if (!captchaEnabled) {
             CaptchaVO disabled = new CaptchaVO();
@@ -72,12 +65,7 @@ public class CaptchaService {
         return new CaptchaVO(key, toBase64Png(code));
     }
 
-    /**
-     * 校验：一次性，通过即删。
-     *
-     * <p>开关关闭时直接放行——本地联调每次都要先调下发接口太烦，
-     * 但**生产必须开**，否则注册接口就是裸的刷子入口。
-     */
+    /** 校验：一次性，通过即删。开关关闭时直接放行（本地联调用）；生产必须开，否则注册接口是裸的刷子入口 */
     public void verify(String key, String code) {
         if (!captchaEnabled) {
             return;

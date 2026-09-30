@@ -58,11 +58,9 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * 静态资源不存在：浏览器打开任何页面都会自动请求 /favicon.ico，
-     * 项目没放这个文件，Spring Boot 3.2 起找不到静态资源会抛
-     * NoResourceFoundException（旧版本是静默 404）。它若无专属 handler
-     * 就会落进下面的 Exception 兜底，每次开页面都刷一条 ERROR + 全栈，
-     * 日志很快被污染。404 语义，warn 一行即可，不打印堆栈。
+     * 静态资源不存在：浏览器总会请求 /favicon.ico，而 Spring Boot 3.2 起找不到静态资源
+     * 会抛 NoResourceFoundException（旧版是静默 404）。不接住它就会落进下面的 Exception
+     * 兜底，每次开页面刷一条 ERROR + 全栈，日志很快被污染。这里按 404 warn 一行即可。
      */
     @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
     public Result<?> handleNoResource(org.springframework.web.servlet.resource.NoResourceFoundException e) {
