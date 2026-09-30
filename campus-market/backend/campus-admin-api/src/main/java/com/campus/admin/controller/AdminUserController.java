@@ -10,7 +10,7 @@ import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
 import com.campus.core.satoken.StpAdminUtil;
 import com.campus.core.service.AdminAccountService;
-import com.campus.core.service.dto.AdminUserVO;
+import com.campus.core.dto.resp.AdminUserVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;

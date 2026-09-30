@@ -1,4 +1,4 @@
-package com.campus.core.service.dto;
+package com.campus.core.dto.req;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;

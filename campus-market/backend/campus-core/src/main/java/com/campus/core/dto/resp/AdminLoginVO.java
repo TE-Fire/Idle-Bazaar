@@ -1,4 +1,4 @@
-package com.campus.core.service.dto;
+package com.campus.core.dto.resp;
 
 import lombok.Data;
 

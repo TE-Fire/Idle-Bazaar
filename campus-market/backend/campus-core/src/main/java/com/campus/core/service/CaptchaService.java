@@ -3,7 +3,7 @@ package com.campus.core.service;
 import com.campus.common.asserts.BizAssert;
 import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.errcode.UserErrorCode;
-import com.campus.core.service.dto.CaptchaVO;
+import com.campus.core.dto.resp.CaptchaVO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
