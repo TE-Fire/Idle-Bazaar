@@ -6,7 +6,6 @@ import com.campus.core.service.AdminAccountService;
 import com.campus.core.service.AdminAuthService;
 import com.campus.core.service.CaptchaService;
 import com.campus.core.dto.req.AdminLoginReq;
-import com.campus.core.dto.req.AdminMailLoginReq;
 import com.campus.core.dto.resp.AdminLoginVO;
 import com.campus.core.dto.req.AdminRegisterReq;
 import com.campus.core.dto.req.AdminResetReq;
@@ -39,20 +38,14 @@ public class AuthController {
     private final AdminAccountService adminAccountService;
     private final CaptchaService captchaService;
 
-    @Operation(summary = "登录", description = "账号 + 密码（+ 图形验证码）。失败 5 次锁定 10 分钟。")
+    @Operation(summary = "登录",
+            description = "type：1 用户名 + 密码 / 2 邮箱 + 邮箱验证码（验证码先调 /send-code 取）。"
+                    + "两种方式的返回值完全一致（同一份 AdminLoginVO）。"
+                    + "密码登录失败 5 次锁定 10 分钟；邮箱验证码登录失败**不计入**锁定——"
+                    + "否则任何人拿一个已知邮箱乱猜 5 次就能把该管理员锁 10 分钟（DoS）")
     @PostMapping("/login")
     public Result<AdminLoginVO> login(@Valid @RequestBody AdminLoginReq req) {
         return Result.ok(adminAuthService.login(req));
-    }
-
-    /* ── 邮箱验证码登录（business/03 F-A1 的第二种入口）────────── */
-
-    @Operation(summary = "邮箱验证码登录",
-            description = "邮箱 + 6 位邮箱验证码直接换令牌，返回的 AdminLoginVO 与密码登录完全一致。"
-                    + "status=0 停用、status=2 待分配角色的账号同样被拦下")
-    @PostMapping("/login/mail")
-    public Result<AdminLoginVO> loginByMailCode(@Valid @RequestBody AdminMailLoginReq req) {
-        return Result.ok(adminAuthService.loginByMailCode(req));
     }
 
     /* ── 发邮箱验证码（注册 / 找回密码 / 登录 三场景共用一个端点）───── */

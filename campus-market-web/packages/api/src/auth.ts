@@ -7,19 +7,26 @@
 
 import { request } from './http'
 
-export interface AdminLoginReq {
-  username: string
-  password: string
-  /** 验证码 key；后端开关关闭时可为空 */
-  captchaKey?: string
-  captchaCode?: string
-}
+/**
+ * 登录方式，与后端 `LoginTypeEnum` 的 code 一一对应（改值要同步改后端）。
+ *
+ * 两种方式共用一个端点 `/admin/auth/login`，只有「凭据是什么」不同。
+ */
+export const LOGIN_TYPE = {
+  byUsername: 1,
+  byEmail: 2
+} as const
 
-/** 邮箱验证码登录入参（与密码登录并列，不合并——凭据形态不同：长期密码 vs 一次性码） */
-export interface AdminMailLoginReq {
-  email: string
-  /** 邮箱收到的 6 位数字验证码 */
-  mailCode: string
+export type LoginType = (typeof LOGIN_TYPE)[keyof typeof LOGIN_TYPE]
+
+export interface AdminLoginReq {
+  /** LOGIN_TYPE：1 传用户名、2 传注册用的邮箱 */
+  type: LoginType
+  /** type=1 时为用户名，type=2 时为邮箱 */
+  usernameOrEmail: string
+  /** type=1 时为密码，type=2 时为 6 位邮箱验证码 */
+  passwordOrCode: string
+  /** 验证码 key；后端开关关闭时可为空 */
   captchaKey?: string
   captchaCode?: string
 }
@@ -88,13 +95,12 @@ export interface AdminResetReq {
 }
 
 export const authApi = {
-  /** 登录：账号 + 密码（+ 图形验证码）。失败 5 次锁定 10 分钟 */
+  /**
+   * 登录：type=1 用户名+密码 / type=2 邮箱+验证码。两种返回值完全一致。
+   * 密码登录失败 5 次锁定 10 分钟；邮箱登录失败不计入锁定（后端防 DoS）。
+   */
   login: (req: AdminLoginReq) =>
     request<AdminLoginVO>({ url: '/admin/auth/login', method: 'POST', data: req }),
-
-  /** 邮箱验证码登录第二步：返回的令牌、权限点与密码登录完全一致 */
-  loginByMailCode: (req: AdminMailLoginReq) =>
-    request<AdminLoginVO>({ url: '/admin/auth/login/mail', method: 'POST', data: req }),
 
   logout: () => request<void>({ url: '/admin/auth/logout', method: 'POST' }),
 

@@ -1,7 +1,7 @@
 package com.campus.core.init;
 
 import com.campus.core.entity.AdminUser;
-import com.campus.core.enums.AdminStatus;
+import com.campus.core.enums.AdminStatusEnum;
 import com.campus.core.mapper.AdminUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,11 +13,9 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 演示账号初始化（对应原型 A1 的四种角色）。
- *
- * <p>密码不在 SQL 里写死哈希——BCrypt 每次结果都不同，写死反而容易对不上。
- * 这里在启动时生成，且只在 admin_user 为空时执行，可重复运行。
- * create_time / update_time / deleted 由 AuditMetaObjectHandler 自动填充，不手动 set。
+ * 演示账号初始化（原型 A1 的四种角色）。密码不在 SQL 里写死哈希：BCrypt 每次结果都不同，
+ * 写死反而对不上；这里启动时生成，且只在 admin_user 为空时执行，可重复运行。
+ * 审计字段由 AuditMetaObjectHandler 自动填充。
  */
 @Slf4j
 @Component
@@ -59,7 +57,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
                 .setRealName(seed.realName())
                 .setRoleId(seed.roleId())
                 // 种子账号直接启用：它们由开发者创建，不经过「待分配」这一步
-                .setStatus(AdminStatus.ENABLED.getCode())
+                .setStatus(AdminStatusEnum.ENABLED.getCode())
                 .setFailCount(0)));
         log.info("[init] 已创建 {} 个演示管理员账号，统一密码：{}", SEEDS.size(), DEMO_PASSWORD);
     }

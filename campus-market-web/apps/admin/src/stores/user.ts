@@ -12,7 +12,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { authApi, setToken, clearToken } from '@campus/api'
-import type { AdminLoginReq, AdminLoginVO, AdminMailLoginReq } from '@campus/api'
+import type { AdminLoginReq, AdminLoginVO } from '@campus/api'
 import type { PermCode } from '@campus/shared'
 
 const STORAGE_KEY = 'campus-admin-session'
@@ -81,12 +81,11 @@ export const useUserStore = defineStore('user', () => {
     persist()
   }
 
-  /** 密码登录：后端下发 tokenName（管理端为 satoken-admin），写回请求层 */
+  /**
+   * 登录（type=1 用户名+密码 / type=2 邮箱+验证码，后端同一个端点）。
+   * 后端下发 tokenName（管理端为 satoken-admin），写回请求层。
+   */
   const login = async (req: AdminLoginReq): Promise<void> => applySession(await authApi.login(req))
-
-  /** 邮箱验证码登录 */
-  const loginByMailCode = async (req: AdminMailLoginReq): Promise<void> =>
-    applySession(await authApi.loginByMailCode(req))
 
   /** 登出：先调后端注销，再清本地——后端失败也要清，否则界面卡在半登录态 */
   const logout = async (): Promise<void> => {
@@ -125,7 +124,6 @@ export const useUserStore = defineStore('user', () => {
     permCodes,
     isLogin,
     login,
-    loginByMailCode,
     logout,
     clearSession,
     hasPerm,

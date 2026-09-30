@@ -23,7 +23,7 @@ import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import { LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { DEMO_PASSWORD } from '@campus/shared'
-import { authApi, MAIL_CODE_SCENE } from '@campus/api'
+import { authApi, LOGIN_TYPE, MAIL_CODE_SCENE } from '@campus/api'
 import CaptchaField from '@/components/CaptchaField.vue'
 import { useCountdown } from '@/composables/useCountdown'
 import { isQqMail } from '@/utils/mail'
@@ -124,21 +124,24 @@ const onSubmit = async (): Promise<void> => {
   }
   loading.value = true
   try {
-    if (tab.value === 'mail') {
-      await user.loginByMailCode({
-        email: form.email.trim(),
-        mailCode: form.mailCode.trim(),
-        captchaKey: form.captchaKey,
-        captchaCode: form.captchaCode
-      })
-    } else {
-      await user.login({
-        username: form.username,
-        password: form.password,
-        captchaKey: form.captchaKey,
-        captchaCode: form.captchaCode
-      })
-    }
+    // 两种登录方式走同一个端点，只差 type 与「凭据是什么」
+    await user.login(
+      tab.value === 'mail'
+        ? {
+            type: LOGIN_TYPE.byEmail,
+            usernameOrEmail: form.email.trim(),
+            passwordOrCode: form.mailCode.trim(),
+            captchaKey: form.captchaKey,
+            captchaCode: form.captchaCode
+          }
+        : {
+            type: LOGIN_TYPE.byUsername,
+            usernameOrEmail: form.username,
+            passwordOrCode: form.password,
+            captchaKey: form.captchaKey,
+            captchaCode: form.captchaCode
+          }
+    )
     const redirect = (route.query.redirect as string) || '/dashboard'
     message.success(`欢迎回来，${user.realName}`)
     void router.push(redirect)

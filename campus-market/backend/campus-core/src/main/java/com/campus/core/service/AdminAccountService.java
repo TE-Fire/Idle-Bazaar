@@ -4,8 +4,8 @@ import com.campus.common.asserts.BizAssert;
 import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.entity.AdminRole;
 import com.campus.core.entity.AdminUser;
-import com.campus.core.enums.AdminStatus;
-import com.campus.core.enums.MailCodeScene;
+import com.campus.core.enums.AdminStatusEnum;
+import com.campus.core.enums.MailCodeSceneEnum;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
@@ -28,15 +28,13 @@ import java.util.List;
 /**
  * 管理员注册与找回密码（business/03 F-A0 / F-A10）。
  *
- * <p>本类与 {@link AdminAuthService} 分开：**登录是高频只读校验，注册/找回是低频写入**，
- * 混在一起会让登录链路背上发邮件、生成验证码这些跟登录无关的依赖。
+ * <p>与 {@link AdminAuthService} 分开：登录是高频只读校验，注册/找回是低频写入，
+ * 混在一起会让登录链路背上发邮件、生成验证码这些无关依赖。
  *
- * <p>三条安全边界（改这里前先读 business/03 的「已决（2026-09-29）」）：
- * <ol>
- *   <li>注册接口**不接受 roleId**——否则任何人都能给自己审核/封禁权限；</li>
- *   <li>注册后是 `status=2` 待分配，**登录会被拦**，由超管在 A9 分配角色；</li>
- *   <li>找回密码**不暴露邮箱是否注册**，统一返回「已发送」。</li>
- * </ol>
+ * <p>三条安全边界（改这里前先读 business/03「已决（2026-09-29）」）：
+ * ① 注册不接受 roleId，否则任何人都能给自己审核/封禁权限；
+ * ② 注册后是待分配态，登录被拦，由超管在 A9 分配角色；
+ * ③ 找回密码不暴露邮箱是否注册，统一返回「已发送」。
  */
 @Slf4j
 @Service
@@ -67,7 +65,7 @@ public class AdminAccountService {
         BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
         BizAssert.isTrue(adminUserMapper.selectByEmail(email) == null, UserErrorCode.EMAIL_ALREADY_REGISTERED);
 
-        verifyMailCode(email, MailCodeScene.REGISTER, req.getMailCode());
+        verifyMailCode(email, MailCodeSceneEnum.REGISTER, req.getMailCode());
 
         AdminUser admin = new AdminUser()
                 .setEmail(email)
@@ -76,7 +74,7 @@ public class AdminAccountService {
                 .setRealName(req.getRealName())
                 // ★ 关键：不给角色、不给权限，等超管分配
                 .setRoleId(0L)
-                .setStatus(AdminStatus.PENDING_ROLE.getCode())
+                .setStatus(AdminStatusEnum.PENDING_ROLE.getCode())
                 .setFailCount(0);
         try {
             adminUserMapper.insert(admin);
@@ -90,23 +88,16 @@ public class AdminAccountService {
     /* ── 发邮箱验证码（注册 / 找回密码 / 邮箱登录 三场景共用一个入口）── */
 
     /**
-     * 给邮箱发 6 位验证码，场景由 {@code req.type}（{@link MailCodeScene}）决定。
+     * 给邮箱发 6 位验证码，场景由 {@code req.type}（{@link MailCodeSceneEnum}）决定。
+     * 三场景的发码动作完全一致，只有两点不同，故合成一处用 switch 分：
+     * ① 注册暴露「邮箱已注册」（4008），找回与登录必须不暴露，否则成了枚举管理员邮箱的工具；
+     * ② 发信文案取 {@link MailCodeSceneEnum#getDesc()}。
      *
-     * <p>三个场景的**发码动作完全一致**（图形验证码 → 归一化 → QQ 系校验 → 60 秒节流 →
-     * 生成 6 位码 → 存 Redis → 发信），只有两点不同，所以合成一处、用 switch 分：
-     * <ol>
-     *   <li>**要不要先查库、查到以后怎么办**：注册要暴露「邮箱已注册」（4008），
-     *       找回密码与登录**必须不暴露**——否则这个接口就成了枚举管理员邮箱的工具；</li>
-     *   <li>**发信文案**：直接取 {@link MailCodeScene#getDesc()}。</li>
-     * </ol>
+     * <p>节流必须在查库之前且三场景顺序一致：先查库后节流会让「找回/登录」的响应耗时
+     * 随邮箱是否存在而变化，等于开了计时侧信道。代价是注册场景用已注册邮箱点第二次
+     * 拿到 4010 而非 4008，可接受。
      *
-     * <p>**节流必须放在查库之前**，且三场景顺序一致：若先查库后节流，
-     * 「找回密码 / 登录」的响应耗时会随邮箱是否存在而变化，等于开了一个计时侧信道。
-     * 代价是注册场景里用已注册邮箱点第二次会拿到 4010（频繁）而不是 4008——
-     * 用户已经知道邮箱被注册了，不会反复点，可接受。
-     *
-     * <p>`default` 写 throw 而不是静默兜底：将来加第四种场景时，若忘了补分支，
-     * 有 default 兜着会**静默走错逻辑**，编译器也不会提醒。
+     * <p>`default` 写 throw 而非静默兜底：将来加第四种场景漏写分支时，静默兜底不会有任何提醒。
      */
     public void sendCode(AdminSendCodeReq req) {
         captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
@@ -114,19 +105,19 @@ public class AdminAccountService {
         String email = normalize(req.getEmail());
         BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
 
-        MailCodeScene scene = MailCodeScene.fromCodeOrNull(req.getType());
+        MailCodeSceneEnum scene = MailCodeSceneEnum.fromCodeOrNull(req.getType());
         BizAssert.notNull(scene, CommonErrorCode.PARAM_ERROR);
 
-        // 60 秒内同一邮箱只发一次（按邮箱节流，不按场景，见 MailRedisKeys.buildThrottleKey）
+        // 按邮箱节流（不按场景），见 MailRedisKeys.buildThrottleKey
         Boolean fresh = stringRedisTemplate.opsForValue()
                 .setIfAbsent(MailRedisKeys.buildThrottleKey(email), "1", THROTTLE_TTL);
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
         switch (scene) {
-            // 注册页是公开入口，用户填了别人的邮箱需要立刻知道
+            // 注册页是公开入口，填了别人的邮箱要立刻知道
             case REGISTER -> BizAssert.isTrue(adminUserMapper.selectByEmail(email) == null,
                     UserErrorCode.EMAIL_ALREADY_REGISTERED);
-            // 不发信，但对外仍返回「已发送」——不暴露该邮箱是否注册
+            // 不发信，但对外仍返回「已发送」，不暴露该邮箱是否注册
             case RESET, LOGIN -> {
                 AdminUser admin = adminUserMapper.selectByEmail(email);
                 if (admin == null || isDisabled(admin.getStatus())) {
@@ -153,14 +144,12 @@ public class AdminAccountService {
         BizAssert.notNull(admin, UserErrorCode.MAIL_CODE_INVALID);
         BizAssert.isTrue(!isDisabled(admin.getStatus()), UserErrorCode.MAIL_CODE_INVALID);
 
-        // ★「新密码不能与旧密码相同」必须在校验验证码**之前**判：
-        // 验证码是一次性的，若先校验再判重，用户输了个重复密码就把码用掉了，
-        // 还得等 60 秒节流过去才能重发——等于拿验证码替用户做输入校验。
+        // 「新密码不能与旧密码相同」必须在校验验证码之前判：验证码一次性，
+        // 先校验再判重的话，用户输个重复密码就把码用掉了，还得等 60 秒节流
         BizAssert.isTrue(!passwordEncoder.matches(req.getPassword(), admin.getPasswordHash()),
                 UserErrorCode.PASSWORD_SAME_AS_OLD);
 
-        // 验证码最后一次使用：校验通过即删，防止同一个码被反复用来改密码
-        verifyMailCode(email, MailCodeScene.RESET, req.getMailCode());
+        verifyMailCode(email, MailCodeSceneEnum.RESET, req.getMailCode());
 
         adminUserMapper.updateById(new AdminUser()
                 .setId(admin.getId())
@@ -176,10 +165,10 @@ public class AdminAccountService {
     /* ── 超管分配角色 ─────────────────────────────────────── */
 
     /**
-     * 给待分配（或已在册）账号分配角色，同时把 status 置为启用。
+     * 给账号分配角色，同时把 status 置为启用。
      *
-     * <p>**不允许分配 SUPER**：超级管理员只能由开发者经种子数据创建
-     * （business/03 已决 2026-09-29）。否则超管能批量造超管，权限模型就塌了。
+     * <p>不允许分配 SUPER：超管只能由开发者经种子数据创建（business/03 已决 2026-09-29），
+     * 否则超管能批量造超管，权限模型就塌了。
      */
     public void assignRole(Long adminId, Long roleId) {
         AdminUser admin = adminUserMapper.selectById(adminId);
@@ -193,33 +182,33 @@ public class AdminAccountService {
         adminUserMapper.updateById(new AdminUser()
                 .setId(adminId)
                 .setRoleId(roleId)
-                .setStatus(AdminStatus.ENABLED.getCode()));
+                .setStatus(AdminStatusEnum.ENABLED.getCode()));
         log.info("[admin] 账号 {} 分配角色 {} 并启用", admin.getEmail(), role.getRoleCode());
     }
 
     /* ── 内部工具 ─────────────────────────────────────────── */
 
     /**
-     * 邮箱验证码校验：一次性，通过即删。
+     * 邮箱验证码校验：一次性，比对通过才删。
      *
-     * <p>**必须带场景**：注册码只能注册、找回码只能找回、登录码只能登录
-     * （key 里带场景，见 {@link MailRedisKeys#buildCodeKey}）。跨场景能用等于让掉一道校验。
+     * <p>必须带场景：注册码只能注册、找回码只能找回、登录码只能登录
+     * （key 里带场景，见 {@link MailRedisKeys#buildCodeKey}），跨场景能用等于让掉一道校验。
      *
-     * <p>对外可见（而非 private）是因为 `AdminAuthService.loginByMailCode` 也要校验
-     * LOGIN 场景的码；登录是高频只读链路，不并进本类，只复用这一个方法。
+     * <p>对外可见（而非 private）是因为登录也要校验 LOGIN 场景的码；登录是高频只读链路，
+     * 不并进本类，只复用这一个方法。
      */
-    public void verifyMailCode(String email, MailCodeScene scene, String code) {
+    public void verifyMailCode(String email, MailCodeSceneEnum scene, String code) {
         String key = MailRedisKeys.buildCodeKey(scene, email);
         String cached = stringRedisTemplate.opsForValue().get(key);
         BizAssert.notNull(cached, UserErrorCode.MAIL_CODE_INVALID);
-        // ★ 先比对、后删除：反过来的话，输错一次就把正确验证码也删了，用户只能重新发
+        // 先比对、后删除：反过来的话输错一次就把正确的码也删了，用户只能重新发
         BizAssert.isTrue(cached.equals(code.trim()), UserErrorCode.MAIL_CODE_INVALID);
         stringRedisTemplate.delete(key);
     }
 
     /** 状态是否「停用」。status 理论上非空（库里有 NOT NULL），仍兜住查询结果为 null 的情况 */
     private static boolean isDisabled(Integer status) {
-        return status != null && AdminStatus.fromCode(status).isDisabled();
+        return status != null && AdminStatusEnum.fromCode(status).isDisabled();
     }
 
     private String sixDigitCode() {
@@ -236,13 +225,10 @@ public class AdminAccountService {
         return MAIL_SUFFIXES.stream().anyMatch(e::endsWith);
     }
 
-    /**
-     * 登录账号取邮箱前缀（3037749727@qq.com → 3037749727）；冲突时补 4 位随机后缀。
-     * 注册页不单独让用户填用户名——邮箱已经是唯一标识，再填一个是负担。
-     */
+    /** 登录账号取邮箱前缀（3037749727@qq.com → 3037749727），冲突时补 4 位随机后缀 */
     private String deriveUsername(String email) {
         String base = email.substring(0, email.indexOf('@'));
-        // 太短或纯数字前缀太长都截断，避免 varchar(32) 溢出
+        // 截断避免 varchar(32) 溢出
         if (base.length() > 24) {
             base = base.substring(0, 24);
         }

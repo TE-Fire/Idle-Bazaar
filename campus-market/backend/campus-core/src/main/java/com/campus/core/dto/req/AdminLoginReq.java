@@ -1,6 +1,7 @@
 package com.campus.core.dto.req;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 /**
@@ -10,13 +11,16 @@ import lombok.Data;
 public class AdminLoginReq {
 
     @NotBlank(message = "账号不能为空")
-    private String username;
+    private String usernameOrEmail;
 
     @NotBlank(message = "密码不能为空")
-    private String password;
+    private String passwordOrCode;
 
     /** 验证码 key（前端拿图时一起返回）；开关关闭时可为空 */
     private String captchaKey;
 
     private String captchaCode;
+
+    @NotNull(message = "登录类型不能为空")
+    private  Integer type;
 }

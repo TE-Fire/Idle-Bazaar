@@ -2,9 +2,12 @@ package com.campus.core.service;
 
 import com.campus.common.asserts.BizAssert;
 import com.campus.common.constant.PermCodes;
+import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.entity.AdminRole;
 import com.campus.core.entity.AdminUser;
-import com.campus.core.enums.AdminStatus;
+import com.campus.core.enums.AdminStatusEnum;
+import com.campus.core.enums.LoginTypeEnum;
+import com.campus.core.enums.MailCodeSceneEnum;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminRolePermMapper;
@@ -12,6 +15,7 @@ import com.campus.core.mapper.AdminUserMapper;
 import com.campus.core.redis.AdminRedisKeys;
 import com.campus.core.satoken.MultiAccountConfig;
 import com.campus.core.satoken.StpAdminUtil;
+
 import com.campus.core.dto.req.AdminLoginReq;
 import com.campus.core.dto.resp.AdminLoginVO;
 import lombok.RequiredArgsConstructor;
@@ -23,13 +27,14 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 /**
- * 管理端登录（business/03 F-A1）。
+ * 管理端登录（business/03 F-A1）。密码校验自己做：Sa-Token 只管会话，不管密码。
+ * 失败 5 次锁定 10 分钟，以 `fail_count / lock_until` 为准，Redis 锁标记只是查库前的快路径。
  *
- * <p>密码校验由本服务自己做：Sa-Token 只管会话，不管密码。
- * 失败 5 次锁定 10 分钟，以 `admin_user.fail_count / lock_until` 为准，
- * Redis 的锁定标记（`cm:admin:lock:{username}`）只是查库前的快路径。
+ * <p>两种登录方式合在一个方法：只有「按哪个字段查库」和「凭据怎么校验」不同，
+ * 分开写会让「邮箱登录忘了写 last_login_at」这类遗漏有机可乘。
  */
 @Slf4j
 @Service
@@ -44,56 +49,74 @@ public class AdminAuthService {
     private final AdminRolePermMapper adminRolePermMapper;
     private final CaptchaService captchaService;
     private final StringRedisTemplate stringRedisTemplate;
+    /** 只为复用 `verifyMailCode`（邮箱验证码的取-比对-删除），登录本身不依赖注册/找回流程 */
+    private final AdminAccountService adminAccountService;
 
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     /*
-     * 故意不加 @Transactional：失败分支要在抛 BizException 之前把 fail_count 落库，
-     * 而 @Transactional(rollbackFor = Exception.class) 会把这个写入一并回滚——
-     * 结果是失败次数永远累加不到 MAX_FAIL，「失败 5 次锁定 10 分钟」形同虚设
-     * （2026-09-30 实测发现）。失败与成功分支各自只更新 admin_user 一行，
-     * 单条 UPDATE 本身原子，不需要事务。
+     * 不加 @Transactional：事务内 throw 会把失败分支的 fail_count 写入一并回滚，
+     * 「失败 5 次锁定」形同虚设（2026-09-30 实测踩过）。单条 UPDATE 本身原子。
      */
     public AdminLoginVO login(AdminLoginReq req) {
-        // 与注册 / 找回页共用同一套验证码（key 前缀与「一次性」语义都在 CaptchaService）
         captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
 
-        String username = req.getUsername();
+        LoginTypeEnum type = LoginTypeEnum.fromCodeOrNull(req.getType());
+        BizAssert.notNull(type, CommonErrorCode.PARAM_ERROR);
 
-        // 锁定判断放在**查库之前**：命中就直接拒绝，省掉这一次 DB 查询——
-        // 账号被锁期间往往正被反复试探，省下的正是最密集的那些请求。
-        // 用入参 username 拼 key：此刻还没查库，拿不到 id。
-        BizAssert.isTrue(!isLocked(username), UserErrorCode.ADMIN_ACCOUNT_LOCKED);
+        String account = req.getUsernameOrEmail().trim();
 
-        AdminUser admin = adminUserMapper.selectByUsername(username);
+        // 快路径只对用户名登录有效：锁 key 是 cm:admin:lock:{username}，邮箱登录拼不出同一个。
+        // 邮箱登录由下面 DB 的 lock_until 兜底，不漏判
+        if (type == LoginTypeEnum.BY_USERNAME) {
+            BizAssert.isTrue(!isLocked(account), UserErrorCode.ADMIN_ACCOUNT_LOCKED);
+        }
+
+        // switch 表达式强制穷尽：将来加第三种登录方式会编译失败，不会静默漏分支
+        AdminUser admin = switch (type) {
+            case BY_USERNAME -> adminUserMapper.selectByUsername(account);
+            case BY_EMAIL -> adminUserMapper.selectByEmail(account.toLowerCase(Locale.ROOT)); // 库里存的是小写
+        };
         BizAssert.notNull(admin, UserErrorCode.ADMIN_BAD_CREDENTIAL);
-        // status 在库里有 NOT NULL 约束，取到 null 说明数据异常；按凭证错误返回，不泄漏细节
         BizAssert.notNull(admin.getStatus(), UserErrorCode.ADMIN_BAD_CREDENTIAL);
 
-        AdminStatus status = AdminStatus.fromCode(admin.getStatus());
+        AdminStatusEnum status = AdminStatusEnum.fromCode(admin.getStatus());
         BizAssert.isTrue(!status.isDisabled(), UserErrorCode.ADMIN_BAD_CREDENTIAL);
-        // status=2 待分配角色：不与「密码错误」混为一谈——注册完登录被拦是设计，
-        // 若提示成密码错误，用户会以为自己注册失败（business/03 已决 2026-09-29）
+        // 待分配角色单独报 4006：提示成密码错误会让人以为注册失败（business/03 已决）
         BizAssert.isTrue(!status.isPendingRole(), UserErrorCode.ADMIN_PENDING_ROLE);
 
-        // 锁定期内直接拒绝，不再比对密码（避免爆破）。
-        // Redis 是快路径（前面已判），这里兜住「Redis 被清空 / 判断降级」的情况
+        // 锁定期内不再比对凭据，避免爆破；这里兜住「Redis 被清空 / 邮箱登录」的情况
         BizAssert.isTrue(admin.getLockUntil() == null || LocalDateTime.now().isAfter(admin.getLockUntil()),
                 UserErrorCode.ADMIN_ACCOUNT_LOCKED);
 
-        if (!passwordEncoder.matches(req.getPassword(), admin.getPasswordHash())) {
-            int fails = (admin.getFailCount() == null ? 0 : admin.getFailCount()) + 1;
-            int reached = fails;
-            AdminUser update = new AdminUser()
-                    .setId(admin.getId())
-                    .setFailCount(fails >= MAX_FAIL ? 0 : fails);
-            if (fails >= MAX_FAIL) {
-                update.setLockUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
-                markLocked(username);
-                log.warn("[admin] 账号 {} 连续失败 {} 次，锁定 {} 分钟", username, reached, LOCK_MINUTES);
+        String credential = req.getPasswordOrCode();
+
+        switch (type) {
+            case BY_USERNAME -> {
+                if (!passwordEncoder.matches(credential, admin.getPasswordHash())) {
+                    int fails = (admin.getFailCount() == null ? 0 : admin.getFailCount()) + 1;
+                    AdminUser update = new AdminUser()
+                            .setId(admin.getId())
+                            .setFailCount(fails >= MAX_FAIL ? 0 : fails);
+                    if (fails >= MAX_FAIL) {
+                        update.setLockUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
+                        // 用库里的 username 拼 key：入参大小写可能不同，拼错就白写了
+                        markLocked(admin.getUsername());
+                        log.warn("[admin] 账号 {} 连续失败 {} 次，锁定 {} 分钟",
+                                admin.getUsername(), fails, LOCK_MINUTES);
+                    }
+                    adminUserMapper.updateById(update);
+                    throw UserErrorCode.ADMIN_BAD_CREDENTIAL.ex();
+                }
             }
-            adminUserMapper.updateById(update);
-            throw UserErrorCode.ADMIN_BAD_CREDENTIAL.ex();
+            case BY_EMAIL -> {
+                // 比对成功才删码，与注册 / 找回密码同一套
+                adminAccountService.verifyMailCode(
+                        account.toLowerCase(Locale.ROOT), MailCodeSceneEnum.LOGIN, credential);
+                // ★ 不计 fail_count：否则拿一个已知邮箱乱猜 5 次就能把该管理员锁 10 分钟（DoS）。
+                //   邮箱登录的防爆破靠提交时的图形验证码，以及验证码自身的错误次数上限（待加）
+            }
+            default -> throw new IllegalStateException("未处理的登录方式：" + type);
         }
 
         // 登录成功：清零失败计数、写最近登录时间
@@ -118,6 +141,7 @@ public class AdminAuthService {
         vo.setPermCodes(permCodes);
         return vo;
     }
+
 
     /* ── 登录锁定：Redis 快路径 + DB 兜底 ───────────────────── */
 
@@ -156,4 +180,5 @@ public class AdminAuthService {
     public List<String> allPermCodes() {
         return List.of(PermCodes.ALL);
     }
+
 }
