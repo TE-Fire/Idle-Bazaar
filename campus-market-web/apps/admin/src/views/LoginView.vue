@@ -1,247 +1,147 @@
 <script setup lang="ts">
 /**
- * A1 登录页（原型 prototypes/admin/login.html，design/03 第五章）
+ * 认证外壳（A1 登录 / A0 注册 / A10 找回，design/03 第五章）
  *
- * <p>两种登录方式并列（密码 / 邮箱验证码），但**共用同一个**图形验证码输入框：
- * 验证码是一次性的，每个 Tab 各放一个 CaptchaField 会同时占着两张图，
- * 切回来那张已经作废。所以验证码放在 Tab 外面，切换方式时手动换一张即可。
+ * <p>版式：左侧 banner 三屏自动轮播（纯 CSS 渐变 + 内联 SVG 几何插画，不引图片资源），
+ * 右侧是**同一张白卡片**，登录 / 注册 / 找回三种表单在卡片内切换——
+ * 不再是三个独立页面各铺一整屏，来回切不用整页跳转。<1024px 时隐藏 banner。
  *
- * <p>图形验证码：登录 / 注册 / 找回三页共用 `CaptchaField` 组件。
- * 后端 `campus.captcha.enabled=false` 时接口会返回 `disabled=true`，
- * 组件收到后通知这里把自己隐藏——本地联调不必每次都输四位验证码。
+ * <p>路由用 `/login/:mode?` 一条记录：登录 ↔ 注册 ↔ 找回是**同一路由内的参数变化**，
+ * 组件实例复用，只有卡片内容做过场动画；旧的 /register、/forgot 路径在路由表里重定向兼容。
  *
- * <p>⚠️ 登录失败后必须**换一张**验证码：后端是「校验通过即删」的一次性码，
- * 密码输错时那张图已经作废，不刷新的话第二次提交必然卡在验证码上。
- *
- * <p>演示账号四个角色同密码（后端 AdminAccountInitializer.DEMO_PASSWORD），
- * 一键填充是为了答辩时快速切换角色验证权限隔离。
+ * <p>表单本体在 `components/auth/` 下三个子组件里，本组件只管壳。
  */
-
-import { computed, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { message } from 'ant-design-vue'
-import type { FormInstance, Rule } from 'ant-design-vue/es/form'
-import { LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons-vue'
-import { DEMO_PASSWORD } from '@campus/shared'
-import { authApi, LOGIN_TYPE, MAIL_CODE_SCENE } from '@campus/api'
-import CaptchaField from '@/components/CaptchaField.vue'
-import { useCountdown } from '@/composables/useCountdown'
-import { isQqMail } from '@/utils/mail'
-import { useUserStore } from '@/stores/user'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
+import LoginForm from '@/components/auth/LoginForm.vue'
+import RegisterForm from '@/components/auth/RegisterForm.vue'
+import ForgotForm from '@/components/auth/ForgotForm.vue'
 
 const route = useRoute()
-const router = useRouter()
-const user = useUserStore()
 
-type LoginTab = 'password' | 'mail'
-const tab = ref<LoginTab>('password')
+type AuthMode = 'login' | 'register' | 'forgot'
 
-const formRef = ref<FormInstance>()
-const loading = ref(false)
-const sending = ref(false)
-const captchaOn = ref(true)
-const captchaRef = ref<InstanceType<typeof CaptchaField> | null>(null)
-const { left: countdown, start: startCountdown } = useCountdown(60)
+const FORMS = {
+  login: LoginForm,
+  register: RegisterForm,
+  forgot: ForgotForm
+} as const
 
-const form = reactive({
-  username: 'super',
-  password: DEMO_PASSWORD,
-  email: '',
-  mailCode: '',
-  captchaKey: '',
-  captchaCode: ''
+/** /login/:mode? 的参数即模式；裸 /login 归登录 */
+const mode = computed<AuthMode>(() => {
+  const m = route.params.mode
+  return m === 'register' || m === 'forgot' ? m : 'login'
 })
 
-/** 四个角色一键切换，用于验证「审核员不能封禁用户」这类互斥 */
-const DEMO_ACCOUNTS = [
-  { username: 'super', label: '超级管理员' },
-  { username: 'reviewer', label: '审核员' },
-  { username: 'operator', label: '运营' },
-  { username: 'readonly', label: '只读' }
-]
+const SLIDE_COUNT = 3
+const SLIDE_INTERVAL = 6000
 
-/** 只有邮箱验证码这一路有格式约束；账号/密码沿用后端 1000 的提示，前端不再重复拦 */
-const rules: Record<string, Rule[]> = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    {
-      validator: (_r: unknown, value: string) =>
-        isQqMail(value ?? '')
-          ? Promise.resolve()
-          : Promise.reject(new Error('仅支持 QQ 邮箱（@qq.com / @foxmail.com）')),
-      trigger: 'blur'
-    }
-  ],
-  mailCode: [
-    { required: true, message: '请输入邮箱验证码', trigger: 'blur' },
-    { len: 6, message: '验证码为 6 位数字', trigger: 'blur' }
-  ],
-  captchaCode: [{ required: true, message: '请输入图形验证码', trigger: 'blur' }]
+// 轮播：外壳常驻，切表单不打断（这是不拆三个页面的最大收益）
+const current = ref(0)
+let timer: number | undefined
+
+const stopAuto = (): void => {
+  if (timer !== undefined) window.clearInterval(timer)
 }
 
-const sendLabel = computed(() => (countdown.value > 0 ? `${countdown.value}s 后重发` : '获取验证码'))
-
-/** 切换登录方式：图形验证码一次性，换方式就得换一张 */
-const onTabChange = (key: string | number): void => {
-  tab.value = key as LoginTab
-  void captchaRef.value?.refresh()
+const startAuto = (): void => {
+  stopAuto()
+  timer = window.setInterval(() => {
+    current.value = (current.value + 1) % SLIDE_COUNT
+  }, SLIDE_INTERVAL)
 }
 
-/** 发邮箱验证码：只校验邮箱与图形验证码，不牵动账号密码字段 */
-const onSendCode = async (): Promise<void> => {
-  try {
-    await formRef.value?.validateFields(['email', 'captchaCode'])
-  } catch {
-    return
-  }
-  sending.value = true
-  try {
-    await authApi.sendCode({
-      type: MAIL_CODE_SCENE.login,
-      email: form.email.trim(),
-      captchaKey: form.captchaKey,
-      captchaCode: form.captchaCode
-    })
-    message.success('验证码已发送至邮箱，10 分钟内有效')
-    startCountdown()
-    // 图形验证码一次性：发码用掉后必须换一张给登录提交用
-    await captchaRef.value?.refresh()
-  } catch {
-    // 失败提示由请求层统一 toast
-    await captchaRef.value?.refresh()
-  } finally {
-    sending.value = false
-  }
+/** 手动切屏后重置计时，否则刚点完 1 秒就自动跳走了 */
+const goSlide = (index: number): void => {
+  current.value = index
+  startAuto()
 }
 
-const onSubmit = async (): Promise<void> => {
-  if (tab.value === 'mail') {
-    try {
-      await formRef.value?.validateFields(['email', 'mailCode'])
-    } catch {
-      return
-    }
-  }
-  loading.value = true
-  try {
-    // 两种登录方式走同一个端点，只差 type 与「凭据是什么」
-    await user.login(
-      tab.value === 'mail'
-        ? {
-            type: LOGIN_TYPE.byEmail,
-            usernameOrEmail: form.email.trim(),
-            passwordOrCode: form.mailCode.trim(),
-            captchaKey: form.captchaKey,
-            captchaCode: form.captchaCode
-          }
-        : {
-            type: LOGIN_TYPE.byUsername,
-            usernameOrEmail: form.username,
-            passwordOrCode: form.password,
-            captchaKey: form.captchaKey,
-            captchaCode: form.captchaCode
-          }
-    )
-    const redirect = (route.query.redirect as string) || '/dashboard'
-    message.success(`欢迎回来，${user.realName}`)
-    void router.push(redirect)
-  } catch {
-    // 失败提示由请求层统一 toast（含 traceId），这里不再重复弹
-    void captchaRef.value?.refresh()
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(startAuto)
+onUnmounted(stopAuto)
 </script>
 
 <template>
   <div class="login">
-    <div class="cm-card login__card">
-      <div class="login__brand">
-        <div class="login__title">校园二手交易平台</div>
-        <div class="login__sub">管理后台 · 请登录后继续</div>
+    <!-- 左侧 banner：三屏渐变 + 几何插画，自动轮播 -->
+    <aside class="login__banner">
+      <div class="slide slide--blue" :class="{ 'is-active': current === 0 }">
+        <svg class="slide__art" viewBox="0 0 320 320" aria-hidden="true">
+          <circle cx="160" cy="160" r="118" fill="none" stroke="rgba(255,255,255,.28)" stroke-width="1.5" />
+          <circle cx="160" cy="160" r="78" fill="none" stroke="rgba(255,255,255,.22)" stroke-width="1.5" />
+          <rect x="96" y="112" width="128" height="96" rx="16" fill="rgba(255,255,255,.16)" />
+          <rect x="112" y="132" width="96" height="10" rx="5" fill="rgba(255,255,255,.5)" />
+          <rect x="112" y="152" width="64" height="10" rx="5" fill="rgba(255,255,255,.34)" />
+          <rect x="112" y="172" width="80" height="10" rx="5" fill="rgba(255,255,255,.34)" />
+        </svg>
+        <div class="slide__text">
+          <p class="slide__eyebrow">校园二手交易平台</p>
+          <h2 class="slide__title">把闲置流转起来</h2>
+          <p class="slide__desc">发布、审核、成交，一条链路管到底。同校交易，见面即验货。</p>
+        </div>
       </div>
 
-      <a-form ref="formRef" :model="form" :rules="rules" size="large" @finish="onSubmit">
-        <a-tabs :active-key="tab" centered @change="onTabChange">
-          <a-tab-pane key="password" tab="账号密码">
-            <a-form-item name="username">
-              <a-input v-model:value="form.username" placeholder="账号" allow-clear>
-                <template #prefix><UserOutlined /></template>
-              </a-input>
-            </a-form-item>
+      <div class="slide slide--indigo" :class="{ 'is-active': current === 1 }">
+        <svg class="slide__art" viewBox="0 0 320 320" aria-hidden="true">
+          <rect x="52" y="60" width="96" height="96" rx="20" fill="rgba(255,255,255,.16)" />
+          <rect x="172" y="60" width="96" height="96" rx="20" fill="rgba(255,255,255,.10)" />
+          <rect x="52" y="172" width="96" height="96" rx="20" fill="rgba(255,255,255,.10)" />
+          <rect x="172" y="172" width="96" height="96" rx="20" fill="rgba(255,255,255,.16)" />
+          <circle cx="100" cy="108" r="18" fill="rgba(255,255,255,.42)" />
+          <circle cx="220" cy="220" r="18" fill="rgba(255,255,255,.42)" />
+        </svg>
+        <div class="slide__text">
+          <p class="slide__eyebrow">审核与风控</p>
+          <h2 class="slide__title">违规内容，先拦后放</h2>
+          <p class="slide__desc">商品先审后发、违规下架可申诉，处置过程全程留痕可追溯。</p>
+        </div>
+      </div>
 
-            <a-form-item name="password">
-              <a-input-password
-                v-model:value="form.password"
-                placeholder="密码"
-                @press-enter="onSubmit"
-              >
-                <template #prefix><LockOutlined /></template>
-              </a-input-password>
-            </a-form-item>
-          </a-tab-pane>
-
-          <a-tab-pane key="mail" tab="邮箱验证码">
-            <a-form-item name="email">
-              <a-input v-model:value="form.email" placeholder="注册用的 QQ 邮箱" allow-clear>
-                <template #prefix><MailOutlined /></template>
-              </a-input>
-            </a-form-item>
-
-            <a-form-item name="mailCode">
-              <a-input v-model:value="form.mailCode" placeholder="邮箱验证码" :maxlength="6">
-                <template #addonAfter>
-                  <a-button
-                    type="link"
-                    size="small"
-                    :disabled="countdown > 0"
-                    :loading="sending"
-                    @click="onSendCode"
-                  >
-                    {{ sendLabel }}
-                  </a-button>
-                </template>
-              </a-input>
-            </a-form-item>
-          </a-tab-pane>
-        </a-tabs>
-
-        <a-form-item v-if="captchaOn" name="captchaCode">
-          <CaptchaField
-            ref="captchaRef"
-            v-model:code="form.captchaCode"
-            v-model:captcha-key="form.captchaKey"
-            @disabled="captchaOn = false"
-            @submit="onSubmit"
+      <div class="slide slide--warm" :class="{ 'is-active': current === 2 }">
+        <svg class="slide__art" viewBox="0 0 320 320" aria-hidden="true">
+          <path
+            d="M40 210 L100 150 L150 180 L210 96 L280 140"
+            fill="none"
+            stroke="rgba(255,255,255,.55)"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
           />
-        </a-form-item>
-
-        <a-form-item>
-          <a-button type="primary" html-type="submit" block :loading="loading">登 录</a-button>
-        </a-form-item>
-      </a-form>
-
-      <div class="login__links">
-        <router-link to="/register">注册新账号</router-link>
-        <a-divider type="vertical" />
-        <router-link to="/forgot">忘记密码</router-link>
+          <circle cx="100" cy="150" r="8" fill="rgba(255,255,255,.85)" />
+          <circle cx="150" cy="180" r="8" fill="rgba(255,255,255,.85)" />
+          <circle cx="210" cy="96" r="8" fill="rgba(255,255,255,.85)" />
+          <rect x="40" y="240" width="240" height="2" rx="1" fill="rgba(255,255,255,.3)" />
+          <rect x="40" y="180" width="240" height="2" rx="1" fill="rgba(255,255,255,.18)" />
+          <rect x="40" y="120" width="240" height="2" rx="1" fill="rgba(255,255,255,.18)" />
+        </svg>
+        <div class="slide__text">
+          <p class="slide__eyebrow">数据看板</p>
+          <h2 class="slide__title">运营状况，一眼看清</h2>
+          <p class="slide__desc">成交趋势、品类分布、校区热度，指标按角色分权限下发。</p>
+        </div>
       </div>
 
-      <template v-if="tab === 'password'">
-        <a-divider plain>演示账号（密码统一 {{ DEMO_PASSWORD }}）</a-divider>
-        <a-space wrap>
-          <a-button
-            v-for="acc in DEMO_ACCOUNTS"
-            :key="acc.username"
-            size="small"
-            @click="form.username = acc.username"
-          >
-            {{ acc.label }}
-          </a-button>
-        </a-space>
-      </template>
-    </div>
+      <div class="login__dots">
+        <button
+          v-for="i in SLIDE_COUNT"
+          :key="i"
+          type="button"
+          class="dot"
+          :class="{ 'is-active': current === i - 1 }"
+          :aria-label="`切换到第 ${i} 屏`"
+          @click="goSlide(i - 1)"
+        />
+      </div>
+    </aside>
+
+    <!-- 右侧卡片：三种表单原地切换 -->
+    <main class="login__main">
+      <div class="auth__panel">
+        <Transition name="swap" mode="out-in">
+          <component :is="FORMS[mode]" :key="mode" />
+        </Transition>
+      </div>
+    </main>
   </div>
 </template>
 
@@ -249,36 +149,146 @@ const onSubmit = async (): Promise<void> => {
 .login {
   height: 100%;
   display: flex;
-  align-items: center;
-  justify-content: center;
   background: var(--cm-color-bg);
 }
 
-.login__card {
-  width: 380px;
-  padding: var(--cm-space-6);
+/* ── 左侧 banner ─────────────────────────────────────────── */
+
+.login__banner {
+  position: relative;
+  flex: 1 1 58%;
+  overflow: hidden;
+  border-radius: 0 var(--cm-radius-xl) var(--cm-radius-xl) 0;
 }
 
-.login__brand {
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cm-space-6);
+  padding: var(--cm-space-12);
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity var(--cm-motion-duration-slow) var(--cm-motion-ease),
+    transform var(--cm-motion-duration-slow) var(--cm-motion-ease);
+  pointer-events: none;
+}
+
+.slide.is-active {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.slide--blue {
+  background: linear-gradient(135deg, var(--cm-banner-blue-from), var(--cm-banner-blue-to));
+}
+
+.slide--indigo {
+  background: linear-gradient(135deg, var(--cm-banner-indigo-from), var(--cm-banner-indigo-to));
+}
+
+.slide--warm {
+  background: linear-gradient(135deg, var(--cm-banner-warm-from), var(--cm-banner-warm-to));
+}
+
+.slide__art {
+  width: 320px;
+  max-width: 60%;
+  flex: none;
+}
+
+.slide__text {
+  color: #fff;
   text-align: center;
-  margin-bottom: var(--cm-space-6);
+  max-width: 420px;
 }
 
-.login__title {
-  font-size: var(--cm-font-size-lg);
+.slide__eyebrow {
+  margin: 0 0 var(--cm-space-2);
+  font-size: var(--cm-font-size-sm);
+  letter-spacing: 0.08em;
+  opacity: 0.75;
+}
+
+.slide__title {
+  margin: 0;
+  font-size: var(--cm-font-size-xl);
   font-weight: 600;
-  color: var(--cm-color-text-1);
+  letter-spacing: -0.01em;
 }
 
-.login__sub {
-  margin-top: var(--cm-space-1);
-  font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
+.slide__desc {
+  margin: var(--cm-space-3) 0 0;
+  font-size: var(--cm-font-size-md);
+  line-height: 1.6;
+  opacity: 0.85;
 }
 
-.login__links {
-  text-align: center;
-  font-size: var(--cm-font-size-sm);
-  margin-bottom: var(--cm-space-4);
+.login__dots {
+  position: absolute;
+  left: 50%;
+  bottom: var(--cm-space-8);
+  transform: translateX(-50%);
+  display: flex;
+  gap: var(--cm-space-2);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: all var(--cm-motion-duration-fast) var(--cm-motion-ease);
+}
+
+.dot.is-active {
+  width: 24px;
+  border-radius: var(--cm-radius-pill);
+  background: #fff;
+}
+
+/* ── 右侧卡片 ────────────────────────────────────────────── */
+
+.login__main {
+  flex: 1 1 42%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cm-space-12) var(--cm-space-10);
+  background: var(--cm-color-bg);
+}
+
+/* 卡片内容切换过场：轻微上移淡入 */
+.swap-enter-active,
+.swap-leave-active {
+  transition: opacity var(--cm-motion-duration-base) var(--cm-motion-ease),
+    transform var(--cm-motion-duration-base) var(--cm-motion-ease);
+}
+
+.swap-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.swap-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (max-width: 1023px) {
+  .login__banner {
+    display: none;
+  }
+
+  .login__main {
+    flex: 1 1 100%;
+  }
 }
 </style>

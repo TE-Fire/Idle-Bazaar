@@ -66,16 +66,16 @@ onMounted(load)
 </script>
 
 <template>
-  <div>
-    <div class="admins__head">
+  <div class="cm-page">
+    <header class="cm-page__head admins__head">
       <div>
-        <h3 class="admins__title">待分配角色的账号</h3>
-        <p class="admins__desc">
+        <h1 class="cm-page__title">管理员账号</h1>
+        <p class="cm-page__sub">
           注册产生的账号处于「待分配」状态，登录会被拦下；分配角色后自动启用。
         </p>
       </div>
-      <a-button :loading="loading" @click="load">刷新</a-button>
-    </div>
+      <a-button :loading="loading" shape="round" @click="load">刷新</a-button>
+    </header>
 
     <a-table
       :columns="columns"
@@ -118,24 +118,11 @@ onMounted(load)
 </template>
 
 <style scoped>
+/* 标题排版走全局 .cm-page__head，这里只保留「标题 + 刷新按钮」的两端对齐 */
 .admins__head {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--cm-space-4);
-  margin-bottom: var(--cm-space-4);
-}
-
-.admins__title {
-  margin: 0;
-  font-size: var(--cm-font-size-md);
-  font-weight: 600;
-  color: var(--cm-color-text-1);
-}
-
-.admins__desc {
-  margin: var(--cm-space-1) 0 0;
-  font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
 }
 </style>

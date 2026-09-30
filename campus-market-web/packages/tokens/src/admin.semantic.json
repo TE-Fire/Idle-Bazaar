@@ -1,36 +1,76 @@
 {
   "color": {
-    "brand": "#1677FF",
-    "brand-hover": "#4096FF",
-    "brand-bg": "#E6F0FF",
-    "brand-border": "#91CAFF",
-    "bg": "#F0F2F5",
+    "brand": "#0071E3",
+    "brand-hover": "#0077ED",
+    "brand-bg": "#E8F2FE",
+    "brand-border": "#99C7F7",
+    "bg": "#F5F5F7",
     "surface": "#FFFFFF",
-    "border": "#E5E7EB",
-    "border-ctrl": "#D9D9D9",
+    "surface-muted": "#FAFAFC",
+    "border": "#D2D2D7",
+    "border-ctrl": "#C7C7CC",
     "text": {
-      "1": "#1F1F26",
-      "2": "#5E5E68",
-      "3": "#9A9AA4"
+      "1": "#1D1D1F",
+      "2": "#6E6E73",
+      "3": "#8E8E93"
     },
-    "st-pending": "#FF8F1F",
-    "st-pass": "#0FA968",
-    "st-fail": "#E5484D",
-    "st-off": "#9A9AA4",
-    "st-run": "#1677FF"
+    "st-pending": "#FF9F0A",
+    "st-pass": "#34C759",
+    "st-fail": "#FF3B30",
+    "st-off": "#8E8E93",
+    "st-run": "#007AFF"
   },
   "fontSize": {
-    "xl": "30px"
+    "hero": "44px",
+    "display": "34px",
+    "xl": "28px",
+    "lg": "21px",
+    "md": "17px",
+    "base": "15px",
+    "sm": "13px",
+    "xs": "12px"
+  },
+  "radius": {
+    "sm": "6px",
+    "md": "10px",
+    "lg": "14px",
+    "xl": "18px",
+    "pill": "980px"
+  },
+  "space": {
+    "7": "28px",
+    "10": "40px",
+    "12": "48px",
+    "16": "64px"
   },
   "shadow": {
-    "1": "0 1px 2px rgba(20,20,30,.06)",
-    "2": "0 2px 8px rgba(20,20,30,.08)"
+    "1": "0 1px 2px rgba(0,0,0,.04)",
+    "2": "0 4px 16px rgba(0,0,0,.06)",
+    "3": "0 8px 30px rgba(0,0,0,.10)"
+  },
+  "banner": {
+    "blue-from": "#0A84FF",
+    "blue-to": "#5AC8FA",
+    "indigo-from": "#5E5CE6",
+    "indigo-to": "#AF52DE",
+    "warm-from": "#FF9500",
+    "warm-to": "#FF5E5B"
+  },
+  "motion": {
+    "ease": "cubic-bezier(.4,0,.2,1)",
+    "ease-spring": "cubic-bezier(.32,.72,0,1)",
+    "duration-fast": "0.2s",
+    "duration-base": "0.3s",
+    "duration-slow": "0.6s"
   },
   "layout": {
-    "sider-w": "208px",
-    "sider-w-collapsed": "48px",
-    "header-h": "48px",
-    "content-pad": "24px",
-    "chart-h": "300px"
+    "sider-w": "240px",
+    "sider-w-collapsed": "64px",
+    "header-h": "56px",
+    "content-pad": "32px",
+    "content-max": "1200px",
+    "chart-h": "320px",
+    "nav-bg": "rgba(255,255,255,.72)",
+    "nav-blur": "saturate(180%) blur(20px)"
   }
 }

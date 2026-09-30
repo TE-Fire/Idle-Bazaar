@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * A10 找回密码（business/03 F-A10，design/03 第五章「认证三页共用规范」）
+ * 找回密码表单（A10 表单部分，外壳在 LoginView；business/03 F-A10）
  *
  * <p>做成**同页两步**而不是两个路由：第二步只依赖第一步的邮箱，
  * 拆成两页要么把邮箱塞进路由参数（可被篡改），要么再存一份状态；
@@ -12,7 +12,6 @@
  *
  * <p>成功后强制跳登录：后端已把该账号所有会话踢下线，留在原页没有意义。
  */
-
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
@@ -46,7 +45,9 @@ const rules: Record<string, Rule[]> = {
     { required: true, message: '请输入邮箱', trigger: 'blur' },
     {
       validator: (_r: unknown, value: string) =>
-        isQqMail(value ?? '') ? Promise.resolve() : Promise.reject(new Error('仅支持 QQ 邮箱（@qq.com / @foxmail.com）')),
+        isQqMail(value ?? '')
+          ? Promise.resolve()
+          : Promise.reject(new Error('仅支持 QQ 邮箱（@qq.com / @foxmail.com）')),
       trigger: 'blur'
     }
   ],
@@ -117,127 +118,101 @@ const onReset = async (): Promise<void> => {
 </script>
 
 <template>
-  <div class="forgot">
-    <div class="cm-card forgot__card">
-      <div class="forgot__brand">
-        <div class="forgot__title">找回密码</div>
-        <div class="forgot__sub">通过 QQ 邮箱验证码重置管理端密码</div>
-      </div>
+  <div>
+    <div class="auth__logo">校</div>
 
-      <a-steps :current="step" size="small" class="forgot__steps">
-        <a-step title="验证邮箱" />
-        <a-step title="设置新密码" />
-      </a-steps>
+    <header class="auth__brand">
+      <h1 class="auth__title">找回密码</h1>
+      <p class="auth__sub">通过 QQ 邮箱验证码重置管理端密码</p>
+    </header>
 
-      <a-form ref="formRef" :model="form" :rules="rules" size="large">
-        <a-form-item name="email">
-          <a-input
-            v-model:value="form.email"
-            placeholder="注册时使用的 QQ 邮箱"
-            :disabled="step === 1"
-            allow-clear
-          >
-            <template #prefix><MailOutlined /></template>
+    <a-steps :current="step" size="small" class="forgot__steps">
+      <a-step title="验证邮箱" />
+      <a-step title="设置新密码" />
+    </a-steps>
+
+    <a-form ref="formRef" :model="form" :rules="rules" size="large">
+      <a-form-item name="email">
+        <a-input
+          v-model:value="form.email"
+          placeholder="注册时使用的 QQ 邮箱"
+          :disabled="step === 1"
+          allow-clear
+        >
+          <template #prefix><MailOutlined /></template>
+        </a-input>
+      </a-form-item>
+
+      <template v-if="step === 0">
+        <a-form-item v-if="captchaOn" name="captchaCode">
+          <CaptchaField
+            ref="captchaRef"
+            v-model:code="form.captchaCode"
+            v-model:captcha-key="form.captchaKey"
+            @disabled="captchaOn = false"
+            @submit="onSendCode"
+          />
+        </a-form-item>
+
+        <a-button type="primary" block :loading="submitting" @click="onSendCode">
+          获取验证码
+        </a-button>
+      </template>
+
+      <template v-else>
+        <a-form-item name="mailCode">
+          <a-input v-model:value="form.mailCode" placeholder="邮箱验证码" :maxlength="6">
+            <template #addonAfter>
+              <a-button
+                type="link"
+                size="small"
+                :disabled="countdown > 0"
+                @click="onSendCode"
+              >
+                {{ countdown > 0 ? `${countdown}s 后重发` : '重发' }}
+              </a-button>
+            </template>
           </a-input>
         </a-form-item>
 
-        <template v-if="step === 0">
-          <a-form-item v-if="captchaOn" name="captchaCode">
-            <CaptchaField
-              ref="captchaRef"
-              v-model:code="form.captchaCode"
-              v-model:captcha-key="form.captchaKey"
-              @disabled="captchaOn = false"
-              @submit="onSendCode"
-            />
-          </a-form-item>
+        <a-form-item name="password">
+          <a-input-password v-model:value="form.password" placeholder="新密码（8–32 位）">
+            <template #prefix><LockOutlined /></template>
+          </a-input-password>
+        </a-form-item>
 
-          <a-button type="primary" block :loading="submitting" @click="onSendCode">
-            获取验证码
-          </a-button>
-        </template>
+        <a-form-item name="confirm">
+          <a-input-password
+            v-model:value="form.confirm"
+            placeholder="确认新密码"
+            @press-enter="onReset"
+          >
+            <template #prefix><LockOutlined /></template>
+          </a-input-password>
+        </a-form-item>
 
-        <template v-else>
-          <a-form-item name="mailCode">
-            <a-input v-model:value="form.mailCode" placeholder="邮箱验证码" :maxlength="6">
-              <template #addonAfter>
-                <a-button
-                  type="link"
-                  size="small"
-                  :disabled="countdown > 0"
-                  @click="onSendCode"
-                >
-                  {{ countdown > 0 ? `${countdown}s 后重发` : '重发' }}
-                </a-button>
-              </template>
-            </a-input>
-          </a-form-item>
+        <a-button type="primary" block :loading="submitting" @click="onReset">重置密码</a-button>
+      </template>
+    </a-form>
 
-          <a-form-item name="password">
-            <a-input-password v-model:value="form.password" placeholder="新密码（8–32 位）">
-              <template #prefix><LockOutlined /></template>
-            </a-input-password>
-          </a-form-item>
-
-          <a-form-item name="confirm">
-            <a-input-password v-model:value="form.confirm" placeholder="确认新密码" @press-enter="onReset">
-              <template #prefix><LockOutlined /></template>
-            </a-input-password>
-          </a-form-item>
-
-          <a-button type="primary" block :loading="submitting" @click="onReset">
-            重置密码
-          </a-button>
-        </template>
-      </a-form>
-
-      <div class="forgot__links">
-        <router-link to="/login">返回登录</router-link>
-        <a-divider type="vertical" />
-        <router-link to="/register">注册新账号</router-link>
-      </div>
+    <div class="auth__links">
+      <router-link to="/login">返回登录</router-link>
+      <span class="auth__links-dot" />
+      <router-link to="/login/register">注册新账号</router-link>
     </div>
   </div>
 </template>
 
 <style scoped>
-.forgot {
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--cm-color-bg);
-}
-
-.forgot__card {
-  width: 400px;
-  padding: var(--cm-space-6);
-}
-
-.forgot__brand {
-  text-align: center;
-  margin-bottom: var(--cm-space-5);
-}
-
-.forgot__title {
-  font-size: var(--cm-font-size-lg);
-  font-weight: 600;
-  color: var(--cm-color-text-1);
-}
-
-.forgot__sub {
-  margin-top: var(--cm-space-1);
-  font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
-}
-
+/* 版式走全局 .auth-*，与登录 / 注册同源 */
 .forgot__steps {
-  margin-bottom: var(--cm-space-5);
+  margin-bottom: var(--cm-space-6);
 }
 
-.forgot__links {
-  margin-top: var(--cm-space-4);
-  text-align: center;
-  font-size: var(--cm-font-size-sm);
+.auth__links-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--cm-color-text-3);
 }
 </style>

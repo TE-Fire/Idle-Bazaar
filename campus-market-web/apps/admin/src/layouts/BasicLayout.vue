@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 管理后台主框架（design/03 第三章：Sider 208px + Header 48px + 内容区 24px）
+ * 管理后台主框架（design/03 第三章：Sider 240px + Header 56px + 内容区 32px）
  *
  * <p>菜单来自路由表里 meta.hideInMenu !== true 的项，并**按权限点过滤**——
  * 没有 dashboard.view 的角色看不到「数据看板」，与后端 Sa-Token 注解同名。
@@ -11,7 +11,6 @@ import { computed, ref, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   DashboardOutlined,
-  LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   SafetyCertificateOutlined,
@@ -26,6 +25,9 @@ const router = useRouter()
 const user = useUserStore()
 
 const collapsed = ref(false)
+
+/** 与 --cm-layout-sider-w 同值：antd 的 Sider 宽度只吃数字 prop，读不到 CSS 变量 */
+const SIDER_W = 240
 
 /** 菜单图标：与路由 name 对应，新增页面时在这里补一个 */
 const ICONS: Record<string, Component> = {
@@ -56,11 +58,13 @@ const menuItems = computed<MenuItem[]>(() =>
 )
 
 const selectedKeys = computed(() => [String(route.name)])
-const breadcrumb = computed(() => (route.meta.title ? [route.meta.title] : []))
 
 const roleMeta = computed(
   () => ROLE_META[user.roleCode as RoleCode] ?? { label: user.roleCode || '未知角色', color: 'default' }
 )
+
+/** 头像里放姓名首字；没有姓名就用 ID 兜底 */
+const avatarChar = computed(() => (user.realName || String(user.adminId || '管')).slice(0, 1))
 
 const onMenuClick = ({ key }: { key: string | number }): void => {
   void router.push({ name: String(key) })
@@ -82,10 +86,15 @@ const onLogout = (): void => {
 
 <template>
   <a-layout class="layout">
-    <a-layout-sider v-model:collapsed="collapsed" :width="208" class="layout__sider" theme="light">
+    <a-layout-sider
+      v-model:collapsed="collapsed"
+      :width="SIDER_W"
+      class="layout__sider"
+      theme="light"
+    >
       <div class="layout__logo">
-        <span v-if="!collapsed">校园二手 · 管理后台</span>
-        <span v-else>校</span>
+        <span class="layout__logo-mark">校</span>
+        <span v-if="!collapsed" class="layout__logo-name">校园二手 · 管理后台</span>
       </div>
       <!-- 不用 :items 数据源写法：那样图标要传 VNode，类型上要给 VueNode 让路；
            直接写 <a-menu-item> 更贴合 Vue 模板，也让权限过滤的结果一目了然 -->
@@ -101,24 +110,25 @@ const onLogout = (): void => {
 
     <a-layout>
       <a-layout-header class="layout__header">
-        <a-space :size="8">
+        <a-space :size="12">
           <component
             :is="collapsed ? MenuUnfoldOutlined : MenuFoldOutlined"
             class="layout__toggle"
             @click="collapsed = !collapsed"
           />
-          <a-breadcrumb>
-            <a-breadcrumb-item v-for="b in breadcrumb" :key="b">{{ b }}</a-breadcrumb-item>
-          </a-breadcrumb>
+          <!-- 菜单只有一层，面包屑没有信息量，直接展示当前页大标题 -->
+          <span class="layout__page-title">{{ route.meta.title }}</span>
         </a-space>
 
         <a-space :size="12">
-          <a-tag :color="roleMeta.color">{{ roleMeta.label }}</a-tag>
+          <!-- 角色不再单独展示标签：演示账号的 realName 就是角色名，两个「超级管理员」纯冗余。
+               角色信息收进头像的 tooltip，实名非角色名的账号也能看到 -->
           <span class="layout__user">{{ user.realName || user.adminId }}</span>
-          <a-button type="text" @click="onLogout">
-            <template #icon><LogoutOutlined /></template>
-            退出
-          </a-button>
+          <a-tooltip :title="`${roleMeta.label} · 点击退出登录`">
+            <button type="button" class="layout__avatar" @click="onLogout">
+              {{ avatarChar }}
+            </button>
+          </a-tooltip>
         </a-space>
       </a-layout-header>
 
@@ -135,6 +145,7 @@ const onLogout = (): void => {
 }
 
 .layout__sider {
+  background: var(--cm-color-surface);
   border-right: 1px solid var(--cm-color-border);
 }
 
@@ -142,23 +153,62 @@ const onLogout = (): void => {
   height: var(--cm-layout-header-h);
   display: flex;
   align-items: center;
-  padding: 0 var(--cm-space-4);
-  font-weight: 600;
-  color: var(--cm-color-text-1);
-  border-bottom: 1px solid var(--cm-color-border);
+  gap: var(--cm-space-3);
+  padding: 0 var(--cm-space-5);
   white-space: nowrap;
   overflow: hidden;
 }
 
+/* 与登录页的 .auth__logo 同一形状：渐变圆角方块 + 单字 */
+.layout__logo-mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--cm-radius-md);
+  background: linear-gradient(135deg, var(--cm-banner-blue-from), var(--cm-banner-blue-to));
+  color: #fff;
+  font-size: var(--cm-font-size-base);
+  font-weight: 600;
+}
+
+.layout__logo-name {
+  font-size: var(--cm-font-size-base);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--cm-color-text-1);
+}
+
+.layout__sider :deep(.ant-menu) {
+  padding: var(--cm-space-2) var(--cm-space-3);
+  border-inline-end: none;
+  background: transparent;
+}
+
+/* Apple 官网那根半透明导航条：滚内容时底下的东西会透上来 */
 .layout__header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   height: var(--cm-layout-header-h);
   line-height: var(--cm-layout-header-h);
-  padding: 0 var(--cm-space-4);
-  background: var(--cm-color-surface);
+  padding: 0 var(--cm-space-5);
+  background: var(--cm-layout-nav-bg);
+  backdrop-filter: var(--cm-layout-nav-blur);
+  -webkit-backdrop-filter: var(--cm-layout-nav-blur);
   border-bottom: 1px solid var(--cm-color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.layout__page-title {
+  font-size: var(--cm-font-size-md);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--cm-color-text-1);
 }
 
 .layout__toggle {
@@ -168,6 +218,29 @@ const onLogout = (): void => {
 
 .layout__user {
   color: var(--cm-color-text-2);
+}
+
+/* 头像即退出入口：品牌浅底圆 + 首字，hover 加柔光圈提示可点 */
+.layout__avatar {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--cm-color-brand-bg);
+  color: var(--cm-color-brand);
+  font-size: var(--cm-font-size-sm);
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: box-shadow var(--cm-motion-duration-fast) var(--cm-motion-ease);
+}
+
+.layout__avatar:hover {
+  box-shadow: 0 0 0 3px var(--cm-color-brand-bg);
 }
 
 .layout__content {

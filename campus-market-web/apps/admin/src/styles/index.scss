@@ -1,7 +1,7 @@
 /**
  * 全局基础样式
  *
- * 规则：这里只写「组件库不提供」的东西（页面底色、卡片骨架、滚动条）。
+ * 规则：这里只写「组件库不提供」的东西（页面底色、卡片骨架、大标题、认证页版式）。
  * 任何色值都必须走 var(--cm-*)，禁止写死——令牌是唯一源头（tech/02 §5）。
  * Sass 用 @use，不要用已废弃的 @import。
  */
@@ -17,12 +17,33 @@ body {
   font-size: var(--cm-font-size-base);
   color: var(--cm-color-text-1);
   background: var(--cm-color-bg);
-  font-family: -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  /* SF Pro 优先：Apple 官网的字形是这套风格的一半，装了就用，没装回落到系统字体 */
+  font-family: 'SF Pro Text', 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'PingFang SC',
+    'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
   /* design/03：全局等宽数字，保证表格与 KPI 的列对齐 */
   font-variant-numeric: tabular-nums;
 }
 
-/* 内容区卡片：白底 + 1px 边框 + 8px 圆角 + 极浅阴影（design/03 三章） */
+/*
+ * 表格表头：antd 4.2.6 的 Table 组件令牌没对外暴露（ComponentToken 是空接口），
+ * theme.components 里写不进去，只能在这里覆盖。做成 Apple 表头那种「浅灰底、无竖线」。
+ */
+.ant-table-thead > tr > th {
+  background: var(--cm-color-surface-muted) !important;
+  color: var(--cm-color-text-2);
+  font-weight: 500;
+}
+
+.ant-table-thead > tr > th::before {
+  display: none;
+}
+
+.ant-table-tbody > tr > td {
+  border-color: var(--cm-color-border);
+}
+
+/* 内容区卡片：白底 + hairline 边框 + 14px 圆角 + Apple 那种极淡的大范围阴影 */
 .cm-card {
   background: var(--cm-color-surface);
   border: 1px solid var(--cm-color-border);
@@ -30,14 +51,195 @@ body {
   box-shadow: var(--cm-shadow-1);
 }
 
-/* 卡片标题区 16px padding，与内容区之间 1px 分隔线 */
 .cm-card__title {
-  padding: var(--cm-space-4);
+  padding: var(--cm-space-5);
   border-bottom: 1px solid var(--cm-color-border);
   font-size: var(--cm-font-size-md);
   font-weight: 600;
 }
 
 .cm-card__body {
-  padding: var(--cm-space-4);
+  padding: var(--cm-space-5);
+}
+
+/* ── 页面骨架：Apple 官网那套「大留白 + 大标题」 ─────────────── */
+
+.cm-page {
+  max-width: var(--cm-layout-content-max);
+  margin: 0 auto;
+}
+
+.cm-page__head {
+  margin-bottom: var(--cm-space-7);
+}
+
+.cm-page__title {
+  margin: 0;
+  font-size: var(--cm-font-size-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--cm-color-text-1);
+}
+
+.cm-page__sub {
+  margin: var(--cm-space-2) 0 0;
+  font-size: var(--cm-font-size-md);
+  color: var(--cm-color-text-2);
+}
+
+/* ── 认证三页共用版式（登录 / 注册 / 找回） ──────────────────── */
+
+.auth {
+  position: relative;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--cm-space-8);
+  background: var(--cm-color-bg);
+  overflow: hidden;
+}
+
+/* 背景光斑：两团大号模糊渐变，让灰底不显得空 */
+.auth::before,
+.auth::after {
+  content: '';
+  position: absolute;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.22;
+  pointer-events: none;
+}
+
+.auth::before {
+  top: -160px;
+  left: -120px;
+  background: linear-gradient(135deg, var(--cm-banner-blue-from), var(--cm-banner-blue-to));
+}
+
+.auth::after {
+  right: -140px;
+  bottom: -180px;
+  background: linear-gradient(135deg, var(--cm-banner-indigo-from), var(--cm-banner-indigo-to));
+}
+
+.auth__panel {
+  position: relative;
+  z-index: 1;
+  width: 440px;
+  max-width: 100%;
+  padding: var(--cm-space-10) var(--cm-space-8);
+  background: var(--cm-color-surface);
+  border-radius: var(--cm-radius-xl);
+  box-shadow: var(--cm-shadow-3);
+}
+
+/* 品牌角标：渐变圆角方块 + 单字，三页共用 */
+.auth__logo {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--cm-radius-lg);
+  background: linear-gradient(135deg, var(--cm-banner-blue-from), var(--cm-banner-blue-to));
+  color: #fff;
+  font-size: var(--cm-font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--cm-space-5);
+}
+
+.auth__brand {
+  margin-bottom: var(--cm-space-7);
+}
+
+.auth__title {
+  margin: 0;
+  font-size: var(--cm-font-size-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.auth__sub {
+  margin: var(--cm-space-2) 0 0;
+  font-size: var(--cm-font-size-base);
+  color: var(--cm-color-text-2);
+}
+
+/*
+ * iOS 输入框：44px 高、hairline 边框、聚焦时主色描边 + 柔光圈
+ * 这是全局样式表（非 SFC scoped），不能用 :deep()——那只在 <style scoped> 里被编译，
+ * 写在这里会原样输出成无效 CSS。直接用后代选择器覆盖 antd。
+ */
+.auth__panel .ant-input,
+.auth__panel .ant-input-password {
+  height: 44px;
+  border-radius: var(--cm-radius-md);
+  border-color: var(--cm-color-border-ctrl);
+  font-size: var(--cm-font-size-md);
+}
+
+.auth__panel .ant-input-affix-wrapper {
+  padding: 0 var(--cm-space-3);
+  border-radius: var(--cm-radius-md);
+  border-color: var(--cm-color-border-ctrl);
+}
+
+/* 「获取验证码」是用 addonAfter 挂上去的：去掉 addon 自带的灰底和边框，
+   否则 44px 的圆角输入框旁边会多出一块方角灰块 */
+.auth__panel .ant-input-group-addon {
+  padding-left: var(--cm-space-2);
+  border: none;
+  background: transparent;
+}
+
+.auth__panel .ant-input-affix-wrapper .ant-input {
+  height: auto;
+}
+
+.auth__panel .ant-input:focus,
+.auth__panel .ant-input-affix-wrapper:focus,
+.auth__panel .ant-input-affix-wrapper-focused {
+  border-color: var(--cm-color-brand);
+  box-shadow: 0 0 0 3px var(--cm-color-brand-bg);
+}
+
+.auth__panel .ant-btn {
+  height: 44px;
+  font-size: var(--cm-font-size-md);
+}
+
+/* 胶囊主按钮：Apple 官网 CTA 的形状，悬停轻微上浮 */
+.auth__panel .ant-btn-primary {
+  border-radius: var(--cm-radius-pill);
+  font-weight: 500;
+  box-shadow: var(--cm-shadow-2);
+  transition: transform var(--cm-motion-duration-fast) var(--cm-motion-ease),
+    box-shadow var(--cm-motion-duration-fast) var(--cm-motion-ease);
+}
+
+.auth__panel .ant-btn-primary:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: var(--cm-shadow-3);
+}
+
+.auth__links {
+  margin-top: var(--cm-space-5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cm-space-3);
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-2);
+}
+
+.auth__links a {
+  color: var(--cm-color-text-2);
+  transition: color var(--cm-motion-duration-fast) var(--cm-motion-ease);
+}
+
+.auth__links a:hover {
+  color: var(--cm-color-brand);
 }

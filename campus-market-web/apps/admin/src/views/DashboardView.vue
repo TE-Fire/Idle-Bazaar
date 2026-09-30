@@ -171,7 +171,12 @@ const carbonKg = computed(() => Math.round(loopTotal.value * 2.3))
 </script>
 
 <template>
-  <div class="dashboard">
+  <div class="dashboard cm-page">
+    <header class="cm-page__head">
+      <h1 class="cm-page__title">数据看板</h1>
+      <p class="cm-page__sub">全校交易概况，指标按角色权限下发</p>
+    </header>
+
     <!-- ① KPI×4 -->
     <a-row :gutter="[16, 16]">
       <a-col v-for="kpi in KPI_ITEMS" :key="kpi.key" :span="6">
@@ -254,7 +259,7 @@ const carbonKg = computed(() => Math.round(loopTotal.value * 2.3))
 
 <style scoped>
 .dashboard__row {
-  margin-top: var(--cm-space-4);
+  margin-top: var(--cm-space-5);
 }
 
 .dashboard__queue {

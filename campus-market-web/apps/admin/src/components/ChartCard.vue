@@ -37,23 +37,24 @@ withDefaults(defineProps<Props>(), { height: 300, loading: false })
   flex-direction: column;
 }
 
+/* 标题区不再压分隔线：Apple 卡片靠留白分层，不靠线 */
 .chart-card__head {
-  height: 44px;
-  padding: 0 var(--cm-space-4);
+  height: 52px;
+  padding: 0 var(--cm-space-5);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--cm-color-border);
 }
 
 .chart-card__title {
   font-size: var(--cm-font-size-md);
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .chart-card__body {
   flex: 1;
   min-height: 0;
-  padding: var(--cm-space-2) var(--cm-space-2) 0;
+  padding: 0 var(--cm-space-3) var(--cm-space-3);
 }
 </style>

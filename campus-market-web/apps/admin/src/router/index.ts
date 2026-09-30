@@ -28,7 +28,12 @@ const BasicLayout = () => import('@/layouts/BasicLayout.vue')
 
 const routes: RouteRecordRaw[] = [
   {
-    path: '/login',
+    /*
+     * 认证三页共用一条路由：/login、/login/register、/login/forgot。
+     * 同一记录内切参数组件实例复用，卡片原地过场，不再整页跳转；
+     * 旧的 /register、/forgot 由下面的 redirect 兼容。
+     */
+    path: '/login/:mode(register|forgot)?',
     name: 'login',
     component: () => import('@/views/LoginView.vue'),
     meta: { title: '登录', public: true, hideInMenu: true }
@@ -36,16 +41,12 @@ const routes: RouteRecordRaw[] = [
   {
     // A0 注册：注册后为「待分配角色」，由超管分配后才能登录（business/03 F-A0）
     path: '/register',
-    name: 'register',
-    component: () => import('@/views/RegisterView.vue'),
-    meta: { title: '注册', public: true, hideInMenu: true }
+    redirect: '/login/register'
   },
   {
     // A10 找回密码：邮箱验证码两步（business/03 F-A10）
     path: '/forgot',
-    name: 'forgot',
-    component: () => import('@/views/ForgotView.vue'),
-    meta: { title: '找回密码', public: true, hideInMenu: true }
+    redirect: '/login/forgot'
   },
   {
     path: '/',
