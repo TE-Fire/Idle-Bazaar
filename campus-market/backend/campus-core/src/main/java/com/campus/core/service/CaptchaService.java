@@ -68,7 +68,7 @@ public class CaptchaService {
         }
         String code = randomCode();
         String key = UUID.randomUUID().toString().replace("-", "");
-        stringRedisTemplate.opsForValue().set(CaptchaRedisKeys.code(key), code, TTL);
+        stringRedisTemplate.opsForValue().set(CaptchaRedisKeys.buildCodeKey(key), code, TTL);
         return new CaptchaVO(key, toBase64Png(code));
     }
 
@@ -84,7 +84,7 @@ public class CaptchaService {
         }
         BizAssert.isTrue(key != null && !key.isBlank() && code != null && !code.isBlank(),
                 CommonErrorCode.PARAM_ERROR);
-        String cacheKey = CaptchaRedisKeys.code(key);
+        String cacheKey = CaptchaRedisKeys.buildCodeKey(key);
         String cached = stringRedisTemplate.opsForValue().get(cacheKey);
         BizAssert.notNull(cached, UserErrorCode.CAPTCHA_INVALID);
         // ★ 先比对、后删除：先删的话输错一次图片就失效了，用户被迫刷新重填

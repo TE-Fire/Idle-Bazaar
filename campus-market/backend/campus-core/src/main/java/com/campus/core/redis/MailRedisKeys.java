@@ -15,7 +15,7 @@ public final class MailRedisKeys {
      *
      * @param email 已规范化的邮箱（小写去空白），非规范化会写出两份 key
      */
-    public static String code(String email) {
+    public static String buildCodeKey(String email) {
         return MODULE + "code:" + email;
     }
 
@@ -24,7 +24,7 @@ public final class MailRedisKeys {
      *
      * <p>用 `setIfAbsent` 抢占，抢到才允许发，所以同一邮箱 60 秒内只会真发一封。
      */
-    public static String sendThrottle(String email) {
+    public static String buildThrottleKey(String email) {
         return MODULE + "throttle:" + email;
     }
 

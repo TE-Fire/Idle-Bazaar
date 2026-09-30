@@ -12,6 +12,9 @@ package com.campus.core.redis;
  *
  * <p>**新增模块时**：在本包加一个 `XxxRedisKeys`，不要往已有的类里塞。
  * core 被管理端与用户端共用，一个类塞几十个 key 之后，两个人改同一个文件必冲突。
+ *
+ * <p>**命名规范**：拼 key 的方法一律是 `buildXxxKey(...)`——动词开头表明它每次都会
+ * 拼出一个新字符串（而不是读某个已有字段），后缀 `Key` 让调用处一眼看出这不是业务方法。
  */
 public final class RedisKeys {
 

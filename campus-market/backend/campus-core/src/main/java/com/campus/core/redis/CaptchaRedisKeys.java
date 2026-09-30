@@ -14,7 +14,7 @@ public final class CaptchaRedisKeys {
      *
      * @param captchaKey 下发时返回给前端的一次性随机串，提交时原样带回
      */
-    public static String code(String captchaKey) {
+    public static String buildCodeKey(String captchaKey) {
         return MODULE + captchaKey;
     }
 

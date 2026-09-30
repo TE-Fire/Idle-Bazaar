@@ -106,11 +106,11 @@ public class AdminAccountService {
                 UserErrorCode.EMAIL_ALREADY_REGISTERED);
 
         Boolean fresh = stringRedisTemplate.opsForValue()
-                .setIfAbsent(MailRedisKeys.sendThrottle(email), "1", THROTTLE_TTL);
+                .setIfAbsent(MailRedisKeys.buildThrottleKey(email), "1", THROTTLE_TTL);
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
         String code = sixDigitCode();
-        stringRedisTemplate.opsForValue().set(MailRedisKeys.code(email), code, CODE_TTL);
+        stringRedisTemplate.opsForValue().set(MailRedisKeys.buildCodeKey(email), code, CODE_TTL);
         mailService.sendVerifyCode(email, code, "注册");
     }
 
@@ -131,7 +131,7 @@ public class AdminAccountService {
 
         // 60 秒内同一邮箱只发一次
         Boolean fresh = stringRedisTemplate.opsForValue()
-                .setIfAbsent(MailRedisKeys.sendThrottle(email), "1", THROTTLE_TTL);
+                .setIfAbsent(MailRedisKeys.buildThrottleKey(email), "1", THROTTLE_TTL);
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
         AdminUser admin = adminUserMapper.selectByEmail(email);
@@ -141,7 +141,7 @@ public class AdminAccountService {
         }
 
         String code = sixDigitCode();
-        stringRedisTemplate.opsForValue().set(MailRedisKeys.code(email), code, CODE_TTL);
+        stringRedisTemplate.opsForValue().set(MailRedisKeys.buildCodeKey(email), code, CODE_TTL);
         mailService.sendVerifyCode(email, code, "找回密码");
     }
 
@@ -206,11 +206,11 @@ public class AdminAccountService {
     /** 邮箱验证码校验：一次性，通过即删 */
     private void verifyMailCode(String email, String code) {
         BizAssert.isTrue(code != null && !code.isBlank(), CommonErrorCode.PARAM_ERROR);
-        String cached = stringRedisTemplate.opsForValue().get(MailRedisKeys.code(email));
+        String cached = stringRedisTemplate.opsForValue().get(MailRedisKeys.buildCodeKey(email));
         BizAssert.notNull(cached, UserErrorCode.MAIL_CODE_INVALID);
         // ★ 先比对、后删除：反过来的话，输错一次就把正确验证码也删了，用户只能重新发
         BizAssert.isTrue(cached.equals(code.trim()), UserErrorCode.MAIL_CODE_INVALID);
-        stringRedisTemplate.delete(MailRedisKeys.code(email));
+        stringRedisTemplate.delete(MailRedisKeys.buildCodeKey(email));
     }
 
     private String sixDigitCode() {
