@@ -46,12 +46,11 @@ public class AuthController {
 
     /* ── 注册 / 找回密码（business/03 F-A0 / F-A10）───────────── */
 
-    @Operation(summary = "图形验证码", description = "登录 / 注册 / 找回密码三处共用；一次性，5 分钟有效")
+    @Operation(summary = "图形验证码",
+            description = "登录 / 注册 / 找回密码三处共用；一次性，5 分钟有效。开关关闭时返回 disabled=true，前端隐藏输入框")
     @GetMapping("/captcha")
     public Result<CaptchaVO> captcha() {
-        CaptchaVO vo = captchaService.generate();
-        vo.setDisabled(!captchaService.isEnabled());
-        return Result.ok(vo);
+        return Result.ok(captchaService.generate());
     }
 
     @Operation(summary = "注册 · 发邮箱验证码",

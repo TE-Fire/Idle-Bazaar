@@ -44,7 +44,8 @@ public class AdminAuthService {
 
     @Transactional(rollbackFor = Exception.class)
     public AdminLoginVO login(AdminLoginReq req) {
-        checkCaptcha(req);
+        // 与注册 / 找回页共用同一套验证码（key 前缀与「一次性」语义都在 CaptchaService）
+        captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
 
         AdminUser admin = adminUserMapper.selectByUsername(req.getUsername());
         BizAssert.isTrue(admin != null && admin.getStatus() != null && admin.getStatus() != 0,
@@ -93,19 +94,6 @@ public class AdminAuthService {
         vo.setTokenValue(StpAdminUtil.getTokenValue());
         vo.setPermCodes(permCodes);
         return vo;
-    }
-
-    /**
-     * 图形验证码（A1 需求）：直接复用 {@link CaptchaService}，不再自己读 Redis。
-     * 登录页与注册/找回页共用一套 key 前缀与「一次性」语义，避免两处实现漂移。
-     */
-    private void checkCaptcha(AdminLoginReq req) {
-        captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
-    }
-
-    /** 演示用：判断当前登录人是否持有某权限点（实际校验走注解） */
-    public boolean hasPermission(String permCode) {
-        return StpAdminUtil.hasPermission(permCode);
     }
 
     /** 权限点清单，供管理端 A9 矩阵页对照（与 PermCodes.ALL 同源） */

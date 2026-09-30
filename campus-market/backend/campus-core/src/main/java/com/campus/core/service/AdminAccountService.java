@@ -7,6 +7,7 @@ import com.campus.core.entity.AdminUser;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
+import com.campus.core.redis.MailRedisKeys;
 import com.campus.core.satoken.StpAdminUtil;
 import com.campus.core.dto.req.AdminRegisterReq;
 import com.campus.core.dto.req.AdminResetReq;
@@ -43,8 +44,6 @@ public class AdminAccountService {
 
     /** 只允许 QQ 系：与 design/03「注册不限 / 仅 QQ 系」的决策一致 */
     private static final List<String> MAIL_SUFFIXES = List.of("@qq.com", "@foxmail.com");
-    private static final String MAIL_CODE_PREFIX = "cm:mail:code:";
-    private static final String MAIL_THROTTLE_PREFIX = "cm:mail:throttle:";
     private static final Duration CODE_TTL = Duration.ofMinutes(10);
     private static final Duration THROTTLE_TTL = Duration.ofSeconds(60);
     private static final String SUPER_ROLE_CODE = "SUPER";
@@ -107,11 +106,11 @@ public class AdminAccountService {
                 UserErrorCode.EMAIL_ALREADY_REGISTERED);
 
         Boolean fresh = stringRedisTemplate.opsForValue()
-                .setIfAbsent(MAIL_THROTTLE_PREFIX + email, "1", THROTTLE_TTL);
+                .setIfAbsent(MailRedisKeys.sendThrottle(email), "1", THROTTLE_TTL);
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
         String code = sixDigitCode();
-        stringRedisTemplate.opsForValue().set(MAIL_CODE_PREFIX + email, code, CODE_TTL);
+        stringRedisTemplate.opsForValue().set(MailRedisKeys.code(email), code, CODE_TTL);
         mailService.sendVerifyCode(email, code, "注册");
     }
 
@@ -132,7 +131,7 @@ public class AdminAccountService {
 
         // 60 秒内同一邮箱只发一次
         Boolean fresh = stringRedisTemplate.opsForValue()
-                .setIfAbsent(MAIL_THROTTLE_PREFIX + email, "1", THROTTLE_TTL);
+                .setIfAbsent(MailRedisKeys.sendThrottle(email), "1", THROTTLE_TTL);
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
         AdminUser admin = adminUserMapper.selectByEmail(email);
@@ -142,7 +141,7 @@ public class AdminAccountService {
         }
 
         String code = sixDigitCode();
-        stringRedisTemplate.opsForValue().set(MAIL_CODE_PREFIX + email, code, CODE_TTL);
+        stringRedisTemplate.opsForValue().set(MailRedisKeys.code(email), code, CODE_TTL);
         mailService.sendVerifyCode(email, code, "找回密码");
     }
 
@@ -207,11 +206,11 @@ public class AdminAccountService {
     /** 邮箱验证码校验：一次性，通过即删 */
     private void verifyMailCode(String email, String code) {
         BizAssert.isTrue(code != null && !code.isBlank(), CommonErrorCode.PARAM_ERROR);
-        String cached = stringRedisTemplate.opsForValue().get(MAIL_CODE_PREFIX + email);
+        String cached = stringRedisTemplate.opsForValue().get(MailRedisKeys.code(email));
         BizAssert.notNull(cached, UserErrorCode.MAIL_CODE_INVALID);
         // ★ 先比对、后删除：反过来的话，输错一次就把正确验证码也删了，用户只能重新发
         BizAssert.isTrue(cached.equals(code.trim()), UserErrorCode.MAIL_CODE_INVALID);
-        stringRedisTemplate.delete(MAIL_CODE_PREFIX + email);
+        stringRedisTemplate.delete(MailRedisKeys.code(email));
     }
 
     private String sixDigitCode() {

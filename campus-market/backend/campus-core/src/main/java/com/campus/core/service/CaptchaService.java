@@ -2,8 +2,9 @@ package com.campus.core.service;
 
 import com.campus.common.asserts.BizAssert;
 import com.campus.common.exception.CommonErrorCode;
-import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.dto.resp.CaptchaVO;
+import com.campus.core.errcode.UserErrorCode;
+import com.campus.core.redis.CaptchaRedisKeys;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -44,7 +45,6 @@ public class CaptchaService {
     private static final int WIDTH = 120;
     private static final int HEIGHT = 40;
 
-    public static final String KEY_PREFIX = "cm:captcha:";
     private static final Duration TTL = Duration.ofMinutes(5);
 
     private final StringRedisTemplate stringRedisTemplate;
@@ -54,11 +54,21 @@ public class CaptchaService {
     @Value("${campus.captcha.enabled:true}")
     private boolean captchaEnabled;
 
-    /** 下发：返回 key + 图片 base64，前端直接用 data:image/png;base64 渲染 */
+    /**
+     * 下发：返回 key + 图片 base64，前端直接用 data:image/png;base64 渲染。
+     *
+     * <p>开关关闭时不下发代码、不画图，只回一个 disabled 标记让前端隐藏输入框——
+     * 若照常生成再让调用方打补丁，等于白写一次 Redis 加一次 AWT 画图。
+     */
     public CaptchaVO generate() {
-        String code = randomCode(CODE_LEN);
+        if (!captchaEnabled) {
+            CaptchaVO disabled = new CaptchaVO();
+            disabled.setDisabled(true);
+            return disabled;
+        }
+        String code = randomCode();
         String key = UUID.randomUUID().toString().replace("-", "");
-        stringRedisTemplate.opsForValue().set(KEY_PREFIX + key, code, TTL);
+        stringRedisTemplate.opsForValue().set(CaptchaRedisKeys.code(key), code, TTL);
         return new CaptchaVO(key, toBase64Png(code));
     }
 
@@ -74,20 +84,17 @@ public class CaptchaService {
         }
         BizAssert.isTrue(key != null && !key.isBlank() && code != null && !code.isBlank(),
                 CommonErrorCode.PARAM_ERROR);
-        String cached = stringRedisTemplate.opsForValue().get(KEY_PREFIX + key);
+        String cacheKey = CaptchaRedisKeys.code(key);
+        String cached = stringRedisTemplate.opsForValue().get(cacheKey);
         BizAssert.notNull(cached, UserErrorCode.CAPTCHA_INVALID);
         // ★ 先比对、后删除：先删的话输错一次图片就失效了，用户被迫刷新重填
         BizAssert.isTrue(cached.equalsIgnoreCase(code.trim()), UserErrorCode.CAPTCHA_INVALID);
-        stringRedisTemplate.delete(KEY_PREFIX + key);
+        stringRedisTemplate.delete(cacheKey);
     }
 
-    public boolean isEnabled() {
-        return captchaEnabled;
-    }
-
-    private String randomCode(int len) {
-        StringBuilder sb = new StringBuilder(len);
-        for (int i = 0; i < len; i++) {
+    private String randomCode() {
+        StringBuilder sb = new StringBuilder(CODE_LEN);
+        for (int i = 0; i < CODE_LEN; i++) {
             sb.append(CHARS.charAt(random.nextInt(CHARS.length())));
         }
         return sb.toString();
