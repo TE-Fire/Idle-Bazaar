@@ -4,6 +4,7 @@ import com.campus.common.asserts.BizAssert;
 import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.entity.AdminRole;
 import com.campus.core.entity.AdminUser;
+import com.campus.core.enums.AdminStatus;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
@@ -47,10 +48,6 @@ public class AdminAccountService {
     private static final Duration CODE_TTL = Duration.ofMinutes(10);
     private static final Duration THROTTLE_TTL = Duration.ofSeconds(60);
     private static final String SUPER_ROLE_CODE = "SUPER";
-    /** status：0 停用 / 1 启用 / 2 待分配角色 */
-    private static final int STATUS_PENDING = 2;
-    private static final int STATUS_ENABLED = 1;
-    private static final int STATUS_DISABLED = 0;
 
     private final AdminUserMapper adminUserMapper;
     private final AdminRoleMapper adminRoleMapper;
@@ -80,7 +77,7 @@ public class AdminAccountService {
                 .setRealName(req.getRealName())
                 // ★ 关键：不给角色、不给权限，等超管分配
                 .setRoleId(0L)
-                .setStatus(STATUS_PENDING)
+                .setStatus(AdminStatus.PENDING_ROLE.getCode())
                 .setFailCount(0);
         try {
             adminUserMapper.insert(admin);
@@ -135,7 +132,7 @@ public class AdminAccountService {
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
         AdminUser admin = adminUserMapper.selectByEmail(email);
-        if (admin == null || admin.getStatus() == null || admin.getStatus() == STATUS_DISABLED) {
+        if (admin == null || isDisabled(admin.getStatus())) {
             log.info("[admin] 找回密码：邮箱 {} 无可用账号，按「已发送」返回", email);
             return;
         }
@@ -153,8 +150,7 @@ public class AdminAccountService {
 
         AdminUser admin = adminUserMapper.selectByEmail(email);
         BizAssert.notNull(admin, UserErrorCode.MAIL_CODE_INVALID);
-        BizAssert.isTrue(admin.getStatus() == null || admin.getStatus() != STATUS_DISABLED,
-                UserErrorCode.MAIL_CODE_INVALID);
+        BizAssert.isTrue(!isDisabled(admin.getStatus()), UserErrorCode.MAIL_CODE_INVALID);
 
         // ★「新密码不能与旧密码相同」必须在校验验证码**之前**判：
         // 验证码是一次性的，若先校验再判重，用户输了个重复密码就把码用掉了，
@@ -197,7 +193,7 @@ public class AdminAccountService {
         adminUserMapper.updateById(new AdminUser()
                 .setId(adminId)
                 .setRoleId(roleId)
-                .setStatus(STATUS_ENABLED));
+                .setStatus(AdminStatus.ENABLED.getCode()));
         log.info("[admin] 账号 {} 分配角色 {} 并启用", admin.getEmail(), role.getRoleCode());
     }
 
@@ -211,6 +207,11 @@ public class AdminAccountService {
         // ★ 先比对、后删除：反过来的话，输错一次就把正确验证码也删了，用户只能重新发
         BizAssert.isTrue(cached.equals(code.trim()), UserErrorCode.MAIL_CODE_INVALID);
         stringRedisTemplate.delete(MailRedisKeys.buildCodeKey(email));
+    }
+
+    /** 状态是否「停用」。status 理论上非空（库里有 NOT NULL），仍兜住查询结果为 null 的情况 */
+    private static boolean isDisabled(Integer status) {
+        return status != null && AdminStatus.fromCode(status).isDisabled();
     }
 
     private String sixDigitCode() {

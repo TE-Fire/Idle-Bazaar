@@ -1,6 +1,7 @@
 package com.campus.core.init;
 
 import com.campus.core.entity.AdminUser;
+import com.campus.core.enums.AdminStatus;
 import com.campus.core.mapper.AdminUserMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -58,7 +59,7 @@ public class AdminAccountInitializer implements ApplicationRunner {
                 .setRealName(seed.realName())
                 .setRoleId(seed.roleId())
                 // 种子账号直接启用：它们由开发者创建，不经过「待分配」这一步
-                .setStatus(1)
+                .setStatus(AdminStatus.ENABLED.getCode())
                 .setFailCount(0)));
         log.info("[init] 已创建 {} 个演示管理员账号，统一密码：{}", SEEDS.size(), DEMO_PASSWORD);
     }
