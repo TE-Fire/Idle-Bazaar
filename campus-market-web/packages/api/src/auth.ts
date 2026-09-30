@@ -60,7 +60,22 @@ export interface AdminRegisterReq {
   captchaCode?: string
 }
 
+/**
+ * 邮箱验证码场景，与后端 `MailCodeScene` 的 code 一一对应（改值要同步改后端）。
+ *
+ * 三场景的发码规则完全一致，只有「是否暴露邮箱已注册」和邮件文案不同。
+ */
+export const MAIL_CODE_SCENE = {
+  register: 1,
+  reset: 2,
+  login: 3
+} as const
+
+export type MailCodeScene = (typeof MAIL_CODE_SCENE)[keyof typeof MAIL_CODE_SCENE]
+
 export interface AdminSendCodeReq {
+  /** 见 MAIL_CODE_SCENE：1 注册 / 2 找回密码 / 3 登录 */
+  type: MailCodeScene
   email: string
   captchaKey?: string
   captchaCode?: string
@@ -77,10 +92,6 @@ export const authApi = {
   login: (req: AdminLoginReq) =>
     request<AdminLoginVO>({ url: '/admin/auth/login', method: 'POST', data: req }),
 
-  /** 邮箱验证码登录第一步：给已注册的 QQ 邮箱发码（60 秒节流，10 分钟有效，一次性） */
-  sendLoginCode: (req: AdminSendCodeReq) =>
-    request<void>({ url: '/admin/auth/login/send-code', method: 'POST', data: req }),
-
   /** 邮箱验证码登录第二步：返回的令牌、权限点与密码登录完全一致 */
   loginByMailCode: (req: AdminMailLoginReq) =>
     request<AdminLoginVO>({ url: '/admin/auth/login/mail', method: 'POST', data: req }),
@@ -90,17 +101,17 @@ export const authApi = {
   /** 图形验证码：登录 / 注册 / 找回密码三处共用，一次性 */
   captcha: () => request<CaptchaVO>({ url: '/admin/auth/captcha' }),
 
-  /** 注册第一步：给邮箱发码。邮箱已注册会直接报 4008 */
-  sendRegisterCode: (req: AdminSendCodeReq) =>
-    request<void>({ url: '/admin/auth/register/send-code', method: 'POST', data: req }),
+  /**
+   * 发邮箱验证码（注册 / 找回密码 / 登录 三场景共用一个端点，用 type 区分）。
+   * 60 秒按邮箱节流、10 分钟有效、一次性；type=1 时邮箱已注册会报 4008，
+   * type=2/3 对未注册邮箱同样返回成功（后端防邮箱枚举）。
+   */
+  sendCode: (req: AdminSendCodeReq) =>
+    request<void>({ url: '/admin/auth/send-code', method: 'POST', data: req }),
 
   /** 注册第二步：提交后为「待分配角色」，需超管分配后才能登录 */
   register: (req: AdminRegisterReq) =>
     request<void>({ url: '/admin/auth/register', method: 'POST', data: req }),
-
-  /** 找回密码第一步。邮箱未注册**同样返回成功**——后端防邮箱枚举 */
-  sendResetCode: (req: AdminSendCodeReq) =>
-    request<void>({ url: '/admin/auth/forgot/send-code', method: 'POST', data: req }),
 
   /** 找回密码第二步：成功后该账号所有会话被踢下线 */
   resetPassword: (req: AdminResetReq) =>

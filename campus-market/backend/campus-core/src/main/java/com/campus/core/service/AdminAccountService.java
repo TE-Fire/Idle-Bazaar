@@ -5,6 +5,7 @@ import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.entity.AdminRole;
 import com.campus.core.entity.AdminUser;
 import com.campus.core.enums.AdminStatus;
+import com.campus.core.enums.MailCodeScene;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
@@ -66,7 +67,7 @@ public class AdminAccountService {
         BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
         BizAssert.isTrue(adminUserMapper.selectByEmail(email) == null, UserErrorCode.EMAIL_ALREADY_REGISTERED);
 
-        verifyMailCode(email, req.getMailCode());
+        verifyMailCode(email, MailCodeScene.REGISTER, req.getMailCode());
 
         AdminUser admin = new AdminUser()
                 .setEmail(email)
@@ -86,59 +87,62 @@ public class AdminAccountService {
         log.info("[admin] 新账号注册待分配角色：{} (id={})", email, admin.getId());
     }
 
-    /**
-     * 注册前置：给邮箱发 6 位验证码。
-     *
-     * <p>这里**可以**暴露「邮箱已注册」——注册页本就是公开入口，用户填了别人的邮箱
-     * 需要立刻知道；与找回密码（要防枚举）的结论相反，别把两者改成同一个方法。
-     */
-    public void sendRegisterCode(AdminSendCodeReq req) {
-        captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
-
-        String email = normalize(req.getEmail());
-        BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
-        BizAssert.isTrue(adminUserMapper.selectByEmail(email) == null,
-                UserErrorCode.EMAIL_ALREADY_REGISTERED);
-
-        Boolean fresh = stringRedisTemplate.opsForValue()
-                .setIfAbsent(MailRedisKeys.buildThrottleKey(email), "1", THROTTLE_TTL);
-        BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
-
-        String code = sixDigitCode();
-        stringRedisTemplate.opsForValue().set(MailRedisKeys.buildCodeKey(email), code, CODE_TTL);
-        mailService.sendVerifyCode(email, code, "注册");
-    }
-
-    /* ── 找回密码：两步 ────────────────────────────────────── */
+    /* ── 发邮箱验证码（注册 / 找回密码 / 邮箱登录 三场景共用一个入口）── */
 
     /**
-     * 第一步：下发邮箱验证码。
+     * 给邮箱发 6 位验证码，场景由 {@code req.type}（{@link MailCodeScene}）决定。
      *
-     * <p>**邮箱未注册时也返回成功**——若区分「已发送 / 邮箱不存在」，
-     * 这个接口就成了枚举管理员邮箱的工具（撞库前置）。代价是用户输错邮箱时
-     * 收不到邮件也没提示，所以用「10 分钟有效 + 60 秒节流」把滥用成本顶上去。
+     * <p>三个场景的**发码动作完全一致**（图形验证码 → 归一化 → QQ 系校验 → 60 秒节流 →
+     * 生成 6 位码 → 存 Redis → 发信），只有两点不同，所以合成一处、用 switch 分：
+     * <ol>
+     *   <li>**要不要先查库、查到以后怎么办**：注册要暴露「邮箱已注册」（4008），
+     *       找回密码与登录**必须不暴露**——否则这个接口就成了枚举管理员邮箱的工具；</li>
+     *   <li>**发信文案**：直接取 {@link MailCodeScene#getDesc()}。</li>
+     * </ol>
+     *
+     * <p>**节流必须放在查库之前**，且三场景顺序一致：若先查库后节流，
+     * 「找回密码 / 登录」的响应耗时会随邮箱是否存在而变化，等于开了一个计时侧信道。
+     * 代价是注册场景里用已注册邮箱点第二次会拿到 4010（频繁）而不是 4008——
+     * 用户已经知道邮箱被注册了，不会反复点，可接受。
+     *
+     * <p>`default` 写 throw 而不是静默兜底：将来加第四种场景时，若忘了补分支，
+     * 有 default 兜着会**静默走错逻辑**，编译器也不会提醒。
      */
-    public void sendResetCode(AdminSendCodeReq req) {
+    public void sendCode(AdminSendCodeReq req) {
         captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
 
         String email = normalize(req.getEmail());
         BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
 
-        // 60 秒内同一邮箱只发一次
+        MailCodeScene scene = MailCodeScene.fromCodeOrNull(req.getType());
+        BizAssert.notNull(scene, CommonErrorCode.PARAM_ERROR);
+
+        // 60 秒内同一邮箱只发一次（按邮箱节流，不按场景，见 MailRedisKeys.buildThrottleKey）
         Boolean fresh = stringRedisTemplate.opsForValue()
                 .setIfAbsent(MailRedisKeys.buildThrottleKey(email), "1", THROTTLE_TTL);
         BizAssert.isTrue(Boolean.TRUE.equals(fresh), UserErrorCode.MAIL_CODE_TOO_FREQUENT);
 
-        AdminUser admin = adminUserMapper.selectByEmail(email);
-        if (admin == null || isDisabled(admin.getStatus())) {
-            log.info("[admin] 找回密码：邮箱 {} 无可用账号，按「已发送」返回", email);
-            return;
+        switch (scene) {
+            // 注册页是公开入口，用户填了别人的邮箱需要立刻知道
+            case REGISTER -> BizAssert.isTrue(adminUserMapper.selectByEmail(email) == null,
+                    UserErrorCode.EMAIL_ALREADY_REGISTERED);
+            // 不发信，但对外仍返回「已发送」——不暴露该邮箱是否注册
+            case RESET, LOGIN -> {
+                AdminUser admin = adminUserMapper.selectByEmail(email);
+                if (admin == null || isDisabled(admin.getStatus())) {
+                    log.info("[admin] {}：邮箱 {} 无可用账号，按「已发送」返回", scene.getDesc(), email);
+                    return;
+                }
+            }
+            default -> throw new IllegalStateException("未处理的邮箱验证码场景：" + scene);
         }
 
         String code = sixDigitCode();
-        stringRedisTemplate.opsForValue().set(MailRedisKeys.buildCodeKey(email), code, CODE_TTL);
-        mailService.sendVerifyCode(email, code, "找回密码");
+        stringRedisTemplate.opsForValue().set(MailRedisKeys.buildCodeKey(scene, email), code, CODE_TTL);
+        mailService.sendVerifyCode(email, code, scene.getDesc());
     }
+
+    /* ── 找回密码：两步 ────────────────────────────────────── */
 
     /** 第二步：校验验证码并重置密码 */
     public void resetPassword(AdminResetReq req) {
@@ -156,7 +160,7 @@ public class AdminAccountService {
                 UserErrorCode.PASSWORD_SAME_AS_OLD);
 
         // 验证码最后一次使用：校验通过即删，防止同一个码被反复用来改密码
-        verifyMailCode(email, req.getMailCode());
+        verifyMailCode(email, MailCodeScene.RESET, req.getMailCode());
 
         adminUserMapper.updateById(new AdminUser()
                 .setId(admin.getId())
@@ -195,13 +199,22 @@ public class AdminAccountService {
 
     /* ── 内部工具 ─────────────────────────────────────────── */
 
-    /** 邮箱验证码校验：一次性，通过即删 */
-    private void verifyMailCode(String email, String code) {
-        String cached = stringRedisTemplate.opsForValue().get(MailRedisKeys.buildCodeKey(email));
+    /**
+     * 邮箱验证码校验：一次性，通过即删。
+     *
+     * <p>**必须带场景**：注册码只能注册、找回码只能找回、登录码只能登录
+     * （key 里带场景，见 {@link MailRedisKeys#buildCodeKey}）。跨场景能用等于让掉一道校验。
+     *
+     * <p>对外可见（而非 private）是因为 `AdminAuthService.loginByMailCode` 也要校验
+     * LOGIN 场景的码；登录是高频只读链路，不并进本类，只复用这一个方法。
+     */
+    public void verifyMailCode(String email, MailCodeScene scene, String code) {
+        String key = MailRedisKeys.buildCodeKey(scene, email);
+        String cached = stringRedisTemplate.opsForValue().get(key);
         BizAssert.notNull(cached, UserErrorCode.MAIL_CODE_INVALID);
         // ★ 先比对、后删除：反过来的话，输错一次就把正确验证码也删了，用户只能重新发
         BizAssert.isTrue(cached.equals(code.trim()), UserErrorCode.MAIL_CODE_INVALID);
-        stringRedisTemplate.delete(MailRedisKeys.buildCodeKey(email));
+        stringRedisTemplate.delete(key);
     }
 
     /** 状态是否「停用」。status 理论上非空（库里有 NOT NULL），仍兜住查询结果为 null 的情况 */

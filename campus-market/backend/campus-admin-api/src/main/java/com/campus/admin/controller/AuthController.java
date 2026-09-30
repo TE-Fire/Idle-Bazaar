@@ -47,21 +47,26 @@ public class AuthController {
 
     /* ── 邮箱验证码登录（business/03 F-A1 的第二种入口）────────── */
 
-    @Operation(summary = "邮箱验证码登录 · 发码",
-            description = "给已注册的 QQ 邮箱下发 6 位验证码。图形验证码、60 秒节流、"
-                    + "10 分钟有效、一次性——与注册 / 找回密码共用同一套规则")
-    @PostMapping("/login/send-code")
-    public Result<Void> sendLoginCode(@Valid @RequestBody AdminSendCodeReq req) {
-        adminAccountService.sendLoginCode(req);
-        return Result.ok();
-    }
-
     @Operation(summary = "邮箱验证码登录",
             description = "邮箱 + 6 位邮箱验证码直接换令牌，返回的 AdminLoginVO 与密码登录完全一致。"
                     + "status=0 停用、status=2 待分配角色的账号同样被拦下")
     @PostMapping("/login/mail")
     public Result<AdminLoginVO> loginByMailCode(@Valid @RequestBody AdminMailLoginReq req) {
         return Result.ok(adminAuthService.loginByMailCode(req));
+    }
+
+    /* ── 发邮箱验证码（注册 / 找回密码 / 登录 三场景共用一个端点）───── */
+
+    @Operation(summary = "发邮箱验证码",
+            description = "type：1 注册 / 2 找回密码 / 3 登录。三场景的发码规则完全一致"
+                    + "（图形验证码、60 秒节流、10 分钟有效、一次性），差异只有两点："
+                    + "① type=1 时邮箱已注册会返回 4008，type=2/3 对未注册邮箱同样返回成功（防枚举）；"
+                    + "② 邮件文案按场景不同。"
+                    + "注意节流按邮箱而非按场景，同一邮箱 60 秒内只发一封")
+    @PostMapping("/send-code")
+    public Result<Void> sendCode(@Valid @RequestBody AdminSendCodeReq req) {
+        adminAccountService.sendCode(req);
+        return Result.ok();
     }
 
     /* ── 注册 / 找回密码（business/03 F-A0 / F-A10）───────────── */
@@ -73,26 +78,10 @@ public class AuthController {
         return Result.ok(captchaService.generate());
     }
 
-    @Operation(summary = "注册 · 发邮箱验证码",
-            description = "邮箱已注册会直接报错（注册是公开入口，用户填了别人的邮箱需要立刻知道）")
-    @PostMapping("/register/send-code")
-    public Result<Void> sendRegisterCode(@Valid @RequestBody AdminSendCodeReq req) {
-        adminAccountService.sendRegisterCode(req);
-        return Result.ok();
-    }
-
     @Operation(summary = "注册", description = "QQ 邮箱 + 邮箱验证码 + 图形验证码。注册后为「待分配角色」，需超管分配后才能登录")
     @PostMapping("/register")
     public Result<Void> register(@Valid @RequestBody AdminRegisterReq req) {
         adminAccountService.register(req);
-        return Result.ok();
-    }
-
-    @Operation(summary = "找回密码 · 发邮箱验证码",
-            description = "邮箱未注册时也返回成功——否则该接口可用于枚举管理员邮箱")
-    @PostMapping("/forgot/send-code")
-    public Result<Void> sendResetCode(@Valid @RequestBody AdminSendCodeReq req) {
-        adminAccountService.sendResetCode(req);
         return Result.ok();
     }
 

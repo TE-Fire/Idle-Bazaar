@@ -23,7 +23,7 @@ import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import { LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons-vue'
 import { DEMO_PASSWORD } from '@campus/shared'
-import { authApi } from '@campus/api'
+import { authApi, MAIL_CODE_SCENE } from '@campus/api'
 import CaptchaField from '@/components/CaptchaField.vue'
 import { useCountdown } from '@/composables/useCountdown'
 import { isQqMail } from '@/utils/mail'
@@ -96,7 +96,8 @@ const onSendCode = async (): Promise<void> => {
   }
   sending.value = true
   try {
-    await authApi.sendLoginCode({
+    await authApi.sendCode({
+      type: MAIL_CODE_SCENE.login,
       email: form.email.trim(),
       captchaKey: form.captchaKey,
       captchaCode: form.captchaCode

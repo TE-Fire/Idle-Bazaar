@@ -18,7 +18,7 @@ import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import type { FormInstance, Rule } from 'ant-design-vue/es/form'
 import { LockOutlined, MailOutlined, UserOutlined } from '@ant-design/icons-vue'
-import { authApi } from '@campus/api'
+import { authApi, MAIL_CODE_SCENE } from '@campus/api'
 import CaptchaField from '@/components/CaptchaField.vue'
 import { useCountdown } from '@/composables/useCountdown'
 import { isQqMail } from '@/utils/mail'
@@ -84,7 +84,8 @@ const onSendCode = async (): Promise<void> => {
   }
   sending.value = true
   try {
-    await authApi.sendRegisterCode({
+    await authApi.sendCode({
+      type: MAIL_CODE_SCENE.register,
       email: form.email.trim(),
       captchaKey: form.captchaKey,
       captchaCode: form.captchaCode
