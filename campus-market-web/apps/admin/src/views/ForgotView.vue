@@ -146,7 +146,7 @@ const onReset = async (): Promise<void> => {
             <CaptchaField
               ref="captchaRef"
               v-model:code="form.captchaCode"
-              v-model:key="form.captchaKey"
+              v-model:captcha-key="form.captchaKey"
               @disabled="captchaOn = false"
               @submit="onSendCode"
             />

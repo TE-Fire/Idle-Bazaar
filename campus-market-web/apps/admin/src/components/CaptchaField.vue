@@ -18,7 +18,10 @@ import { authApi } from '@campus/api'
 const props = withDefaults(defineProps<{ width?: number }>(), { width: 120 })
 
 const code = defineModel<string>('code', { default: '' })
-const key = defineModel<string>('key', { default: '' })
+// ⚠ 不能叫 key：key 是 Vue 保留属性名，defineModel('key') 声明的 prop 会被
+// normalizePropsOptions 直接丢弃（控制台告警 Invalid prop name），useModel 退化为
+// 普通 ref，父页面的 v-model 永远收不到值——表现为提交时 captchaKey 是空串。
+const captchaKey = defineModel<string>('captchaKey', { default: '' })
 
 const emit = defineEmits<{ disabled: []; submit: [] }>()
 
@@ -34,7 +37,7 @@ const refresh = async (): Promise<void> => {
       emit('disabled')
       return
     }
-    key.value = vo.captchaKey
+    captchaKey.value = vo.captchaKey
     image.value = vo.captchaImage
     code.value = ''
   } catch {
