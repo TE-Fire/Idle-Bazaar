@@ -12,7 +12,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { authApi, setToken, clearToken } from '@campus/api'
-import type { AdminLoginReq } from '@campus/api'
+import type { AdminLoginReq, AdminLoginVO, AdminMailLoginReq } from '@campus/api'
 import type { PermCode } from '@campus/shared'
 
 const STORAGE_KEY = 'campus-admin-session'
@@ -65,9 +65,12 @@ export const useUserStore = defineStore('user', () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
   }
 
-  /** 登录：后端下发 tokenName（管理端为 satoken-admin），写回请求层 */
-  const login = async (req: AdminLoginReq): Promise<void> => {
-    const vo = await authApi.login(req)
+  /**
+   * 登录成功后的会话落库：密码登录与邮箱验证码登录**共用一份**——
+   * 两种登录方式后端返回的是同一个 AdminLoginVO，令牌与权限点没有任何差别，
+   * 分开写只会让「验证码登录忘了写 token」这类 bug 有机可乘。
+   */
+  const applySession = (vo: AdminLoginVO): void => {
     adminId.value = vo.adminId
     realName.value = vo.realName
     roleCode.value = vo.roleCode
@@ -77,6 +80,13 @@ export const useUserStore = defineStore('user', () => {
     setToken(vo.tokenName, vo.tokenValue)
     persist()
   }
+
+  /** 密码登录：后端下发 tokenName（管理端为 satoken-admin），写回请求层 */
+  const login = async (req: AdminLoginReq): Promise<void> => applySession(await authApi.login(req))
+
+  /** 邮箱验证码登录 */
+  const loginByMailCode = async (req: AdminMailLoginReq): Promise<void> =>
+    applySession(await authApi.loginByMailCode(req))
 
   /** 登出：先调后端注销，再清本地——后端失败也要清，否则界面卡在半登录态 */
   const logout = async (): Promise<void> => {
@@ -115,6 +125,7 @@ export const useUserStore = defineStore('user', () => {
     permCodes,
     isLogin,
     login,
+    loginByMailCode,
     logout,
     clearSession,
     hasPerm,

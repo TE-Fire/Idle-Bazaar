@@ -6,6 +6,7 @@ import com.campus.core.service.AdminAccountService;
 import com.campus.core.service.AdminAuthService;
 import com.campus.core.service.CaptchaService;
 import com.campus.core.dto.req.AdminLoginReq;
+import com.campus.core.dto.req.AdminMailLoginReq;
 import com.campus.core.dto.resp.AdminLoginVO;
 import com.campus.core.dto.req.AdminRegisterReq;
 import com.campus.core.dto.req.AdminResetReq;
@@ -42,6 +43,25 @@ public class AuthController {
     @PostMapping("/login")
     public Result<AdminLoginVO> login(@Valid @RequestBody AdminLoginReq req) {
         return Result.ok(adminAuthService.login(req));
+    }
+
+    /* ── 邮箱验证码登录（business/03 F-A1 的第二种入口）────────── */
+
+    @Operation(summary = "邮箱验证码登录 · 发码",
+            description = "给已注册的 QQ 邮箱下发 6 位验证码。图形验证码、60 秒节流、"
+                    + "10 分钟有效、一次性——与注册 / 找回密码共用同一套规则")
+    @PostMapping("/login/send-code")
+    public Result<Void> sendLoginCode(@Valid @RequestBody AdminSendCodeReq req) {
+        adminAccountService.sendLoginCode(req);
+        return Result.ok();
+    }
+
+    @Operation(summary = "邮箱验证码登录",
+            description = "邮箱 + 6 位邮箱验证码直接换令牌，返回的 AdminLoginVO 与密码登录完全一致。"
+                    + "status=0 停用、status=2 待分配角色的账号同样被拦下")
+    @PostMapping("/login/mail")
+    public Result<AdminLoginVO> loginByMailCode(@Valid @RequestBody AdminMailLoginReq req) {
+        return Result.ok(adminAuthService.loginByMailCode(req));
     }
 
     /* ── 注册 / 找回密码（business/03 F-A0 / F-A10）───────────── */

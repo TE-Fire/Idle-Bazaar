@@ -15,6 +15,15 @@ export interface AdminLoginReq {
   captchaCode?: string
 }
 
+/** 邮箱验证码登录入参（与密码登录并列，不合并——凭据形态不同：长期密码 vs 一次性码） */
+export interface AdminMailLoginReq {
+  email: string
+  /** 邮箱收到的 6 位数字验证码 */
+  mailCode: string
+  captchaKey?: string
+  captchaCode?: string
+}
+
 export interface AdminLoginVO {
   adminId: string
   realName: string
@@ -67,6 +76,14 @@ export const authApi = {
   /** 登录：账号 + 密码（+ 图形验证码）。失败 5 次锁定 10 分钟 */
   login: (req: AdminLoginReq) =>
     request<AdminLoginVO>({ url: '/admin/auth/login', method: 'POST', data: req }),
+
+  /** 邮箱验证码登录第一步：给已注册的 QQ 邮箱发码（60 秒节流，10 分钟有效，一次性） */
+  sendLoginCode: (req: AdminSendCodeReq) =>
+    request<void>({ url: '/admin/auth/login/send-code', method: 'POST', data: req }),
+
+  /** 邮箱验证码登录第二步：返回的令牌、权限点与密码登录完全一致 */
+  loginByMailCode: (req: AdminMailLoginReq) =>
+    request<AdminLoginVO>({ url: '/admin/auth/login/mail', method: 'POST', data: req }),
 
   logout: () => request<void>({ url: '/admin/auth/logout', method: 'POST' }),
 
