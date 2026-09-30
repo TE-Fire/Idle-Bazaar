@@ -19,7 +19,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Duration;
@@ -60,7 +59,6 @@ public class AdminAccountService {
 
     /* ── 注册 ─────────────────────────────────────────────── */
 
-    @Transactional(rollbackFor = Exception.class)
     public void register(AdminRegisterReq req) {
         captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
 
@@ -143,7 +141,6 @@ public class AdminAccountService {
     }
 
     /** 第二步：校验验证码并重置密码 */
-    @Transactional(rollbackFor = Exception.class)
     public void resetPassword(AdminResetReq req) {
         String email = normalize(req.getEmail());
         BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
@@ -180,7 +177,6 @@ public class AdminAccountService {
      * <p>**不允许分配 SUPER**：超级管理员只能由开发者经种子数据创建
      * （business/03 已决 2026-09-29）。否则超管能批量造超管，权限模型就塌了。
      */
-    @Transactional(rollbackFor = Exception.class)
     public void assignRole(Long adminId, Long roleId) {
         AdminUser admin = adminUserMapper.selectById(adminId);
         BizAssert.notNull(admin, CommonErrorCode.NOT_FOUND);
@@ -201,7 +197,6 @@ public class AdminAccountService {
 
     /** 邮箱验证码校验：一次性，通过即删 */
     private void verifyMailCode(String email, String code) {
-        BizAssert.isTrue(code != null && !code.isBlank(), CommonErrorCode.PARAM_ERROR);
         String cached = stringRedisTemplate.opsForValue().get(MailRedisKeys.buildCodeKey(email));
         BizAssert.notNull(cached, UserErrorCode.MAIL_CODE_INVALID);
         // ★ 先比对、后删除：反过来的话，输错一次就把正确验证码也删了，用户只能重新发
@@ -223,7 +218,7 @@ public class AdminAccountService {
     }
 
     /** QQ 系邮箱校验（应用层，数据库只保证唯一——将来放开域名不用改表） */
-    public static boolean isQqMail(String email) {
+    private static boolean isQqMail(String email) {
         String e = normalize(email);
         return MAIL_SUFFIXES.stream().anyMatch(e::endsWith);
     }
