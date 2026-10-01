@@ -26,7 +26,7 @@ public class Result<T> implements Serializable {
 
     private T data;
 
-    /** 链路追踪 ID，从 MDC 取，由 TraceIdFilter 写入 */
+    /** 链路追踪 ID，从 MDC 取，由 AccessLogFilter 写入 */
     private String traceId;
 
     public static <T> Result<T> ok() {
