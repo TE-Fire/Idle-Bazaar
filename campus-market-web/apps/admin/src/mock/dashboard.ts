@@ -36,12 +36,6 @@ export interface HeatCell {
   cell: [number, number, number]
 }
 
-export interface LoopPoint {
-  month: string
-  /** 循环件数 */
-  reused: number
-}
-
 export interface PendingItem {
   key: string
   label: string
@@ -155,21 +149,12 @@ export const HEATMAP_CELLS: HeatCell[] = (() => {
   return cells
 })()
 
-/** 二手循环率：按月循环件数 */
-export const LOOP_POINTS: LoopPoint[] = [
-  { month: '2026-03', reused: 412 },
-  { month: '2026-04', reused: 508 },
-  { month: '2026-05', reused: 566 },
-  { month: '2026-06', reused: 664 },
-  { month: '2026-07', reused: 336 },
-  { month: '2026-08', reused: 478 }
-]
-
 /**
- * 减碳估算系数与假设说明。
- * 「必须显示估算假设」是已拍板项，UI 上不能省——否则论文里这个数字站不住。
+ * 二手循环率与减碳**不再在这里定义**——同一个指标曾有两份 mock：
+ * 这里 2,964 件 / 2.3kg·件，报表 1,548 件 / 品类加权 9,084kg，答辩一眼被抓。
+ * 现在统一引用 `mock/report.ts` 的 LOOP_SERIES / loopStats() / CARBON_ASSUMPTION，
+ * 看板与报表只有一个真相来源（与「待处置队列」同源的道理相同）。
  */
-export const CARBON_ASSUMPTION = '按每件二手商品平均减碳 2.3kg 估算（参考二手 3C 与教材类目均值，非实测）'
 
 /**
  * 待处置队列：数字**从审核队列与订单的 mock 里实时算出**，不写死。

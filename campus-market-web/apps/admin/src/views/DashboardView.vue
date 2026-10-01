@@ -23,7 +23,6 @@ import ChartCard from '@/components/ChartCard.vue'
 import {
   AXIS_LABEL,
   AXIS_LINE,
-  BAR_SERIES_BASE,
   CHART_COLORS,
   GRID,
   LINE_SERIES_BASE,
@@ -31,19 +30,19 @@ import {
   TOOLTIP
 } from '@/charts/theme'
 import {
-  CARBON_ASSUMPTION,
   CATEGORIES,
   CATEGORY_SLICES,
   COLLEGES,
   HEATMAP_CELLS,
   KPI_ITEMS,
-  LOOP_POINTS,
   pendingQueue,
   TREND,
   type RangeKey
 } from '@/mock/dashboard'
 import { QUEUE_TASKS } from '@/mock/review'
 import { ORDERS } from '@/mock/orders'
+// 循环率 / 减碳与报表共用一份 mock（mock/report.ts）——同一个指标不能有两个数
+import { CARBON_ASSUMPTION, LOOP_SERIES, loopStats } from '@/mock/report'
 
 const router = useRouter()
 const range = ref<RangeKey>('7d')
@@ -169,27 +168,38 @@ const heatmapOption = computed<EChartsOption>(() => ({
 }))
 
 /* ── 校园牌：二手循环率（面积图）+ 减碳估算 ─────────────── */
+/*
+ * 数据与 A8 报表共用 mock/report.ts：看板的「累计循环件数 / 减碳」
+ * 必须等于报表页的「循环 1,548 件 / 9,084kg」，否则就是两个真相。
+ * 减碳不再是「件数 × 2.3」拍脑袋，而是报表那套品类加权系数。
+ */
+const loopStatsData = loopStats()
+
 const loopOption = computed<EChartsOption>(() => ({
   color: [CHART_COLORS[1]],
   tooltip: TOOLTIP,
   grid: { ...GRID, top: 16, bottom: 24 },
-  xAxis: { type: 'category', data: LOOP_POINTS.map((p) => p.month), axisLine: AXIS_LINE, axisLabel: AXIS_LABEL },
+  xAxis: {
+    type: 'category',
+    data: LOOP_SERIES.map((p) => p.month),
+    axisLine: AXIS_LINE,
+    axisLabel: AXIS_LABEL
+  },
   yAxis: { type: 'value', name: '件', axisLine: AXIS_LINE, axisLabel: AXIS_LABEL, splitLine: SPLIT_LINE },
   series: [
     {
-      ...BAR_SERIES_BASE,
+      ...LINE_SERIES_BASE,
       name: '循环件数',
       type: 'line',
-      data: LOOP_POINTS.map((p) => p.reused),
-      smooth: false,
+      data: LOOP_SERIES.map((p) => p.reused),
       areaStyle: { opacity: 0.12 }
     }
   ]
 }))
 
 /** 累计循环件数与估算减碳：数字必须配假设说明，否则站不住 */
-const loopTotal = computed(() => LOOP_POINTS.reduce((s, p) => s + p.reused, 0))
-const carbonKg = computed(() => Math.round(loopTotal.value * 2.3))
+const loopTotal = computed(() => loopStatsData.reused)
+const carbonKg = computed(() => loopStatsData.carbon)
 </script>
 
 <template>
