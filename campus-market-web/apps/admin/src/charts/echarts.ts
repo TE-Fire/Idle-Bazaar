@@ -15,6 +15,7 @@ import {
   GraphicComponent,
   GridComponent,
   LegendComponent,
+  MarkLineComponent,
   TooltipComponent,
   VisualMapComponent
 } from 'echarts/components'
@@ -32,6 +33,8 @@ export function setupEcharts(): void {
     VisualMapComponent,
     // 环形图中心的「总在售件数」用 graphic 画文字，漏了它那行字会静默消失
     GraphicComponent,
+    // SLA 卡的目标线用 markLine 画，漏了它整条线会静默消失（2026-10-01 实测踩过）
+    MarkLineComponent,
     CanvasRenderer
   ])
 }
