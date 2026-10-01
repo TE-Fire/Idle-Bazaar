@@ -15,6 +15,7 @@
  */
 
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { EChartsOption } from 'echarts'
 import VChart from 'vue-echarts'
 import KpiCard from '@/components/KpiCard.vue'
@@ -37,13 +38,34 @@ import {
   HEATMAP_CELLS,
   KPI_ITEMS,
   LOOP_POINTS,
-  PENDING_QUEUE,
+  pendingQueue,
   TREND,
   type RangeKey
 } from '@/mock/dashboard'
+import { QUEUE_TASKS } from '@/mock/review'
+import { ORDERS } from '@/mock/orders'
 
+const router = useRouter()
 const range = ref<RangeKey>('7d')
 const trend = computed(() => TREND[range.value])
+
+/*
+ * ⑤ 待处置队列：角标从审核队列与订单数据实时算出，不再写死。
+ * 看板是「动作入口」（design/03 A2 层级⑤），点一下要能直接进处置页，
+ * 否则这个模块只是装饰。
+ */
+const pending = computed(() =>
+  pendingQueue({
+    item: QUEUE_TASKS.filter((t) => t.kind === 'item').length,
+    report: QUEUE_TASKS.filter((t) => t.kind === 'report').length,
+    appeal: QUEUE_TASKS.filter((t) => t.kind === 'appeal').length,
+    refund: ORDERS.filter((o) => o.status === 'REFUNDING' || o.status === 'DISPUTE').length
+  })
+)
+
+const goQueue = (item: { route?: string }): void => {
+  if (item.route) void router.push({ name: item.route })
+}
 
 /* ── ② 趋势：GMV 走面积，成交笔数走折线，双 Y 轴 ───────── */
 const trendOption = computed<EChartsOption>(() => ({
@@ -243,12 +265,12 @@ const carbonKg = computed(() => Math.round(loopTotal.value * 2.3))
           <div class="cm-card__title">待处置队列</div>
           <div class="cm-card__body dashboard__queue">
             <a-badge
-              v-for="item in PENDING_QUEUE"
+              v-for="item in pending"
               :key="item.key"
               :count="item.count"
               :overflow-count="99"
             >
-              <a-button>{{ item.label }}</a-button>
+              <a-button shape="round" @click="goQueue(item)">{{ item.label }}</a-button>
             </a-badge>
           </div>
         </div>

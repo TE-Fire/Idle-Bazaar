@@ -60,6 +60,56 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '数据看板', perm: PERM_CODES.DASHBOARD_VIEW }
       },
       {
+        /*
+         * A3 商品管理（business/03 A-B4）：只能下架不能代编辑。
+         * 菜单级权限用 item.view——四种角色都有，所以人人可见；
+         * 但「下架」「删除」按钮另由 item.offline / item.delete 控制（页面内 v-perm）。
+         */
+        path: 'items',
+        name: 'items',
+        component: () => import('@/views/ItemsView.vue'),
+        meta: { title: '商品管理', perm: PERM_CODES.ITEM_VIEW }
+      },
+      {
+        // A4 用户管理（A-B5 / F-A5）：认证审核逐条做，不做批量通过
+        path: 'users',
+        name: 'users',
+        component: () => import('@/views/UsersView.vue'),
+        meta: { title: '用户管理', perm: PERM_CODES.USER_VIEW }
+      },
+      {
+        // A5 审核队列（F-A2 / F-A3 / F-A4）：管理端每日最大工作量，权重排序 + 连续审核
+        path: 'review',
+        name: 'review',
+        component: () => import('@/views/ReviewView.vue'),
+        meta: { title: '审核队列', perm: PERM_CODES.REVIEW_JUDGE }
+      },
+      {
+        /*
+         * A6 订单管理（A-B7 / F-A6）：纠纷裁决看商品快照。
+         * 16 个权限点里没有 order.view，菜单级只能借 order.refund 做门禁——
+         * 代价是只读角色看不到订单页。要打通需后端补一个 order.view，记进待办。
+         */
+        path: 'orders',
+        name: 'orders',
+        component: () => import('@/views/OrdersView.vue'),
+        meta: { title: '订单管理', perm: PERM_CODES.ORDER_REFUND }
+      },
+      {
+        // A7 内容管理（A-B6 / F-A7）：五张字典是全端一致性的源头
+        path: 'content',
+        name: 'content',
+        component: () => import('@/views/ContentView.vue'),
+        meta: { title: '内容管理', perm: PERM_CODES.CONTENT_EDIT }
+      },
+      {
+        // A8 数据报表：四张校园独有可视化
+        path: 'report',
+        name: 'report',
+        component: () => import('@/views/ReportView.vue'),
+        meta: { title: '数据报表', perm: PERM_CODES.REPORT_VIEW }
+      },
+      {
         // A9 管理员账号：给注册产生的待分配账号分配角色（business/03 F-A0 下半段）
         // ⚠️ 路径不能写成 'admins'：vite 代理前缀 /admin 是**前缀匹配**，
         //    /admins 会被当成后端接口转发出去（实测返回 1003「资源不存在」）。
@@ -67,6 +117,13 @@ const routes: RouteRecordRaw[] = [
         name: 'admins',
         component: () => import('@/views/AdminUsersView.vue'),
         meta: { title: '管理员账号', perm: PERM_CODES.SETTINGS_EDIT }
+      },
+      {
+        // A9 系统设置：操作日志 / SLA 阈值 / 敏感词
+        path: 'settings',
+        name: 'settings',
+        component: () => import('@/views/SettingsView.vue'),
+        meta: { title: '系统设置', perm: PERM_CODES.LOG_VIEW }
       },
       {
         // A9 权限矩阵的骨架版：真实接口 /admin/auth/perm-codes，先验证隔离再扩展成矩阵

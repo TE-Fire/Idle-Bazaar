@@ -10,11 +10,18 @@
 import { computed, ref, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  AppstoreOutlined,
+  AuditOutlined,
+  BarChartOutlined,
   DashboardOutlined,
+  DatabaseOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   SafetyCertificateOutlined,
-  TeamOutlined
+  SettingOutlined,
+  TeamOutlined,
+  TransactionOutlined,
+  UserOutlined
 } from '@ant-design/icons-vue'
 import { Modal } from 'ant-design-vue'
 import { ROLE_META, type PermCode, type RoleCode } from '@campus/shared'
@@ -32,6 +39,13 @@ const SIDER_W = 240
 /** 菜单图标：与路由 name 对应，新增页面时在这里补一个 */
 const ICONS: Record<string, Component> = {
   dashboard: DashboardOutlined,
+  items: AppstoreOutlined,
+  users: UserOutlined,
+  review: AuditOutlined,
+  orders: TransactionOutlined,
+  content: DatabaseOutlined,
+  report: BarChartOutlined,
+  settings: SettingOutlined,
   admins: TeamOutlined,
   'perm-matrix': SafetyCertificateOutlined
 }
