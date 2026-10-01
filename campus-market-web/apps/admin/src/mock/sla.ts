@@ -89,3 +89,62 @@ export const slaSummary = (): SlaSummary => {
 
 /** 目标线的分钟数：阈值可在设置页调，所以从配置算，不写死 120 */
 export const targetMinutes = (cfg: SlaConfig): number => cfg.firstResponseHours * 60
+
+/* ── 分审核员明细（F-A9 呈现点之三：报表分审核员明细） ─────────── */
+
+export interface ReviewerSlaStat {
+  name: string
+  handled: number
+  ok: number
+  /** 累计首审时长（分钟）：avgMin = minutesTotal ÷ handled，存总量才能保证按处置量加权可加 */
+  minutesTotal: number
+  p95Min: number
+  handleSec: number
+}
+
+/**
+ * 两位审核员近 14 日的聚合。**数字不是随手写的**：
+ * handled 合计 474、ok 合计 457、minutesTotal 合计 23860，均与 SLA_DAILY 逐日求和严格相等
+ * （221×45 + 253×55 = 23860 = Σ avgMin×handled）。报表的「合计」行与看板 SLA 卡是同一个数，
+ * 分审核员只是把同一份事实按人拆开——否则又造出「同一指标两个数」。
+ */
+export const REVIEWER_SLA: ReviewerSlaStat[] = [
+  { name: '审核员·李', handled: 221, ok: 215, minutesTotal: 9945, p95Min: 96, handleSec: 22 },
+  // 周的单条平均处置 31s 刻意超 30s 目标：整表全绿对运营没有信息量（与看板 09-24 红柱同理）
+  { name: '审核员·周', handled: 253, ok: 242, minutesTotal: 13915, p95Min: 138, handleSec: 31 }
+]
+
+export interface ReviewerSlaRow {
+  key: string
+  name: string
+  handled: number
+  avgMin: number
+  okRate: number
+  p95Min: number
+  handleSec: number
+}
+
+/**
+ * 派生展示行。合计行的 avgMin / okRate / p95 / handleSec 全部取 `slaSummary()` 的结果
+ * （与看板 SLA 卡同一出处），不在这里重新加权——重新算必然出现尾数不一致。
+ */
+export const reviewerSlaRows = (summary: SlaSummary): ReviewerSlaRow[] => [
+  ...REVIEWER_SLA.map((r, i) => ({
+    key: `r${i}`,
+    name: r.name,
+    handled: r.handled,
+    avgMin: Math.round(r.minutesTotal / r.handled),
+    okRate: Math.round((r.ok / r.handled) * 1000) / 10,
+    p95Min: r.p95Min,
+    handleSec: r.handleSec
+  })),
+  {
+    key: 'total',
+    name: '合计',
+    handled: REVIEWER_SLA.reduce((s, r) => s + r.handled, 0),
+    avgMin: summary.avgMin,
+    okRate: summary.okRate,
+    p95Min: summary.p95Min,
+    handleSec: summary.handleSec
+  }
+]

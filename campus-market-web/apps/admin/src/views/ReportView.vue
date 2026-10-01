@@ -16,6 +16,7 @@ import { computed, ref } from 'vue'
 import type { EChartsOption } from 'echarts'
 import VChart from 'vue-echarts'
 import { Modal } from 'ant-design-vue'
+import type { TableColumnsType } from 'ant-design-vue'
 import {
   AXIS_LABEL,
   AXIS_LINE,
@@ -40,6 +41,8 @@ import {
   WEEKS,
   loopStats
 } from '@/mock/report'
+import { DEFAULT_SLA } from '@/mock/settings'
+import { reviewerSlaRows, slaSummary, targetMinutes, type ReviewerSlaRow } from '@/mock/sla'
 
 /* ── 图 1 · 学期时间轴 ── */
 
@@ -236,6 +239,32 @@ const showAssumption = (): void => {
     ③ 假设每件二手交易真的替代了一次新购。论文中原样标注为假设值，不得作为精确结论。`
   })
 }
+
+/* ── 分审核员明细（F-A9 呈现点之三） ── */
+
+const sla = DEFAULT_SLA
+const targetMin = targetMinutes(sla)
+// 合计行直接取 slaSummary()：与看板 SLA 卡同一出处，不在报表里重新加权
+const reviewerRows = reviewerSlaRows(slaSummary())
+
+const reviewerColumns: TableColumnsType = [
+  { title: '审核员', dataIndex: 'name', width: 120 },
+  { title: '处置量（件）', dataIndex: 'handled', width: 110, align: 'right' },
+  { title: '平均首审（分钟）', dataIndex: 'avgMin', width: 140, align: 'right' },
+  { title: '达标率', key: 'okRate', width: 100, align: 'right' },
+  { title: 'P95（分钟）', dataIndex: 'p95Min', width: 110, align: 'right' },
+  { title: '平均处置（秒）', dataIndex: 'handleSec', width: 130, align: 'right' },
+  { title: '状态', key: 'verdict', width: 90 }
+]
+
+/** 达标判定：任一项越过 F-A9 阈值即「预警」，不看单项颜色自己脑补 */
+const verdictOf = (row: { okRate: number; avgMin: number; p95Min: number; handleSec: number }): '达标' | '预警' =>
+  row.okRate >= sla.targetRate &&
+  row.avgMin <= targetMin &&
+  row.p95Min <= sla.p95Hours * 60 &&
+  row.handleSec <= sla.avgHandleSeconds
+    ? '达标'
+    : '预警'
 </script>
 
 <template>
@@ -309,6 +338,35 @@ const showAssumption = (): void => {
         <li><b>循环率</b>：循环件数 ÷ 发布件数，减碳按品类系数加权，属估算假设。</li>
       </ul>
     </div>
+
+    <!-- 分审核员明细：F-A9 的第三处呈现，答辩时用来说明「SLA 落到了人」 -->
+    <div class="cm-card report__reviewer">
+      <div class="cm-card__title">分审核员明细（SLA · 近 14 日）</div>
+      <div class="cm-card__body">
+        <a-table
+          :columns="reviewerColumns"
+          :data-source="reviewerRows"
+          :pagination="false"
+          size="middle"
+          :row-class-name="({ key }: { key: string }) => (key === 'total' ? 'report__reviewer-total' : '')"
+        >
+          <template #bodyCell="{ column, record }">
+            <template v-if="column.key === 'okRate'">{{ (record as ReviewerSlaRow).okRate }}%</template>
+            <template v-else-if="column.key === 'verdict'">
+              <a-tag :color="verdictOf(record as ReviewerSlaRow) === '达标' ? 'green' : 'orange'">
+                {{ verdictOf(record as ReviewerSlaRow) }}
+              </a-tag>
+            </template>
+          </template>
+        </a-table>
+        <p class="report__reviewer-foot">
+          口径与看板 SLA 卡同源（近 14 日已处置统计，阈值取自「系统设置 · SLA 配置」）；
+          首审响应 ≤ {{ sla.firstResponseHours }} 小时、P95 ≤ {{ sla.p95Hours }} 小时、达标率 ≥ {{ sla.targetRate }}%、
+          单条平均处置 ≤ {{ sla.avgHandleSeconds }} 秒，任一项越线即预警。
+          不含当前未处置的积压（该实时量在看板与审核队列呈现）。
+        </p>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -378,6 +436,23 @@ const showAssumption = (): void => {
   color: var(--cm-color-text-2);
   font-size: var(--cm-font-size-sm);
   line-height: 1.9;
+}
+
+/* ── 分审核员明细 ── */
+.report__reviewer {
+  margin-top: var(--cm-space-5);
+}
+
+.report__reviewer-foot {
+  margin: var(--cm-space-3) 0 0;
+  font-size: var(--cm-font-size-xs);
+  line-height: 1.8;
+  color: var(--cm-color-text-3);
+}
+
+:deep(.report__reviewer-total td) {
+  font-weight: 600;
+  background: var(--cm-color-surface-muted) !important;
 }
 
 @media (max-width: 1279px) {
