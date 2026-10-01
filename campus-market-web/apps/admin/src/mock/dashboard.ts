@@ -46,7 +46,11 @@ export interface PendingItem {
   key: string
   label: string
   count: number
-  /** 跳转的路由名，页面建好后替换成真实路由 */
+  /**
+   * 跳转的路由名（审核队列 / 订单管理已建好，所以这里不再是占位）。
+   * 角标数字由 `pendingQueue()` 从真实队列数据算出，不写死——
+   * 否则看板显示 23 单待审核、点进去队列里只有 7 条，前后对不上。
+   */
   route?: string
 }
 
@@ -167,9 +171,22 @@ export const LOOP_POINTS: LoopPoint[] = [
  */
 export const CARBON_ASSUMPTION = '按每件二手商品平均减碳 2.3kg 估算（参考二手 3C 与教材类目均值，非实测）'
 
-export const PENDING_QUEUE: PendingItem[] = [
-  { key: 'review', label: '待审核商品', count: 23 },
-  { key: 'report', label: '举报待处理', count: 5 },
-  { key: 'appeal', label: '申诉待复核', count: 2 },
-  { key: 'refund', label: '退款待审', count: 7 }
+/**
+ * 待处置队列：数字**从审核队列与订单的 mock 里实时算出**，不写死。
+ * 看板说「23 单待审核」、点进去队列只有 7 条，是最伤可信度的一类 bug，
+ * 所以在数据层就把两者绑在一起（后端就绪后同理：看板与队列同源于一张统计表）。
+ *
+ * <p>注意这里用的是当前**未处置**的队列长度，审核页处置掉一条后回到看板数字会变小——
+ * 这正是要的效果。
+ */
+export const pendingQueue = (source: {
+  item: number
+  report: number
+  appeal: number
+  refund: number
+}): PendingItem[] => [
+  { key: 'review', label: '待审核商品', count: source.item, route: 'review' },
+  { key: 'report', label: '举报待处理', count: source.report, route: 'review' },
+  { key: 'appeal', label: '申诉待复核', count: source.appeal, route: 'review' },
+  { key: 'refund', label: '退款待审', count: source.refund, route: 'orders' }
 ]
