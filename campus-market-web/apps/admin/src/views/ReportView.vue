@@ -68,18 +68,17 @@ const termOption = computed<EChartsOption>(() => {
       {
         name: '发布量',
         type: 'line',
-        smooth: true,
+        // smooth 固定 false：数据要精确，不做平滑（theme.ts 的约定）
+        ...LINE_SERIES_BASE,
         data: s.publish,
-        areaStyle: { opacity: 0.12 },
-        lineStyle: { width: 2 }
+        areaStyle: { opacity: 0.12 }
       },
       {
         name: '成交量',
         type: 'line',
-        smooth: true,
+        ...LINE_SERIES_BASE,
         data: s.deal,
-        areaStyle: { opacity: 0.12 },
-        lineStyle: { width: 2 }
+        areaStyle: { opacity: 0.12 }
       }
     ]
   }

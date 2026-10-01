@@ -12,6 +12,7 @@
 import { use } from 'echarts/core'
 import { BarChart, HeatmapChart, LineChart, PieChart } from 'echarts/charts'
 import {
+  GraphicComponent,
   GridComponent,
   LegendComponent,
   TooltipComponent,
@@ -29,6 +30,8 @@ export function setupEcharts(): void {
     TooltipComponent,
     LegendComponent,
     VisualMapComponent,
+    // 环形图中心的「总在售件数」用 graphic 画文字，漏了它那行字会静默消失
+    GraphicComponent,
     CanvasRenderer
   ])
 }
