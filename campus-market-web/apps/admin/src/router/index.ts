@@ -119,11 +119,27 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '管理员账号', perm: PERM_CODES.SETTINGS_EDIT }
       },
       {
-        // A9 系统设置：操作日志 / SLA 阈值 / 敏感词
+        /*
+         * A9 系统设置：只剩 SLA 阈值与敏感词两块，都是**写操作**，
+         * 所以门禁用 settings.edit 而不是 log.view——
+         * 用 log.view 的话，运营（有 log.view 无 settings.edit）能进本页，
+         * 而页里的表单正是它改不了的东西。
+         */
         path: 'settings',
         name: 'settings',
         component: () => import('@/views/SettingsView.vue'),
-        meta: { title: '系统设置', perm: PERM_CODES.LOG_VIEW }
+        meta: { title: '系统设置', perm: PERM_CODES.SETTINGS_EDIT }
+      },
+      {
+        /*
+         * 操作日志（business/03 F-A11）：2026-10-01 从系统设置的 Tab 拆为独立页。
+         * 只读场景（巡盘 / 追责 / 答辩演示审计留痕）频率远高于改配置，
+         * 门禁用 log.view：超级管理员与运营可见，恰好区分于 settings.edit。
+         */
+        path: 'settings/logs',
+        name: 'logs',
+        component: () => import('@/views/OperationLogView.vue'),
+        meta: { title: '操作日志', perm: PERM_CODES.LOG_VIEW }
       },
       {
         // A9 权限矩阵的骨架版：真实接口 /admin/auth/perm-codes，先验证隔离再扩展成矩阵

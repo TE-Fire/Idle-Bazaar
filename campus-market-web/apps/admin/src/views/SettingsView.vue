@@ -1,63 +1,29 @@
 <script setup lang="ts">
 /**
- * A9 系统设置（business/03 A-B9 / F-A9）
+ * A9 系统设置（business/03 A-B9）——只剩两块**需要写权限**的配置项
  *
- * <p>三块内容：操作日志、SLA 配置、敏感词。
- * 「管理员账号」与「角色权限矩阵」另有两个页面（/settings/admins、/perm-matrix），
- * 这里不重复实现——A9 拆成三个入口比塞进一个大 Tab 更好找。
+ * <p>历史：本页原先还挂着「操作日志」Tab，2026-10-01 拆成独立页 `/settings/logs`（F-A11）。
+ * 拆的原因有两条：
+ *   ① 操作日志是高频查询（巡盘 / 追责），塞在低频配置项里不好找；
+ *   ② 页面门禁只能用 log.view，而**运营只有 log.view、没有 settings.edit**，
+ *      等于让运营进了放着 SLA 阈值与敏感词表单的页面。拆开后本页门禁改为 settings.edit，
+ *      页面内容与「谁能改配置」才对得上权限矩阵。
+ *
+ * <p>「管理员账号」与「角色权限矩阵」另有两个页面（/settings/admins、/perm-matrix），
+ * 这里不重复实现——A9 拆成多个入口比塞进一个大 Tab 更好找。
  *
  * <p>SLA 的两级指标**不可混用**（F-A9 判据）：
  * 响应时效是对用户的承诺（首审 ≤2h、P95 ≤6h、达标率 ≥95%、超 24h 记积压红牌），
  * 操作效率是对审核员的要求（单条 ≤30s）。这里改的阈值会立刻影响 A5 审核队列的临期/超时判定。
  */
 
-import { computed, reactive, ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
 import { PERM_CODES, type SensitiveWord } from '@campus/shared'
-import { DEFAULT_SLA, LOG_MODULES, OPERATION_LOGS, SENSITIVE_WORDS } from '@/mock/settings'
+import { DEFAULT_SLA, SENSITIVE_WORDS } from '@/mock/settings'
 
-const active = ref<'log' | 'sla' | 'word'>('log')
-
-/* ── 操作日志 ── */
-
-const logFilters = reactive<{ module: string; keyword: string }>({ module: 'ALL', keyword: '' })
-
-const logs = computed(() => {
-  const kw = logFilters.keyword.trim().toLowerCase()
-  return OPERATION_LOGS.filter((l) => {
-    if (logFilters.module !== 'ALL' && l.module !== logFilters.module) return false
-    if (!kw) return true
-    return (
-      l.operator.toLowerCase().includes(kw) ||
-      l.action.toLowerCase().includes(kw) ||
-      l.target.toLowerCase().includes(kw)
-    )
-  })
-})
-
-const logColumns: TableColumnsType = [
-  { title: '时间', key: 'at', width: 140 },
-  { title: '操作者', dataIndex: 'operator', width: 120 },
-  { title: '模块', key: 'module', width: 90 },
-  { title: '动作', dataIndex: 'action', width: 110 },
-  { title: '对象', dataIndex: 'target', width: 260 },
-  { title: '依据', key: 'basis' },
-  { title: 'IP', dataIndex: 'ip', width: 120 }
-]
-
-const MODULE_COLORS: Record<string, string> = {
-  审核: 'blue',
-  申诉: 'purple',
-  举报: 'orange',
-  用户: 'cyan',
-  商品: 'geekblue',
-  订单: 'magenta',
-  内容: 'green',
-  系统: 'red'
-}
-
-const moduleColor = (m: string): string => MODULE_COLORS[m] ?? 'default'
+const active = ref<'sla' | 'word'>('sla')
 
 /* ── SLA 配置：改的是 mock 里的同一份对象，A5 队列立刻按新阈值判定 ── */
 
@@ -123,59 +89,18 @@ const removeWord = (row: SensitiveWord): void => {
     <header class="cm-page__head">
       <h1 class="cm-page__title">系统设置</h1>
       <p class="cm-page__sub">
-        操作日志、审核 SLA 阈值与敏感词；管理员账号与角色权限另有两个页面。
+        审核 SLA 阈值与敏感词，均需 settings.edit；操作日志在独立页面。
       </p>
     </header>
 
     <div class="cm-card settings__card">
       <a-tabs v-model:active-key="active">
-        <a-tab-pane key="log" tab="操作日志" />
         <a-tab-pane key="sla" tab="SLA 配置" />
         <a-tab-pane key="word" tab="敏感词" />
       </a-tabs>
 
-      <!-- 操作日志 -->
-      <template v-if="active === 'log'">
-        <div class="settings__filter">
-          <a-space wrap :size="12">
-            <a-select v-model:value="logFilters.module" style="width: 130px">
-              <a-select-option value="ALL">模块：全部</a-select-option>
-              <a-select-option v-for="m in LOG_MODULES" :key="m" :value="m">{{ m }}</a-select-option>
-            </a-select>
-            <a-input
-              v-model:value="logFilters.keyword"
-              allow-clear
-              placeholder="操作者 / 动作 / 对象"
-              style="width: 240px"
-            />
-          </a-space>
-          <span class="settings__count">共 {{ logs.length }} 条</span>
-        </div>
-
-        <a-table
-          :columns="logColumns"
-          :data-source="logs"
-          row-key="id"
-          size="middle"
-          :pagination="{ pageSize: 10, showTotal: (t: number) => `共 ${t} 条` }"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'at'">
-              {{ record.at.slice(0, 16).replace('T', ' ') }}
-            </template>
-            <template v-else-if="column.key === 'module'">
-              <a-tag :color="moduleColor(record.module)">{{ record.module }}</a-tag>
-            </template>
-            <template v-else-if="column.key === 'basis'">
-              <span v-if="record.basis">{{ record.basis }}</span>
-              <span v-else class="settings__muted">—</span>
-            </template>
-          </template>
-        </a-table>
-      </template>
-
       <!-- SLA 配置 -->
-      <template v-else-if="active === 'sla'">
+      <template v-if="active === 'sla'">
         <p class="settings__note">
           SLA 分两级，不可混用：<b>响应时效</b>是平台对用户的承诺，<b>操作效率</b>是对审核员的要求。
           改这里的阈值会立刻改变审核队列的临期 / 超时判定。
@@ -275,10 +200,6 @@ const removeWord = (row: SensitiveWord): void => {
 
 .settings__count {
   font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
-}
-
-.settings__muted {
   color: var(--cm-color-text-3);
 }
 

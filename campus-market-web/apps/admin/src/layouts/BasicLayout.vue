@@ -15,6 +15,7 @@ import {
   BarChartOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  FileTextOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   SafetyCertificateOutlined,
@@ -46,6 +47,7 @@ const ICONS: Record<string, Component> = {
   content: DatabaseOutlined,
   report: BarChartOutlined,
   settings: SettingOutlined,
+  logs: FileTextOutlined,
   admins: TeamOutlined,
   'perm-matrix': SafetyCertificateOutlined
 }
