@@ -9,12 +9,20 @@
  *
  * <p>数据来自 `@campus/mock`（与小程序同一批）：学生端接口未实现，
  * 等 `/api/item/list` 就位后只换数据源。
+ *
+ * <p>2026-09-30 按闲鱼 Web 版改版：
+ * - 顶部分类条取消，分类收进左侧「全部分类」卡（闲鱼的分类入口在首页左上）；
+ * - 纯首页态在内容区顶部铺**彩色促销卡位**（橙主推 + 黄/蓝/绿三张品类卡），
+ *   这是闲鱼首页"一眼有货"的关键，也是旧版"简陋"观感的主要缺口；
+ * - 「猜你喜欢」快捷分类 chips（胶囊，选中黄底）直接过滤当前列表；
+ * - 排序从下拉换成闲鱼式的**排序胶囊组**（综合/最新/最热/价格）。
  */
 
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CAMPUSES,
+  CATEGORIES,
   CONDITION_GRADES,
   CONDITION_LABELS,
   formatPrice,
@@ -67,6 +75,55 @@ watch(
   },
   { immediate: true }
 )
+
+/* ── 闲鱼式首页装饰层 ───────────────────────────────────── */
+
+/** 公告条：可关（闲鱼顶部的「网页版发布闲置功能升级啦！」） */
+const notice = ref(true)
+
+/** 纯首页（无分类 / 无关键词）才铺促销卡位；一进检索态就收掉，让位给结果 */
+const isPureHome = computed(
+  () => route.name === 'home' && !route.query.cat && !route.query.q
+)
+
+/** 左侧分类卡（顶栏分类条取消后的替代入口） */
+const CAT_LIST = CATEGORIES.filter((c) => c !== '首页')
+
+function pickCat(c: string): void {
+  // 走 URL 而不是直改 category.value：与顶栏 / 促销卡的入口共用同一份 watch 同步
+  void router.push({ name: 'list', query: { cat: c || undefined } })
+}
+
+/** 促销卡位：主推卡 + 三张品类卡。文案与配色写死（装饰层），点击进对应分类 */
+interface HeroCard {
+  cat: string
+  title: string
+  sub: string
+  /** 品类卡右下角的价格钩子 */
+  price?: string
+  /** 主推卡的按钮文案 */
+  btn?: string
+  cls: string
+}
+
+const HERO: HeroCard[] = [
+  { cat: '', title: '校园二手好物', sub: '超绝性价比 · 省到底', btn: '去逛逛', cls: 'hero--promo' },
+  { cat: '数码电子', title: '手机数码', sub: '热门装备放心入', price: '¥99 起', cls: 'hero--blue' },
+  { cat: '教材教辅', title: '教材教辅', sub: '一届传给一届', price: '¥1 起', cls: 'hero--green' },
+  { cat: '运动器材', title: '运动器材', sub: '挥汗如雨', price: '¥59 起', cls: 'hero--pink' }
+]
+
+/** 「猜你喜欢」快捷分类：第一个是「全部」，其余逐分类过滤 */
+const QUICK = [{ label: '猜你喜欢', value: '' }, ...CAT_LIST.map((c) => ({ label: c, value: c }))]
+
+/** 排序胶囊组：闲鱼把排序平铺而不是藏进下拉——扫一眼就能换 */
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'default', label: '综合' },
+  { key: 'time', label: '最新' },
+  { key: 'hot', label: '最热' },
+  { key: 'price-asc', label: '价格从低到高' },
+  { key: 'price-desc', label: '价格从高到低' }
+]
 
 /* ── 结果集 ─────────────────────────────────────────────── */
 
@@ -191,55 +248,88 @@ watch([filtered], () => {
 
 <template>
   <div class="cm-shell home">
-    <!-- 面包屑（design/01 §3.2） -->
-    <div class="crumb">
-      <RouterLink :to="{ name: 'home' }">首页</RouterLink>
-      <span v-if="category"> / {{ category }}</span>
+    <!-- 公告条：白卡胶囊，可关闭 -->
+    <div v-if="notice && isPureHome" class="notice cm-card">
+      <span class="notice__txt">📢 网页版发布闲置功能升级啦！拖拽 9 张图 + 实时预览，快去试试</span>
+      <button type="button" class="notice__x" aria-label="关闭公告" @click="notice = false">×</button>
     </div>
 
     <div class="body">
-      <!-- ── 左侧常驻筛选 240px，sticky ────────────────── -->
+      <!-- ── 左侧常驻 240px：分类卡 + 筛选，sticky ──────── -->
       <aside class="side">
-        <FilterGroup
-          title="价格区间"
-          clearable
-          @clear="((priceMin = null), (priceMax = null), (negotiableOnly = false), (deliveryOnly = false))"
-        >
-          <div class="prange">
-            <el-input-number v-model="priceMin" :min="0" :step="10" size="small" placeholder="最低" controls-position="right" />
-            <i>—</i>
-            <el-input-number v-model="priceMax" :min="0" :step="10" size="small" placeholder="最高" controls-position="right" />
-          </div>
-          <label><input v-model="negotiableOnly" type="checkbox" /> 只看可议价</label>
-          <label><input v-model="deliveryOnly" type="checkbox" /> 包校园配送</label>
-        </FilterGroup>
+        <nav class="cats">
+          <h4 class="cats__hd">全部分类</h4>
+          <a
+            v-for="c in CAT_LIST"
+            :key="c"
+            :class="{ on: category === c }"
+            href="javascript:void(0)"
+            @click="pickCat(c)"
+          >
+            {{ c }}
+          </a>
+        </nav>
 
-        <FilterGroup title="成色" clearable @clear="conditions = []">
-          <p class="hint">成色任选其一（多选为「或」）</p>
-          <label v-for="g in CONDITION_GRADES" :key="g">
-            <input v-model="conditions" type="checkbox" :value="g" /> {{ g }} 级 · {{ CONDITION_LABELS[g] }}
-          </label>
-        </FilterGroup>
+        <div class="filters cm-card">
+          <FilterGroup
+            title="价格区间"
+            clearable
+            @clear="((priceMin = null), (priceMax = null), (negotiableOnly = false), (deliveryOnly = false))"
+          >
+            <div class="prange">
+              <el-input-number v-model="priceMin" :min="0" :step="10" size="small" placeholder="最低" controls-position="right" />
+              <i>—</i>
+              <el-input-number v-model="priceMax" :min="0" :step="10" size="small" placeholder="最高" controls-position="right" />
+            </div>
+            <label><input v-model="negotiableOnly" type="checkbox" /> 只看可议价</label>
+            <label><input v-model="deliveryOnly" type="checkbox" /> 包校园配送</label>
+          </FilterGroup>
 
-        <FilterGroup title="校区 / 面交点" clearable @clear="campuses = []">
-          <label v-for="c in CAMPUSES" :key="c"><input v-model="campuses" type="checkbox" :value="c" /> {{ c }}</label>
-        </FilterGroup>
+          <FilterGroup title="成色" clearable @clear="conditions = []">
+            <p class="hint">成色任选其一（多选为「或」）</p>
+            <label v-for="g in CONDITION_GRADES" :key="g">
+              <input v-model="conditions" type="checkbox" :value="g" /> {{ g }} 级 · {{ CONDITION_LABELS[g] }}
+            </label>
+          </FilterGroup>
 
-        <FilterGroup title="卖家" clearable @clear="((verifiedOnly = false), (creditGood = false))">
-          <label><input v-model="verifiedOnly" type="checkbox" /> 仅看学号已认证</label>
-          <label><input v-model="creditGood" type="checkbox" /> 信用极好</label>
-        </FilterGroup>
+          <FilterGroup title="校区 / 面交点" clearable @clear="campuses = []">
+            <label v-for="c in CAMPUSES" :key="c"><input v-model="campuses" type="checkbox" :value="c" /> {{ c }}</label>
+          </FilterGroup>
 
-        <FilterGroup title="发布时间" clearable @clear="timeRange = ''">
-          <label><input v-model="timeRange" type="radio" value="" /> 不限</label>
-          <label><input v-model="timeRange" type="radio" value="24h" /> 24 小时内</label>
-          <label><input v-model="timeRange" type="radio" value="3d" /> 3 天内</label>
-          <label><input v-model="timeRange" type="radio" value="7d" /> 一周内</label>
-        </FilterGroup>
+          <FilterGroup title="卖家" clearable @clear="((verifiedOnly = false), (creditGood = false))">
+            <label><input v-model="verifiedOnly" type="checkbox" /> 仅看学号已认证</label>
+            <label><input v-model="creditGood" type="checkbox" /> 信用极好</label>
+          </FilterGroup>
+
+          <FilterGroup title="发布时间" clearable @clear="timeRange = ''">
+            <label><input v-model="timeRange" type="radio" value="" /> 不限</label>
+            <label><input v-model="timeRange" type="radio" value="24h" /> 24 小时内</label>
+            <label><input v-model="timeRange" type="radio" value="3d" /> 3 天内</label>
+            <label><input v-model="timeRange" type="radio" value="7d" /> 一周内</label>
+          </FilterGroup>
+        </div>
       </aside>
 
       <!-- ── 内容区 ────────────────────────────────────── -->
       <section class="content">
+        <!-- 促销卡位：只在纯首页铺，检索态收掉 -->
+        <div v-if="isPureHome" class="hero">
+          <div
+            v-for="h in HERO"
+            :key="h.title"
+            class="hero__card"
+            :class="h.cls"
+            @click="pickCat(h.cat)"
+          >
+            <div class="hero__txt">
+              <strong>{{ h.title }}</strong>
+              <span>{{ h.sub }}</span>
+              <span v-if="h.price" class="hero__price">{{ h.price }}</span>
+            </div>
+            <span v-if="h.btn" class="hero__btn">{{ h.btn }}</span>
+          </div>
+        </div>
+
         <div v-if="chips.length" class="chips">
           <span v-for="c in chips" :key="c.key" class="cm-chip" @click="c.clear()">
             {{ c.label }}<i class="cm-chip__x">×</i>
@@ -247,20 +337,41 @@ watch([filtered], () => {
           <button type="button" class="chips__clear" @click="clearAll">清空全部</button>
         </div>
 
-        <div class="toolbar">
-          <span class="count">共 {{ filtered.length }} 件</span>
+        <!-- 猜你喜欢：快捷分类胶囊，选中黄底黑字 -->
+        <div class="quick">
+          <button
+            v-for="q in QUICK"
+            :key="q.value"
+            type="button"
+            class="quick__item"
+            :class="{ on: category === q.value }"
+            @click="pickCat(q.value)"
+          >
+            {{ q.label }}
+          </button>
+        </div>
+
+        <!-- 排序胶囊组 + 视图切换（闲鱼的筛选条形态） -->
+        <div class="toolbar cm-card">
+          <div class="sorts">
+            <button
+              v-for="s in SORTS"
+              :key="s.key"
+              type="button"
+              class="sorts__item"
+              :class="{ on: sort === s.key }"
+              @click="sort = s.key"
+            >
+              {{ s.label }}
+            </button>
+          </div>
+
           <div class="toolbar__right">
+            <span class="count">共 {{ filtered.length }} 件</span>
             <el-radio-group v-model="view" size="small">
               <el-radio-button value="grid">网格</el-radio-button>
               <el-radio-button value="list">列表</el-radio-button>
             </el-radio-group>
-            <el-select v-model="sort" size="small" class="sort">
-              <el-option label="默认排序" value="default" />
-              <el-option label="价格从低到高" value="price-asc" />
-              <el-option label="价格从高到低" value="price-desc" />
-              <el-option label="最新发布" value="time" />
-              <el-option label="最多人想要" value="hot" />
-            </el-select>
           </div>
         </div>
 
@@ -288,23 +399,44 @@ watch([filtered], () => {
 
 <style scoped lang="scss">
 .home {
+  padding-top: var(--cm-space-4);
+}
+
+/* ── 公告条 ─────────────────────────────────────────────── */
+
+.notice {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: var(--cm-space-3);
+  height: 40px;
+  padding: 0 var(--cm-space-4);
+  margin-bottom: var(--cm-space-4);
 }
 
-.crumb {
+.notice__txt {
   font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
+  color: var(--cm-color-text-2);
 }
 
-.crumb a:hover {
-  color: var(--cm-color-text-1);
+.notice__x {
+  margin-left: auto;
+  font-size: var(--cm-font-size-lg);
+  line-height: 1;
+  color: var(--cm-color-text-3);
+  background: none;
+  border: none;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--cm-color-text-1);
+  }
 }
+
+/* ── 双栏 ───────────────────────────────────────────────── */
 
 .body {
   display: flex;
-  gap: var(--cm-space-5);
+  gap: var(--cm-space-4);
   align-items: flex-start;
 }
 
@@ -313,16 +445,48 @@ watch([filtered], () => {
 .side {
   width: var(--cm-layout-side-w);
   flex: none;
-  /* design/01 §4.6：top = nav-h + cat-h + 16px */
+  /* 顶栏分类条取消后，吸附点只留 nav 高度 */
   position: sticky;
-  top: calc(var(--cm-layout-nav-h) + var(--cm-layout-cat-h) + var(--cm-space-4));
-  background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-lg);
-  padding: var(--cm-space-4);
+  top: calc(var(--cm-layout-nav-h) + var(--cm-space-4));
   display: flex;
   flex-direction: column;
   gap: var(--cm-space-4);
+}
+
+/* 分类卡：与筛选卡分开一张，标题区是黑底黄字的闲鱼式强调 */
+.cats {
+  background: var(--cm-color-surface);
+  border-radius: var(--cm-radius-xl);
+  box-shadow: var(--cm-shadow-1);
+  padding: var(--cm-space-4);
+  display: flex;
+  flex-direction: column;
+}
+
+.cats__hd {
+  margin: 0 0 var(--cm-space-2);
+  font-size: var(--cm-font-size-base);
+  font-weight: 800;
+}
+
+.cats a {
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-2);
+  line-height: 2;
+
+  &:hover {
+    color: var(--cm-color-text-1);
+    font-weight: 600;
+  }
+
+  &.on {
+    color: var(--cm-color-text-1);
+    font-weight: 700;
+  }
+}
+
+.filters {
+  padding: var(--cm-space-4);
 }
 
 .prange {
@@ -348,6 +512,104 @@ watch([filtered], () => {
   min-width: 0;
 }
 
+/* ── 促销卡位 ───────────────────────────────────────────── */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: var(--cm-space-3);
+  margin-bottom: var(--cm-space-4);
+}
+
+.hero__card {
+  position: relative;
+  min-height: 120px;
+  border-radius: var(--cm-radius-2xl);
+  padding: var(--cm-space-4);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--cm-shadow-2);
+  }
+}
+
+.hero__txt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-1);
+
+  strong {
+    font-size: var(--cm-font-size-md);
+    font-weight: 800;
+  }
+
+  span {
+    font-size: var(--cm-font-size-xs);
+    opacity: 0.82;
+  }
+}
+
+.hero__price {
+  font-weight: 800;
+  opacity: 1 !important;
+}
+
+.hero__btn {
+  position: absolute;
+  left: var(--cm-space-4);
+  bottom: var(--cm-space-3);
+  height: 26px;
+  padding: 0 var(--cm-space-3);
+  line-height: 26px;
+  font-size: var(--cm-font-size-xs);
+  font-weight: 700;
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-brand);
+  border-radius: var(--cm-radius-pill);
+}
+
+/* 主推卡：橙红渐变 + 白字，是整排里唯一的高饱和块（主色纪律：黄留给按钮） */
+.hero--promo {
+  background: linear-gradient(135deg, #ff8f1f, #ff5000);
+  color: #fff;
+
+  .hero__txt strong {
+    font-size: var(--cm-font-size-lg);
+  }
+}
+
+.hero--blue {
+  background: linear-gradient(135deg, var(--cm-color-tag-blue-bg), #d2e9ff);
+  color: var(--cm-color-tag-blue);
+
+  .hero__txt span {
+    color: var(--cm-color-text-2);
+  }
+}
+
+.hero--green {
+  background: linear-gradient(135deg, var(--cm-color-tag-green-bg), #d0f2e0);
+  color: var(--cm-color-ok);
+
+  .hero__txt span {
+    color: var(--cm-color-text-2);
+  }
+}
+
+.hero--pink {
+  background: linear-gradient(135deg, var(--cm-color-tag-red-bg), #ffd6cf);
+  color: var(--cm-color-price);
+
+  .hero__txt span {
+    color: var(--cm-color-text-2);
+  }
+}
+
+/* ── 已选条件 chips ─────────────────────────────────────── */
+
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -369,20 +631,78 @@ watch([filtered], () => {
   color: var(--cm-color-text-1);
 }
 
+/* ── 猜你喜欢胶囊 ───────────────────────────────────────── */
+
+.quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cm-space-2);
+  margin-bottom: var(--cm-space-3);
+}
+
+.quick__item {
+  height: 30px;
+  padding: 0 var(--cm-space-4);
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-2);
+  background: var(--cm-color-surface);
+  border: none;
+  border-radius: var(--cm-radius-pill);
+  box-shadow: var(--cm-shadow-1);
+  cursor: pointer;
+  transition: background-color 180ms ease-out, color 180ms ease-out;
+
+  &:hover {
+    color: var(--cm-color-text-1);
+  }
+
+  &.on {
+    font-weight: 700;
+    color: var(--cm-color-text-1);
+    background: var(--cm-color-brand);
+  }
+}
+
+/* ── 排序工具条 ─────────────────────────────────────────── */
+
 .toolbar {
   display: flex;
   align-items: center;
-  height: 40px;
-  padding: 0 var(--cm-space-3);
-  background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-md);
+  height: 48px;
+  padding: 0 var(--cm-space-4);
   margin-bottom: var(--cm-space-4);
+}
+
+.sorts {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-1);
+}
+
+.sorts__item {
+  height: 28px;
+  padding: 0 var(--cm-space-3);
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-2);
+  background: none;
+  border: none;
+  border-radius: var(--cm-radius-pill);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--cm-color-text-1);
+  }
+
+  &.on {
+    font-weight: 700;
+    color: var(--cm-color-text-1);
+    background: var(--cm-color-bg);
+  }
 }
 
 .count {
   font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-2);
+  color: var(--cm-color-text-3);
 }
 
 .toolbar__right {
@@ -392,9 +712,7 @@ watch([filtered], () => {
   gap: var(--cm-space-3);
 }
 
-.sort {
-  width: 130px;
-}
+/* ── 结果网格 ───────────────────────────────────────────── */
 
 /* 网格：auto-fill + minmax 让 lg 出 4 列、xl 出 5–6 列（design/01 §3.1） */
 .grid {
@@ -419,6 +737,10 @@ watch([filtered], () => {
 @media (max-width: 1023px) {
   .side {
     display: none;
+  }
+
+  .hero {
+    grid-template-columns: 1fr 1fr;
   }
 }
 </style>

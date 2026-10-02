@@ -5,7 +5,7 @@
     "brand-bg": "#FFF8DB",
     "brand-border": "#F2DFA0",
     "price": "#FF5000",
-    "bg": "#F5F5F6",
+    "bg": "#F4F5F6",
     "surface": "#FFFFFF",
     "border": "#E8E8EC",
     "border-strong": "#DCDCE2",
@@ -16,7 +16,11 @@
     },
     "ok": "#0FA968",
     "warn": "#FF8F1F",
-    "err": "#E5484D"
+    "err": "#E5484D",
+    "tag-red-bg": "#FFECE8",
+    "tag-blue-bg": "#E8F3FF",
+    "tag-blue": "#1677FF",
+    "tag-green-bg": "#E8F8F0"
   },
   "fontSize": {
     "xl": "25px"
@@ -25,7 +29,9 @@
     "10": "40px"
   },
   "radius": {
-    "xl": "12px"
+    "xl": "12px",
+    "2xl": "16px",
+    "pill": "999px"
   },
   "shadow": {
     "1": "0 1px 3px rgba(20,20,30,.06)",
@@ -35,6 +41,7 @@
     "nav-h": "60px",
     "cat-h": "44px",
     "side-w": "240px",
-    "content-max": "1280px"
+    "content-max": "1280px",
+    "rail-w": "72px"
   }
 }

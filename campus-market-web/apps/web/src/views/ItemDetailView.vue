@@ -42,11 +42,6 @@ function onWant(): void {
 
 <template>
   <div v-if="item" class="cm-shell detail">
-    <div class="crumb">
-      <RouterLink :to="{ name: 'home' }">首页</RouterLink>
-      <span> / {{ item.category }} / {{ item.title }}</span>
-    </div>
-
     <div class="top">
       <!-- 图集 -->
       <div class="gallery">
@@ -68,6 +63,12 @@ function onWant(): void {
       <!-- 价格盒 -->
       <div class="box">
         <h1 class="title">{{ item.title }}</h1>
+
+        <div class="tags">
+          <span v-if="item.delivery" class="cm-tag cm-tag--red">包邮</span>
+          <span v-if="item.negotiable" class="cm-tag cm-tag--yellow">可议价</span>
+          <span class="cm-tag cm-tag--blue">学号{{ item.seller.verified ? '已' : '未' }}认证</span>
+        </div>
 
         <div class="price">
           <strong>{{ formatPrice(item.price) }}</strong>
@@ -132,11 +133,7 @@ function onWant(): void {
   display: flex;
   flex-direction: column;
   gap: var(--cm-space-4);
-}
-
-.crumb {
-  font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
+  padding-top: var(--cm-space-4);
 }
 
 .top {
@@ -154,8 +151,8 @@ function onWant(): void {
 
 .stage {
   aspect-ratio: 4 / 3;
-  border-radius: var(--cm-radius-xl);
-  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-2xl);
+  box-shadow: var(--cm-shadow-1);
 }
 
 .thumbs {
@@ -167,15 +164,14 @@ function onWant(): void {
 .thumb {
   width: 84px;
   height: 63px;
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-md);
+  border: 2px solid transparent;
+  border-radius: var(--cm-radius-lg);
   cursor: pointer;
   padding: 0;
 }
 
 .thumb.on {
   border-color: var(--cm-color-brand);
-  border-width: 2px;
 }
 
 /* ── 价格盒 ─────────────────────────────────────────────── */
@@ -185,8 +181,8 @@ function onWant(): void {
   min-width: 0;
   padding: var(--cm-space-5);
   background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-xl);
+  border-radius: var(--cm-radius-2xl);
+  box-shadow: var(--cm-shadow-1);
 }
 
 .title {
@@ -194,6 +190,13 @@ function onWant(): void {
   font-size: var(--cm-font-size-xl);
   line-height: 1.4;
   font-weight: 600;
+}
+
+/* 标题下的卖点标签行：与卡片标题里的 chips 同一套（cm-tag 全局类） */
+.tags {
+  display: flex;
+  gap: var(--cm-space-2);
+  margin-bottom: var(--cm-space-3);
 }
 
 .price {
@@ -300,8 +303,8 @@ function onWant(): void {
 .desc {
   padding: var(--cm-space-5);
   background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-xl);
+  border-radius: var(--cm-radius-2xl);
+  box-shadow: var(--cm-shadow-1);
 }
 
 .desc h2 {

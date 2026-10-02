@@ -8,11 +8,17 @@
  *
  * <p>hover 行为全靠 CSS：浮起 3px（180ms）+ 第二张图交叉淡入（250ms）+ 「＋对比」浮出。
  * 不要在 JS 里管 hover 状态——那样每一张卡都要挂监听，60 张卡时会有明显开销。
+ *
+ * <p>2026-09-30 按闲鱼卡片改版：
+ * - 卡片**去描边**，白卡直接落在灰底上（描边是旧版"表格感"的来源）；
+ * - 标题行内嵌交易标签 chips（包邮 / 可议价），闲鱼把卖点前置到标题第一眼；
+ * - 价格改成「¥ 小号 + 整数大号 + 小数小号」的三段式，右侧跟"N 人想要"；
+ * - 底部卖家行右侧放信用标签（极好=黄 chip / 已认证=绿 chip）。
  */
 
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
+import { formatRelativeTime, type GoodsItem } from '@campus/shared'
 import { useCompareStore } from '@/stores/compare'
 import { ElMessage } from 'element-plus'
 import ConditionBadge from './ConditionBadge.vue'
@@ -38,8 +44,17 @@ const bg = (tints: [string, string], flip = false): string => {
 }
 
 const selected = computed(() => compare.has(props.item.id))
-const priceText = computed(() => formatPrice(props.item.price))
 const timeText = computed(() => formatRelativeTime(props.item.publishedAt))
+
+/**
+ * 闲鱼式三段价格：¥ 与小数缩小、整数放大。
+ * 不直接用 formatPrice——那个是"一整串"的口径，详情页还在用。
+ */
+const priceInt = computed(() => Math.floor(props.item.price))
+const priceDec = computed(() => {
+  const dec = Math.round((props.item.price - Math.floor(props.item.price)) * 100)
+  return dec > 0 ? String(dec).padStart(2, '0') : ''
+})
 
 function goDetail(): void {
   void router.push({ name: 'item', params: { id: props.item.id } })
@@ -66,9 +81,7 @@ function onCompare(e: MouseEvent): void {
       <div v-if="!previewSrc" class="pic pic--b" :style="{ background: bg(item.tints, true) }" />
 
       <!-- 角标：急出用价格色底，其余半透黑底（design/01 §4.1） -->
-      <span v-if="item.badge" class="card__badge" :class="{ 'card__badge--hot': item.badge === '急出' }">
-        {{ item.badge }}
-      </span>
+      <span v-if="item.badge === '急出'" class="card__badge card__badge--hot">急出</span>
 
       <button
         class="card__cmp"
@@ -82,23 +95,31 @@ function onCompare(e: MouseEvent): void {
     </div>
 
     <div class="card__body">
-      <h3 class="card__title cm-clamp-2">{{ item.title }}</h3>
+      <h3 class="card__title">
+        <span v-if="item.delivery" class="cm-tag cm-tag--red">包邮</span>
+        <span v-if="item.negotiable" class="cm-tag cm-tag--yellow">可议价</span>
+        <span class="card__title-text cm-clamp-2">{{ item.title }}</span>
+      </h3>
 
       <div class="card__price">
-        <strong>{{ priceText }}</strong>
-        <s v-if="item.originalPrice">{{ formatPrice(item.originalPrice) }}</s>
+        <span class="yen">¥</span>
+        <strong>{{ priceInt }}</strong>
+        <span v-if="priceDec" class="dec">.{{ priceDec }}</span>
+        <s v-if="item.originalPrice">{{ item.originalPrice }}元</s>
+        <span class="want">{{ item.wantCount }}人想要</span>
       </div>
 
       <div class="card__meta">
         <ConditionBadge :grade="item.condition" />
-        <span>{{ item.campus }} · {{ item.meetPoint }}</span>
+        <span class="meta-txt">{{ item.campus }} · {{ item.meetPoint }}</span>
+        <span class="meta-time">{{ timeText }}</span>
       </div>
 
       <footer class="card__seller">
         <span class="avatar" :style="{ background: bg(item.seller.tints) }" />
         <span class="nick">{{ item.seller.nick }}</span>
-        <span v-if="item.seller.verified" class="verified">学号已认证</span>
-        <span class="time">{{ timeText }}</span>
+        <span v-if="item.seller.credit === '极好'" class="cm-tag cm-tag--yellow credit">信用极好</span>
+        <span v-else-if="item.seller.verified" class="cm-tag cm-tag--green credit">学号已认证</span>
       </footer>
     </div>
   </article>
@@ -107,18 +128,17 @@ function onCompare(e: MouseEvent): void {
 <style scoped lang="scss">
 .card {
   background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-lg);
+  /* 闲鱼口径：白卡无描边，靠灰底分层 + hover 才浮阴影 */
+  border-radius: var(--cm-radius-xl);
   overflow: hidden;
   cursor: pointer;
   /* design/01 §六：180ms ease-out，位移 3px（禁止超过 4px） */
-  transition: transform 180ms ease-out, box-shadow 180ms ease-out, border-color 180ms ease-out;
+  transition: transform 180ms ease-out, box-shadow 180ms ease-out;
 }
 
 .card:hover {
   transform: translateY(-3px);
   box-shadow: var(--cm-shadow-2);
-  border-color: var(--cm-color-border-strong);
 }
 
 /* ── 图片区 4:3 ─────────────────────────────────────────── */
@@ -173,7 +193,7 @@ function onCompare(e: MouseEvent): void {
   color: var(--cm-color-text-1);
   background: var(--cm-color-surface);
   border: 1px solid var(--cm-color-border-strong);
-  border-radius: var(--cm-radius-sm);
+  border-radius: var(--cm-radius-pill);
   cursor: pointer;
   opacity: 0;
   transition: opacity 180ms ease-out, background-color 180ms ease-out;
@@ -202,20 +222,42 @@ function onCompare(e: MouseEvent): void {
   gap: var(--cm-space-2);
 }
 
+/* 标题行：chips 前置 + 文本两行截断（chips 占位时文本实际是一到两行） */
 .card__title {
   margin: 0;
+  min-height: 40px;
   font-size: var(--cm-font-size-base);
   font-weight: 400;
   line-height: 1.45;
-  /* design/01 §4.1：标题固定高 40px，两行截断 */
-  height: 40px;
   color: var(--cm-color-text-1);
 }
+
+.card__title .cm-tag {
+  margin-right: 4px;
+}
+
+/* chips 是 inline-flex，clamp 只作用于文本段 */
+.card__title-text {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  vertical-align: bottom;
+}
+
+/* ── 三段式价格 ─────────────────────────────────────────── */
 
 .card__price {
   display: flex;
   align-items: baseline;
-  gap: var(--cm-space-2);
+  gap: 2px;
+}
+
+.yen,
+.dec {
+  font-size: var(--cm-font-size-sm);
+  font-weight: 800;
+  color: var(--cm-color-price);
 }
 
 .card__price strong {
@@ -226,9 +268,19 @@ function onCompare(e: MouseEvent): void {
 }
 
 .card__price s {
+  margin-left: var(--cm-space-2);
+  font-size: var(--cm-font-size-xs);
+  font-weight: 400;
+  color: var(--cm-color-text-3);
+}
+
+.want {
+  margin-left: auto;
   font-size: var(--cm-font-size-xs);
   color: var(--cm-color-text-3);
 }
+
+/* ── 元信息 / 卖家行 ────────────────────────────────────── */
 
 .card__meta {
   display: flex;
@@ -238,33 +290,42 @@ function onCompare(e: MouseEvent): void {
   color: var(--cm-color-text-3);
 }
 
+.meta-txt {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.meta-time {
+  margin-left: auto;
+  flex: none;
+}
+
 .card__seller {
   display: flex;
   align-items: center;
   gap: var(--cm-space-2);
-  padding-top: var(--cm-space-2);
-  border-top: 1px solid var(--cm-color-border);
   font-size: var(--cm-font-size-xs);
   color: var(--cm-color-text-3);
 }
 
 .avatar {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   flex: none;
 }
 
 .nick {
   color: var(--cm-color-text-2);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
-.verified {
-  color: var(--cm-color-ok);
-}
-
-.time {
+.credit {
   margin-left: auto;
+  flex: none;
 }
 
 /* ── 列表视图：图在左，文字在右 ─────────────────────────── */
@@ -287,7 +348,7 @@ function onCompare(e: MouseEvent): void {
 }
 
 .card--list .card__title {
-  height: auto;
+  min-height: 0;
   font-size: var(--cm-font-size-md);
 }
 </style>

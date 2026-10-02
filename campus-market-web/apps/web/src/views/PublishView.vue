@@ -137,11 +137,6 @@ function submit(): void {
 
 <template>
   <div class="cm-shell publish">
-    <div class="crumb">
-      <RouterLink :to="{ name: 'home' }">首页</RouterLink>
-      <span> / 发布闲置</span>
-    </div>
-
     <div class="cols">
       <!-- ── 左：图片 + 表单 ────────────────────────────── -->
       <section class="pane">
@@ -251,16 +246,12 @@ function submit(): void {
   display: flex;
   flex-direction: column;
   gap: var(--cm-space-4);
-}
-
-.crumb {
-  font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
+  padding-top: var(--cm-space-4);
 }
 
 .cols {
   display: flex;
-  gap: var(--cm-space-5);
+  gap: var(--cm-space-4);
   align-items: flex-start;
 }
 
@@ -269,15 +260,16 @@ function submit(): void {
   min-width: 0;
   padding: var(--cm-space-5);
   background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-xl);
+  border-radius: var(--cm-radius-2xl);
+  box-shadow: var(--cm-shadow-1);
 }
 
 .pane--preview {
   flex: none;
   width: 300px;
   position: sticky;
-  top: calc(var(--cm-layout-nav-h) + var(--cm-layout-cat-h) + var(--cm-space-4));
+  /* 顶栏分类条取消后，吸附点只留 nav 高度 */
+  top: calc(var(--cm-layout-nav-h) + var(--cm-space-4));
 }
 
 .pane__title {

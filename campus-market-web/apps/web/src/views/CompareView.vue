@@ -52,11 +52,6 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
 
 <template>
   <div class="cm-shell compare">
-    <div class="crumb">
-      <RouterLink :to="{ name: 'home' }">首页</RouterLink>
-      <span> / 商品对比</span>
-    </div>
-
     <el-empty v-if="items.length < 2" description="至少选择 2 件商品才能对比">
       <RouterLink :to="{ name: 'home' }"><el-button type="primary">去挑几件</el-button></RouterLink>
     </el-empty>
@@ -99,19 +94,16 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
   display: flex;
   flex-direction: column;
   gap: var(--cm-space-4);
-}
-
-.crumb {
-  font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-3);
+  padding-top: var(--cm-space-4);
 }
 
 .matrix {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   background: var(--cm-color-surface);
-  border: 1px solid var(--cm-color-border);
-  border-radius: var(--cm-radius-xl);
+  border-radius: var(--cm-radius-2xl);
+  box-shadow: var(--cm-shadow-1);
   overflow: hidden;
   font-size: var(--cm-font-size-sm);
 }
@@ -119,15 +111,14 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
 .matrix th,
 .matrix td {
   border-bottom: 1px solid var(--cm-color-border);
-  border-right: 1px solid var(--cm-color-border);
   padding: var(--cm-space-3);
   text-align: center;
   color: var(--cm-color-text-2);
 }
 
-.matrix th:last-child,
-.matrix td:last-child {
-  border-right: none;
+.matrix tr:last-child th,
+.matrix tr:last-child td {
+  border-bottom: none;
 }
 
 /* 维度列：左对齐、灰底，视觉上从数据区里让出来 */

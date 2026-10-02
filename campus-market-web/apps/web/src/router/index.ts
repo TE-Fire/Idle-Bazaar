@@ -10,8 +10,6 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 declare module 'vue-router' {
   interface RouteMeta {
     title?: string
-    /** 隐藏顶栏的分类条（对比页不需要） */
-    hideCat?: boolean
   }
 }
 
@@ -34,9 +32,11 @@ const routes: RouteRecordRaw[] = [
       // P3 发布：桌面独占重头戏，拖拽多图 + 实时预览 + Ctrl+Enter
       { path: 'publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { title: '发布闲置' } },
       // P4 对比：桌面独占，2–4 件参数横评
-      { path: 'compare', name: 'compare', component: () => import('@/views/CompareView.vue'), meta: { title: '对比', hideCat: true } }
+      { path: 'compare', name: 'compare', component: () => import('@/views/CompareView.vue'), meta: { title: '对比' } }
     ]
   },
+  // 登录：独立全屏页（闲鱼口径），不走 MainLayout，因此没有顶栏与悬浮工具栏
+  { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

@@ -64,8 +64,7 @@ function startCompare(): void {
   bottom: 0;
   height: 56px;
   background: var(--cm-color-surface);
-  border-top: 1px solid var(--cm-color-border);
-  box-shadow: 0 -2px 10px rgba(20, 20, 30, 0.06);
+  box-shadow: 0 -2px 14px rgba(20, 20, 30, 0.1);
   z-index: 20;
 }
 
@@ -89,7 +88,7 @@ function startCompare(): void {
   position: relative;
   width: 66px;
   height: 50px;
-  border-radius: var(--cm-radius-sm);
+  border-radius: var(--cm-radius-lg);
   display: flex;
   align-items: center;
   justify-content: center;

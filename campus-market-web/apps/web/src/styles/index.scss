@@ -33,6 +33,19 @@
 .el-button--primary {
   color: var(--cm-color-text-1);
   font-weight: 700;
+  /* 闲鱼的按钮一律胶囊形，主按钮尤其如此 */
+  border-radius: var(--cm-radius-pill);
+}
+
+/* 胶囊化连带：EP 的默认按钮与输入框圆角统一放大一档，跟上卡片的圆角口径 */
+.el-button {
+  border-radius: var(--cm-radius-pill);
+}
+
+.el-input__wrapper,
+.el-select__wrapper,
+.el-textarea__inner {
+  border-radius: var(--cm-radius-md);
 }
 
 /* 复选框用原生 accent-color（design/01 §4.3），不要 EP 自绘图形 */
@@ -108,4 +121,48 @@ a {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
+}
+
+/**
+ * 白卡基线（闲鱼口径）：**无边框**，靠灰底 (#F4F5F6) 与白卡的明度差分层，
+ * 只给一层极淡的阴影兜底；1px 描边会让整页显得"表格化"——这正是旧版显得简陋的主因。
+ */
+.cm-card {
+  background: var(--cm-color-surface);
+  border-radius: var(--cm-radius-xl);
+  box-shadow: var(--cm-shadow-1);
+}
+
+/** 彩色促销卡 / 标签通用的胶囊小字 */
+.cm-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 5px;
+  font-size: var(--cm-font-size-xs);
+  line-height: 1;
+  border-radius: var(--cm-radius-sm);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cm-tag--red {
+  color: var(--cm-color-price);
+  background: var(--cm-color-tag-red-bg);
+}
+
+.cm-tag--yellow {
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-brand-bg);
+  border: 1px solid var(--cm-color-brand-border);
+}
+
+.cm-tag--blue {
+  color: var(--cm-color-tag-blue);
+  background: var(--cm-color-tag-blue-bg);
+}
+
+.cm-tag--green {
+  color: var(--cm-color-ok);
+  background: var(--cm-color-tag-green-bg);
 }
