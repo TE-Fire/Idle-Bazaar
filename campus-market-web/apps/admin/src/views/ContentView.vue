@@ -76,7 +76,7 @@ const categoryColumns: TableColumnsType = [
   { title: '排序', dataIndex: 'sort', width: 80 },
   { title: '在售商品', dataIndex: 'itemCount', width: 100 },
   { title: '状态', key: 'enabled', width: 100 },
-  { title: '操作', key: 'action', width: 200 }
+  { title: '操作', key: 'action', width: 260 }
 ]
 
 const gradeColumns: TableColumnsType = [
@@ -110,6 +110,26 @@ const campusColumns: TableColumnsType = [
 ]
 
 /* ── 启停 ── */
+
+/**
+ * **启停必须改「数据源里的那一行」，不能改 computed 拼出来的副本。**
+ *
+ * <p>分类那张表的 `data-source` 是 `categoryTree`——它是 computed，里面的节点是
+ * `{ ...c }` 浅拷贝出来的普通对象。直接改副本有两个后果：
+ * ① 不是响应式写入，不触发重渲染；
+ * ② 下一次 computed 重算（任何依赖变化、甚至一次无关的重渲染）会用 `categories` 里的
+ * 旧值把副本重新生成一遍，把它覆盖回去。
+ * 合起来的表现就是：**提示弹了「已停用」，开关下一帧又弹回「启用」**。
+ *
+ * <p>所以分类单独走 `toggleCategory`，按 id 回 `categories` 改源行；
+ * 其余四张表的 `data-source` 就是 ref 数组本身，`record` 是响应式代理，直接改即可。
+ */
+const toggleCategory = (record: DictCategoryItem): void => {
+  const row = categories.value.find((c) => c.id === record.id)
+  if (!row) return
+  row.enabled = !row.enabled
+  message.success(`${row.name} 已${row.enabled ? '启用' : '停用'}`)
+}
 
 const toggle = (row: { name?: string; label?: string; enabled: boolean }, kind: TabKey): void => {
   row.enabled = !row.enabled
@@ -150,13 +170,28 @@ const form = reactive<{
 
 const modalTitle = computed(() => (form.id ? '编辑' : '新增'))
 
-const openCreate = (): void => {
+/**
+ * 「上级分类」候选项：树只有两级，所以只能选一级；同时要排除自己，
+ * 否则把自己选成自己的父级会生成一条自指的孤儿数据。
+ */
+const parentOptions = computed(() =>
+  categories.value.filter((c) => c.parentId === null && c.id !== form.id)
+)
+
+/** 本地自增序号：mock 写接口也要 id 可预期，不用 Math.random（见 mock/now.ts 的确定性约定） */
+let seq = 0
+const nextId = (prefix: string): string => `${prefix}-${++seq}`
+
+const openCreate = (parentId: string | null = null): void => {
   form.id = null
   form.name = ''
+  form.code = 'A'
   form.label = ''
   form.desc = ''
+  form.color = '#34C759'
   form.sort = 99
-  form.parentId = null
+  form.parentId = parentId
+  form.campusId = enabledCampusOptions.value[0]?.id ?? 'cp1'
   form.openHours = '08:00–22:00'
   editing.value = true
 }
@@ -175,13 +210,130 @@ const openEdit = (row: Record<string, unknown>): void => {
   editing.value = true
 }
 
-const submit = (): void => {
-  if (!form.name && active.value !== 'grade') {
-    message.warning('请填写名称')
+/* ── 保存：五张表各写一份，不做强行抽象 ── */
+
+const done = (what: string): void => {
+  editing.value = false
+  message.success(`${what}成功（mock：仅更新本地状态）`)
+}
+
+const submitCategory = (): void => {
+  const name = form.name.trim()
+  if (!name) {
+    message.warning('请填写分类名称')
     return
   }
-  editing.value = false
-  message.success(`${modalTitle.value}成功（mock：仅更新本地状态）`)
+  if (form.id) {
+    const row = categories.value.find((c) => c.id === form.id)
+    if (!row) return
+    // 已经有子分类的一级不能再挂到别人下面，否则会出现三级——树只允许两级
+    if (form.parentId && categories.value.some((c) => c.parentId === row.id)) {
+      message.warning('该分类下已有二级分类，不能改为二级')
+      return
+    }
+    row.name = name
+    row.sort = form.sort
+    row.parentId = form.parentId
+  } else {
+    categories.value.push({
+      id: nextId('ca'),
+      name,
+      parentId: form.parentId,
+      sort: form.sort,
+      enabled: true,
+      itemCount: 0
+    })
+  }
+  done(form.id ? modalTitle.value : form.parentId ? '新增二级分类' : '新增分类')
+}
+
+const submitGrade = (): void => {
+  const label = form.label.trim()
+  if (!label) {
+    message.warning('请填写成色文案')
+    return
+  }
+  const color = form.color.trim() || '#8E8E93'
+  const row = grades.value.find((g) => g.code === form.code)
+  if (row) {
+    row.label = label
+    row.desc = form.desc.trim()
+    row.color = color
+  } else {
+    grades.value.push({ code: form.code, label, desc: form.desc.trim(), color, enabled: true })
+  }
+  done(modalTitle.value)
+}
+
+const submitMeetPoint = (): void => {
+  const name = form.name.trim()
+  if (!name) {
+    message.warning('请填写面交点名称')
+    return
+  }
+  const openHours = form.openHours.trim() || '全天'
+  const row = form.id ? meetPoints.value.find((m) => m.id === form.id) : undefined
+  if (row) {
+    row.name = name
+    row.campusId = form.campusId
+    row.openHours = openHours
+  } else {
+    meetPoints.value.push({
+      id: nextId('mp'),
+      name,
+      campusId: form.campusId,
+      openHours,
+      enabled: true
+    })
+  }
+  done(modalTitle.value)
+}
+
+const submitCollege = (): void => {
+  const name = form.name.trim()
+  if (!name) {
+    message.warning('请填写学院名称')
+    return
+  }
+  const row = form.id ? colleges.value.find((c) => c.id === form.id) : undefined
+  if (row) {
+    row.name = name
+    row.campusId = form.campusId
+  } else {
+    colleges.value.push({ id: nextId('co'), name, campusId: form.campusId, enabled: true })
+  }
+  done(modalTitle.value)
+}
+
+const submitCampus = (): void => {
+  const name = form.name.trim()
+  if (!name) {
+    message.warning('请填写校区名称')
+    return
+  }
+  const row = form.id ? campuses.value.find((c) => c.id === form.id) : undefined
+  if (row) row.name = name
+  else campuses.value.push({ id: nextId('cp'), name, enabled: true })
+  done(modalTitle.value)
+}
+
+const submit = (): void => {
+  switch (active.value) {
+    case 'category':
+      submitCategory()
+      break
+    case 'grade':
+      submitGrade()
+      break
+    case 'meetPoint':
+      submitMeetPoint()
+      break
+    case 'college':
+      submitCollege()
+      break
+    default:
+      submitCampus()
+  }
 }
 
 /** 删除只开放给「没有商品挂在上面」的二级分类，避免制造孤儿数据 */
@@ -212,7 +364,7 @@ const onDeleteCategory = (row: DictCategoryItem): void => {
           五张字典是全端一致性的源头，由后台下发，三端不得本地硬编码。
         </p>
       </div>
-      <a-button v-perm="PERM_CODES.CONTENT_EDIT" type="primary" shape="round" @click="openCreate">
+      <a-button v-perm="PERM_CODES.CONTENT_EDIT" type="primary" shape="round" @click="openCreate(null)">
         新增
       </a-button>
     </header>
@@ -237,13 +389,22 @@ const onDeleteCategory = (row: DictCategoryItem): void => {
               v-perm="PERM_CODES.CONTENT_EDIT"
               :checked="record.enabled"
               size="small"
-              @change="toggle(record, 'category')"
+              @change="toggleCategory(record)"
             />
           </template>
           <template v-else-if="column.key === 'action'">
             <a-space>
               <a-button v-perm="PERM_CODES.CONTENT_EDIT" type="link" size="small" @click="openEdit(record)">
                 编辑
+              </a-button>
+              <a-button
+                v-if="!record.parentId"
+                v-perm="PERM_CODES.CONTENT_EDIT"
+                type="link"
+                size="small"
+                @click="openCreate(record.id)"
+              >
+                新增子分类
               </a-button>
               <a-button
                 v-if="canDeleteCategory(record)"
@@ -377,10 +538,11 @@ const onDeleteCategory = (row: DictCategoryItem): void => {
           <a-form-item label="上级分类">
             <a-select v-model:value="form.parentId" allow-clear placeholder="留空为一级分类">
               <a-select-option :value="null">（一级分类）</a-select-option>
-              <a-select-option v-for="c in categoryTree" :key="c.id" :value="c.id">
+              <a-select-option v-for="c in parentOptions" :key="c.id" :value="c.id">
                 {{ c.name }}
               </a-select-option>
             </a-select>
+            <p class="content__hint">分类只分两级：留空是一级，选中一项即在其下新增二级分类。</p>
           </a-form-item>
           <a-form-item label="分类名称">
             <a-input v-model:value="form.name" placeholder="如：专业课教材" />
@@ -468,6 +630,13 @@ const onDeleteCategory = (row: DictCategoryItem): void => {
 }
 
 .content__muted {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+/* 表单项下的补充说明：用最小字号 + 三级文字色，不抢表单控件的视觉重量 */
+.content__hint {
+  margin: var(--cm-space-1) 0 0;
   font-size: var(--cm-font-size-xs);
   color: var(--cm-color-text-3);
 }

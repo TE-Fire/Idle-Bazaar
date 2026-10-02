@@ -283,7 +283,7 @@ List<String> perms = StpAdminUtil.stpLogic.getPermissionList();
 |---|---|---|
 | 超级管理员 | SUPER (2001) | 全部 16 个 |
 | 审核员 | REVIEWER (2002) | dashboard/report/item.view/review.* —— **无 user.ban、无 settings.edit** |
-| 运营 | OPERATOR (2003) | item.*/user.verify/order.*/content.edit/log.view —— **无 review.judge** |
+| 运营 | OPERATOR (2003) | item.view/item.offline/user.view/user.verify/order.*/log.view —— **无 review.judge、无 content.edit**（字典 2026-09-30 起仅超管） |
 | 只读 | READONLY (2004) | dashboard.view/report.view/item.view/user.view |
 
 覆盖现状与风险：

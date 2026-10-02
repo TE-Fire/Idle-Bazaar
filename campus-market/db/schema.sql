@@ -70,6 +70,7 @@ CREATE TABLE dict_grade (
   id          bigint       NOT NULL COMMENT '雪花ID',
   code        char(1)      NOT NULL COMMENT 'A/B/C/D',
   name        varchar(16)  NOT NULL COMMENT '成色名称，如"几乎全新"',
+  color       char(7)      NOT NULL DEFAULT '#8E8E93' COMMENT '徽章色值，如 #34C759；后台下发，前端不硬编码',
   description varchar(255) DEFAULT NULL COMMENT '成色说明',
   sort        int          NOT NULL DEFAULT 0 COMMENT '排序',
   status      tinyint      NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
@@ -497,11 +498,12 @@ CREATE TABLE sys_sensitive_word (
 -- 十、种子数据（建库后必灌，否则前端字典为空）
 -- ════════════════════════════════════════════════════════════
 
-INSERT INTO dict_grade (id, code, name, description, sort) VALUES
- (1001,'A','几乎全新','无明显使用痕迹，功能完好',1),
- (1002,'B','轻微使用痕迹','有轻微痕迹，不影响使用',2),
- (1003,'C','明显使用痕迹','有明显痕迹或轻微瑕疵，功能正常',3),
- (1004,'D','有瑕疵','存在功能或外观问题，须在描述中说明',4);
+-- 色值取 design/01 §4.1：A/B 绿、C 橙、D 灰
+INSERT INTO dict_grade (id, code, name, color, description, sort) VALUES
+ (1001,'A','几乎全新','#1D9E75','无明显使用痕迹，功能完好',1),
+ (1002,'B','轻微使用痕迹','#34C759','有轻微痕迹，不影响使用',2),
+ (1003,'C','明显使用痕迹','#FF9F0A','有明显痕迹或轻微瑕疵，功能正常',3),
+ (1004,'D','有瑕疵','#8E8E93','存在功能或外观问题，须在描述中说明',4);
 
 INSERT INTO admin_role (id, role_code, role_name, sort) VALUES
  (2001,'SUPER','超级管理员',1),
@@ -521,10 +523,10 @@ INSERT INTO admin_role_perm (id, role_id, perm_code) VALUES
  -- REVIEWER：审核相关，不能碰用户封禁与系统设置（关键互斥）
  (30101,2002,'dashboard.view'),(30102,2002,'report.view'),(30103,2002,'item.view'),
  (30104,2002,'review.judge'),(30105,2002,'review.forceoff'),(30106,2002,'review.appeal'),
- -- OPERATOR：运营，能处置商品/用户认证/订单/内容，不能裁决审核
+ -- OPERATOR：运营，能处置商品/用户认证/订单，不能裁决审核，也不能碰字典（content.edit 已收敛为超管专属）
  (30201,2003,'dashboard.view'),(30202,2003,'report.view'),(30203,2003,'item.view'),
  (30204,2003,'item.offline'),(30205,2003,'user.view'),(30206,2003,'user.verify'),
- (30207,2003,'order.refund'),(30208,2003,'order.arbitrate'),(30209,2003,'content.edit'),
+ (30207,2003,'order.refund'),(30208,2003,'order.arbitrate'),
  (30210,2003,'log.view'),
  -- READONLY：答辩巡盘用
  (30301,2004,'dashboard.view'),(30302,2004,'report.view'),(30303,2004,'item.view'),
