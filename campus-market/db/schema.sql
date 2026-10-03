@@ -41,6 +41,7 @@ CREATE TABLE dict_campus (
 
 CREATE TABLE dict_college (
   id          bigint       NOT NULL COMMENT '雪花ID',
+  campus_id   bigint       NOT NULL DEFAULT 0 COMMENT '所属校区，0=未指定',
   name        varchar(64)  NOT NULL COMMENT '学院名称',
   sort        int          NOT NULL DEFAULT 0 COMMENT '排序',
   status      tinyint      NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
@@ -48,6 +49,7 @@ CREATE TABLE dict_college (
   update_time datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   deleted     bigint       NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
+  KEY idx_campus (campus_id, status),
   KEY idx_status (status, sort)
 ) ENGINE=InnoDB COMMENT='学院字典（报表学院×品类矩阵的行）';
 
@@ -538,19 +540,21 @@ INSERT INTO dict_campus (id, name, sort) VALUES
  (1002,'东校区',2);
 
 -- ── 学院（报表「学院×品类矩阵」的行，12 个）────────────────
-INSERT INTO dict_college (id, name, sort) VALUES
- (1101,'计算机学院',1),
- (1102,'电子信息学院',2),
- (1103,'机械工程学院',3),
- (1104,'土木工程学院',4),
- (1105,'材料与化学学院',5),
- (1106,'生命科学学院',6),
- (1107,'数学与统计学院',7),
- (1108,'经济管理学院',8),
- (1109,'文法学院',9),
- (1110,'外国语学院',10),
- (1111,'艺术设计学院',11),
- (1112,'教育学院',12);
+-- campus_id 指向上面的 dict_campus；学院是「校区 → 学院」两级，报表按校区拆行要用。
+-- 演示数据的完整版（4 个校区 + 12 个学院，与前端 mock 对齐）写在 db/zz-demo-data.sql。
+INSERT INTO dict_college (id, campus_id, name, sort) VALUES
+ (1101,1001,'计算机学院',1),
+ (1102,1001,'电子信息学院',2),
+ (1103,1001,'机械工程学院',3),
+ (1104,1001,'土木工程学院',4),
+ (1105,1002,'材料与化学学院',5),
+ (1106,1002,'生命科学学院',6),
+ (1107,1001,'数学与统计学院',7),
+ (1108,1002,'经济管理学院',8),
+ (1109,1001,'文法学院',9),
+ (1110,1001,'外国语学院',10),
+ (1111,1001,'艺术设计学院',11),
+ (1112,1002,'教育学院',12);
 
 -- ── 商品分类（一级 8 个，对应小程序金刚区；二级用于筛选）────
 INSERT INTO dict_category (id, parent_id, name, sort) VALUES
