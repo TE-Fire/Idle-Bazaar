@@ -7,18 +7,16 @@ import lombok.Data;
 /**
  * 分类新增 / 编辑入参
  *
- * <p><b>没有 `id` 字段</b>：新增走 `POST /admin/dict/category`，编辑走
- * `PUT /admin/dict/category/{id}`——**改哪一条由 URL 路径决定**。body 里再带一个 id
- * 只会制造"同一份数据两个来源"的问题（以谁为准？不一致怎么办？）。
- * 对应的 Service 也拆成了 `createCategory(req)` / `updateCategory(id, req)`，
- * 不再靠 `id == null` 在一个方法里分叉。
+ * <p>没有 `id` 字段：新增走 `POST /admin/dict/category`，编辑走 `PUT /admin/dict/category/{id}`，
+ * 改哪一条由 URL 路径决定。body 里再带一个 id 就是同一份数据两个来源，无法确定以谁为准。
+ * 对应的 Service 也拆成了 `createCategory(req)` / `updateCategory(id, req)`。
  *
- * <p>`parentId` 为空表示一级分类，Service 负责校验「父级存在、启用、且自身是一级」——
- * 声明式校验挡不住这种跨记录的约束，那属于业务规则，走 `BizAssert`。
+ * <p>`parentId` 为空表示一级分类，非空时由 Service 校验父级存在、启用且本身是一级——
+ * 声明式校验管不了这种跨记录的约束。
  *
  * <p>为什么五张表各写各的 Req 而不是一个 `DictSaveReq` 通吃：
  * 字段差异太大（分类有父子、成色有 code+color、面交点有校区+时段），
- * 硬塞进一个类会让每个字段都得靠注释说明"这张表不用它"，可读性反而更差。
+ * 硬塞进一个类会让每个字段都得靠注释说明"这张表不用它"。
  */
 @Data
 public class DictCategorySaveReq {
@@ -30,7 +28,7 @@ public class DictCategorySaveReq {
     @Size(max = 32, message = "分类名称不超过 32 字")
     private String name;
 
-    /** 图标 URL，可为空（前端有兜底图形） */
+    /** 图标 URL，可为空（前端有默认图形） */
     @Size(max = 255, message = "图标地址过长")
     private String icon;
 

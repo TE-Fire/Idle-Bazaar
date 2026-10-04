@@ -13,8 +13,8 @@ import java.time.LocalDateTime;
 /**
  * 成色等级 A–D（全端共用）
  *
- * <p>`code` 是**业务主键**（A/B/C/D），`id` 只是雪花主键：前端按 code 取色与文案，
- * 唯一索引 `uk_code(code, deleted)` 兜底，Service 里要先查再插给出友好提示。
+ * <p>`code` 是业务主键（A/B/C/D），`id` 只是雪花主键：前端按 code 取色与文案，
+ * 重复由唯一索引 `uk_code(code, deleted)` 拦截。
  *
  * <p>`color` 由后台下发（`db/01` §4.9 判据：成色带文案与颜色，前端不写死色值），
  * 2026-09-30 从前端 mock 收进表里，改颜色不用发版。

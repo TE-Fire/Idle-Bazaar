@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p><b>只下发启用项</b>：停用的字典不给 C 端选，这是"停用而非删除"能成立的前提
  * ——字典被商品引用着，真删会留下孤儿数据，停用后只是不再出现在可选列表里。
  *
- * <p>缓存见 `DictService#all`：60s TTL 只是兜底，写操作提交后会主动失效。
+ * <p>缓存见 `DictService#all`：写操作提交后主动失效，TTL 60s 用于 del 失败时限制脏数据存活时间。
  */
 @Tag(name = "学生端 · 字典")
 @RestController

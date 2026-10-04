@@ -46,44 +46,28 @@ import java.util.stream.Collectors;
 /**
  * 字典模块五张表的读写（business/03 F-A7，流程见 notes/07）。
  *
- * <p><b>权限</b>：写接口只在 Controller 上挂 `content.edit`——2026-09-30 起该权限点
- * 已从运营角色移除，只有超管持有。Service 不重复判权限：它也可能被内部任务调用，
- * 权限判断统一收口在入口层，避免「有的地方查了有的地方没查」。
+ * <p><b>权限</b>：由 Controller 的 `@SaCheckPermission(content.edit)` 收口，本类不重复判断。
+ * 本类也可能被内部任务调用，权限判断分散到多处容易漏。
  *
- * <p><b>新增与编辑是两个方法，不靠 `id` 是否为空来分叉</b>：
- * `createXxx(req)` / `updateXxx(id, req)`。id 是 `updateXxx` 的**必填参数**（来自 URL 路径），
- * 方法内部不需要也不能判断它是否为空。此前写成一个 `saveXxx(req)` + `if (id == null)` 是
- * 拿 null 当 flag——那个分支 100% 由 Controller 决定（POST 强制置空、PUT 强灌路径 id），
- * Service 自己没有判断力，读代码的人必须追到 Controller 才知道哪条分支会走。
- * 拆开之后语义进方法签名，`*SaveReq` 里也就不再需要那个谁都不会真正采信的 `id` 字段。
+ * <p><b>新增与编辑是两个方法</b>：`createXxx(req)` / `updateXxx(id, req)`。
+ * id 是 `updateXxx` 的必填参数（来自 URL 路径），方法内不判断它是否为空。
  *
- * <p><b>缓存与事务的关系（本类最容易写错的地方）</b>：
- * 只有 `/api/dict/all` 走缓存（{@link DictRedisKeys} 说明了为什么管理端读接口不缓存）。
- * 失效动作统一走 {@link #evictCache()}：
- * <ul>
- *   <li>在事务外 → 立即删；</li>
- *   <li>在事务内 → 注册成 `afterCommit`，**提交成功才删**。</li>
- * </ul>
- * 后者是关键：如果像「事务内更新缓存」那样写，会有两个洞——
- * ① 事务回滚了但 Redis 已经写进去，脏数据要等 TTL 才自愈；
- * ② 事务提交了但 Redis 写失败，同样是脏数据。
- * 「提交后再删」同时堵住这两个洞：回滚时缓存里的旧值与库一致（本来就不用动），
- * 提交后删失败也只是回到「等 TTL」这一条兜底路径。
+ * <p><b>缓存</b>：只有 {@link #all()}（`/api/dict/all`）读缓存，管理端列表直查库——
+ * 两者返回的内容不同（含不含停用项），不能共用一个 key。
+ * 写操作统一调用 {@link #evictCache()} 失效。
  *
- * <p><b>什么时候进事务</b>：单条 INSERT / UPDATE 本身是原子的，**不加事务**
- * （`AdminAuthService` 那行注释记过同一个教训：把无关操作裹进事务，throw 时会连坐回滚）。
- * 只有「停用父分类连带子分类」「停用校区连带面交点与学院」这种**多条 UPDATE** 才用
- * 编程式 `TransactionTemplate`——范围小、边界清楚，不会把一整个方法拖成长事务。
+ * <p><b>事务</b>：只有「停用一级分类连带子级」「停用校区连带面交点与学院」这类多条 UPDATE
+ * 用 `TransactionTemplate`。单条 INSERT / UPDATE 不加事务，它本身是原子的。
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DictService {
 
-    /** 缓存兜底时长：字典改动极少，正常靠写操作主动失效，这里只兜 del 失败的情况 */
+    /** 缓存有效期。正常由写操作主动失效，这个值只用于 del 失败时限制脏数据存活时间 */
     private static final Duration CACHE_TTL = Duration.ofSeconds(60);
 
-    /** 成色默认色值，与 schema.sql 的 DEFAULT 一致——新增时忘了填也不会渲染出透明徽章 */
+    /** 成色默认色值，与 schema.sql 的 DEFAULT 一致 */
     private static final String DEFAULT_GRADE_COLOR = "#8E8E93";
 
     private static final int DEFAULT_SORT = 99;
@@ -109,12 +93,7 @@ public class DictService {
                 .toList();
     }
 
-    /**
-     * 新增分类，返回新 id。
-     *
-     * <p>一级 / 二级只看 `parentId`：**不传 = 一级**（库里存 0），传了 = 二级。
-     * 传了才会去校验父级（{@link #requireParent}），一级没有任何父级约束要查。
-     */
+    /** 新增分类，返回新 id。`parentId` 不传 = 一级（库里存 0），传了 = 二级并校验父级 */
     public Long createCategory(DictCategorySaveReq req) {
         String name = req.getName().trim();
         long parentIdInDb = parseIdOrZero(req.getParentId());
@@ -134,24 +113,13 @@ public class DictService {
         return row.getId();
     }
 
-    /**
-     * 编辑分类。id 是必填参数（来自 URL 路径），不存在直接 6001。
-     *
-     * <p>比新增多一条约束：这次要挂到别人底下（`parentIdInDb != 0`）时，自己不能已经有子分类，
-     * 否则那些子分类会变成三级。不额外判「自己当前必须是一级」——二级按理不可能有子，
-     * 这段对它是空转；但保留通用写法可以顺带兜住「二级挂着子」的脏数据。
-     */
+    /** 编辑分类。id 来自 URL 路径，不存在时抛 6001 */
     public void updateCategory(Long id, DictCategorySaveReq req) {
         String name = req.getName().trim();
         long parentIdInDb = parseIdOrZero(req.getParentId());
-        if (parentIdInDb != 0L) {
-            requireParent(parentIdInDb, id);
-        }
 
         DictCategory row = requireCategory(id);
-        if (parentIdInDb != 0L) {
-            BizAssert.isTrue(!hasChildren(id), DictErrorCode.DICT_LEVEL_EXCEEDED);
-        }
+
         BizAssert.isTrue(!existsCategoryName(name, parentIdInDb, id), DictErrorCode.DICT_NAME_DUPLICATE);
 
         categoryMapper.updateById(new DictCategory()
@@ -164,11 +132,8 @@ public class DictService {
     }
 
     /**
-     * 启停分类。
-     *
-     * <p>停用一级分类时**连带停用它的子分类**：否则会出现「父停用、子还能在发布页选中」
-     * 这种半成品状态（notes/07 §5 已拍板）。启用则**不**连带——启用是放宽限制，
-     * 不该顺手放宽一大批子分类，由超管逐个确认。
+     * 启停分类。停用一级分类时连带停用它的子分类，避免出现「父停用、子仍可选」的状态。
+     * 启用不连带：启用是放宽限制，不该一次放宽一大批子分类。
      */
     public void updateCategoryStatus(Long id, boolean enabled) {
         DictCategory row = requireCategory(id);
@@ -199,10 +164,10 @@ public class DictService {
     }
 
     /**
-     * 按 `code` 新增或编辑成色（upsert）。
+     * 按 `code` 新增或编辑成色（存在则改，不存在则插）。
      *
-     * <p>这里**故意**不拆成 create / update：四档成色是**固定集合**（A–D），
-     * 空库初次维护时如果只认编辑，超管就得先手工插数据才能改文案，没必要。
+     * <p>不拆成 create / update：四档成色是固定集合（A–D），空库初次维护时若只认编辑，
+     * 就得先手工插数据才能改文案。
      */
     public void saveGrade(DictGradeSaveReq req) {
         String code = req.getCode().trim().toUpperCase(Locale.ROOT);
@@ -257,12 +222,7 @@ public class DictService {
                 .toList();
     }
 
-    /**
-     * 新增面交点，返回新 id。
-     *
-     * <p>`campusId` 必填：面交点必须挂在具体校区下。不传 / 传 "0" 都归一成 0，
-     * 被 {@link #requireEnabledCampus} 判成 6006。
-     */
+    /** 新增面交点，返回新 id。`campusId` 必填，不传或传 0 时抛 6006 */
     public Long createMeetPoint(DictMeetPointSaveReq req) {
         String name = req.getName().trim();
         long campusId = parseIdOrZero(req.getCampusId());
@@ -401,10 +361,8 @@ public class DictService {
     }
 
     /**
-     * 启停校区。
-     *
-     * <p>停用**连带停用**它下面的面交点与学院：校区是引用链顶端（校区 → 面交点 / 学院），
-     * 留着「校区停用但面交点仍可选」会出现能选不能去的死数据。启用不连带，理由同分类。
+     * 启停校区。停用时连带停用该校区下的面交点与学院，避免出现「校区停用、面交点仍可选」。
+     * 启用不连带，理由同分类。
      */
     public void updateCampusStatus(Long id, boolean enabled) {
         requireCampus(id);
@@ -429,10 +387,10 @@ public class DictService {
     /* ══ 六、只读下发（走缓存） ══════════════════════════════ */
 
     /**
-     * 五张字典的**启用项**聚合，给 `/api/dict/all` 用。
+     * 五张字典的启用项聚合，给 `/api/dict/all` 用。
      *
-     * <p>缓存读失败或反序列化不出来时**降级直查库**，不抛异常：字典是发布页的依赖项，
-     * Redis 抖一下就让整个发布页 500 不划算（与 `AdminAuthService#isLocked` 同一个取舍）。
+     * <p>Redis 读写异常时不抛错，改为直接查库返回。字典是发布页的依赖项，
+     * Redis 一次抖动就让发布页 500 不划算。
      */
     public DictAllVO all() {
         Object cached = null;
@@ -494,10 +452,10 @@ public class DictService {
     /* ══ 七、缓存失效与事务 ══════════════════════════════════ */
 
     /**
-     * 失效 `/api/dict/all` 的缓存（**删除**而不是重算写入，理由见 {@link #deleteCacheKey}）。
+     * 失效 `/api/dict/all` 的缓存。事务内注册 afterCommit，提交成功后才删；事务外立即删。
      *
-     * <p>在事务内调用时注册 `afterCommit`，提交成功后才删；事务外则立即删。
-     * 这样「多条 UPDATE」这类场景下，回滚 = 库没变 = 缓存里的旧值依然正确，无需任何补偿。
+     * <p>先提交数据库、再删缓存这个顺序不能反。反过来（事务内写缓存）有两个问题：
+     * 事务回滚后 Redis 里已是新值；事务提交后 Redis 写入失败则两边不一致。
      */
     private void evictCache() {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -513,24 +471,21 @@ public class DictService {
     }
 
     /**
-     * 只删 key，不重算。
+     * 删除缓存 key，不重新计算。
      *
-     * <p>为什么是删而不是「查一遍再 set 回去」：① 重算要把五张表全查一遍再组装序列化，
-     * 而删只需一次 DEL，下一次读自然重建（字典读多写少，重建成本摊得开）；
-     * ② 并发下两次写可能乱序——A 改完、B 改完，若 B 先算出旧值写进缓存、A 后写，
-     * 缓存里就是 A 的旧快照，要脏满 TTL。DEL 是幂等的，不存在这个顺序问题。
+     * <p>重算要重新查五张表并组装序列化，删只需一次 DEL，下次读取时重建。
+     * 另外并发下两次写的先后顺序无法保证，重算有可能把旧快照写回缓存。
      */
     private void deleteCacheKey() {
         try {
             redisTemplate.delete(DictRedisKeys.ALL);
         } catch (Exception e) {
-            log.warn("[dict] 删除缓存失败，最多 {} 秒后由 TTL 兜底", CACHE_TTL.toSeconds(), e);
+            log.warn("[dict] 删除缓存失败，{} 秒后随 TTL 过期", CACHE_TTL.toSeconds(), e);
         }
     }
 
-    /** 多条 UPDATE 才用：编程式事务，边界就是这个 lambda，不会把整个方法拖成长事务 */
+    /** 多条 UPDATE 用编程式事务，事务边界就是这个 lambda */
     private void inTransaction(Runnable work) {
-        // 字典写操作极低频（仅超管），每次 new 一个模板对象无所谓，不值得为它单配一个 Bean
         new TransactionTemplate(txManager).executeWithoutResult(status -> {
             work.run();
             evictCache();
@@ -564,10 +519,10 @@ public class DictService {
     }
 
     /**
-     * 校验「要挂到的那个父分类」合不合格，只在 `parentId` 非 0（即二级分类）时调用。
+     * 校验父级分类，只在 `parentId` 非 0（二级分类）时调用。查的是父级那条记录。
      *
-     * @param selfId 编辑时传被编辑分类自己的 id，用来挡住**自环**——
-     *               库里真写下 `parent_id = 自身 id`，前端按 parentId 组装树会无限递归
+     * @param selfId 被编辑的分类 id，用于拒绝自环——`parent_id = 自身 id`
+     *               会让前端按 parentId 组装树时死循环
      */
     private void requireParent(long parentIdInDb, Long selfId) {
         if (selfId != null) {
@@ -575,7 +530,6 @@ public class DictService {
                     CommonErrorCode.PARAM_ERROR, "上级分类不能是自己");
         }
         DictCategory parent = requireCategory(parentIdInDb);
-        // 父级必须是「一级」：父级本身是二级，再挂一层就是三级
         BizAssert.isTrue(isRoot(parent), DictErrorCode.DICT_PARENT_INVALID);
         BizAssert.isTrue(isEnabled(parent), DictErrorCode.DICT_PARENT_DISABLED);
     }
@@ -614,12 +568,7 @@ public class DictService {
         return Integer.valueOf(1).equals(row.getStatus());
     }
 
-    private boolean hasChildren(Long id) {
-        return categoryMapper.selectCount(new LambdaQueryWrapper<DictCategory>()
-                .eq(DictCategory::getParentId, id)
-                .eq(DictCategory::getDeleted, 0)) > 0;
-    }
-
+    /** 同一父级下是否已存在同名分类。excludeId 传被编辑的分类自己，否则改名会撞上自己 */
     private boolean existsCategoryName(String name, long parentId, Long excludeId) {
         LambdaQueryWrapper<DictCategory> q = new LambdaQueryWrapper<DictCategory>()
                 .eq(DictCategory::getName, name)
@@ -662,12 +611,7 @@ public class DictService {
         return campusMapper.selectCount(q) > 0;
     }
 
-    /**
-     * 一次把校区 id → 名称捞成 Map。
-     *
-     * <p>面交点 / 学院列表都要显示校区名，逐行回查校区表就是典型的 N+1（CR 清单第 7 条）；
-     * 字典总量只有几十条，一次查完放内存里最划算。
-     */
+    /** 校区 id → 名称。面交点与学院列表都要显示校区名，一次查完避免逐行回查 */
     private Map<Long, String> campusNameMap() {
         return campusMapper.selectList(new LambdaQueryWrapper<DictCampus>()
                         .eq(DictCampus::getDeleted, 0))
@@ -675,12 +619,7 @@ public class DictService {
                 .collect(Collectors.toMap(DictCampus::getId, DictCampus::getName, (a, b) -> a));
     }
 
-    /**
-     * 把「一级 / 未指定」的入参归一成 **0**（库里的口径）。
-     *
-     * <p>请求里不传、传空串、传 "0" 是同一个意思。归一之后方法里就只有一种编码，
-     * 不会再出现「到底是 null 还是 0」这种要回头确认一遍的判断。
-     */
+    /** 把「一级 / 未指定」的入参转成库里的 0。不传、传空串、传 "0" 都算 0 */
     private long parseIdOrZero(String id) {
         Long v = parseId(id);
         return v == null ? 0L : v;
@@ -707,7 +646,7 @@ public class DictService {
         vo.setParentId(isRoot(r) ? null : r.getParentId());
         vo.setSort(r.getSort());
         vo.setEnabled(isEnabled(r));
-        // 商品模块落地前恒为 0：接口层不要把它当成真实库存（notes/07 问题 2 未拍板）
+        // 商品模块落地前恒为 0，接口消费方不要当成真实库存
         vo.setItemCount(0);
         return vo;
     }

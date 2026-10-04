@@ -34,20 +34,17 @@ import java.util.List;
 /**
  * 字典维护（管理端 A7 内容管理，流程见 notes/07）。
  *
- * <p><b>权限</b>：全部挂 `content.edit`。2026-09-30 起该权限点已从运营角色移除，
- * **只有超管持有**——字典一改三端同步变，写权限必须收口（business/03 F-A7 权限段已决）。
- * 这里不需要新造权限码，改的是角色授权而不是权限点本身。
+ * <p>权限：全部挂 `content.edit`。该权限点 2026-09-30 起已从运营角色移除，只有超管持有——
+ * 字典一改三端同步变，写权限必须收口。不需要新造权限码，改的是角色授权。
  *
- * <p><b>读接口也挂权限</b>：管理端字典列表本来就只给维护者看，没有"只读角色也要看字典列表"的场景。
- * 学生端那一路走 `/api/dict/all`（免登录，见 `com.campus.user.controller.DictController`）。
+ * <p>读接口也挂权限：管理端字典列表只给维护者看，没有只读角色也要看字典列表的场景。
+ * 学生端那一路走 `/api/dict/all`（免登录）。
  *
- * <p><b>新增与编辑是两个接口，body 里没有 id</b>：改哪一条由 URL 路径的 `{id}` 决定，
- * Service 也就拆成了 `createXxx(req)` / `updateXxx(id, req)`。此前是 `req.setId(...)` 强灌之后
- * 再在 Service 里 `if (id == null)` 分叉——那个分支 100% 由本类决定，Service 自己没有判断力，
- * 而 `*SaveReq` 里那个谁都不会真正采信的 `id` 字段还会出现在 Knife4j 上误导人。
- * 唯一例外是成色：`code` 是**业务主键**（A–D，真数据），不是路由用的代理键，所以留在 body 里。
+ * <p>新增与编辑是两个接口，body 里没有 id：改哪一条由 URL 路径的 `{id}` 决定，
+ * Service 对应拆成 `createXxx(req)` / `updateXxx(id, req)`。
+ * 成色是例外——`code` 是业务主键（A–D，真数据），不是路由用的代理键，所以留在 body 里。
  *
- * <p>写接口的 `@OpLog` 待该注解落地后统一补，这里先不预留空注解（CR 清单第 15 条：不留裸 TODO）。
+ * <p>写接口的 `@OpLog` 待该注解落地后统一补（CR 清单第 15 条：不留裸 TODO）。
  */
 @Tag(name = "管理端 · 字典维护")
 @RestController
@@ -73,7 +70,7 @@ public class DictAdminController {
         return Result.ok(dictService.createCategory(req));
     }
 
-    @Operation(summary = "编辑分类", description = "改名 / 改图标 / 改排序 / 改上级；已有子分类的不能再挂到别人下面")
+    @Operation(summary = "编辑分类", description = "改名 / 改图标 / 改排序 / 改上级；同名会报 6002")
     @PutMapping("/category/{id}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
     public Result<Void> updateCategory(@PathVariable("id") Long id,
@@ -100,7 +97,7 @@ public class DictAdminController {
         return Result.ok(dictService.grades());
     }
 
-    @Operation(summary = "新增 / 编辑成色", description = "按 code（A–D）定位，不存在则新增；color 为空时兜底 #8E8E93")
+    @Operation(summary = "新增 / 编辑成色", description = "按 code（A–D）定位，不存在则新增；color 为空时取 #8E8E93")
     @PutMapping("/grade/{code}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
     public Result<Void> saveGrade(@PathVariable("code") String code,
