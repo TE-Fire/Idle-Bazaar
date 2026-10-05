@@ -19,6 +19,19 @@ export interface Result<T> {
   traceId?: string
 }
 
+/**
+ * 分页响应体（对应后端 `com.campus.common.result.PageResult`）。
+ *
+ * <p>放在这里而不是各个业务接口文件：分页形状是全端一致的约定，
+ * 商品 / 订单 / 用户 / 日志列表共用，`total` 是**总条数**不是总页数。
+ */
+export interface PageResult<T> {
+  list: T[]
+  total: number
+  pageNum: number
+  pageSize: number
+}
+
 /** 业务错误码（与后端 CommonErrorCode 通用段一致） */
 export const BIZ_CODE = {
   OK: 0,

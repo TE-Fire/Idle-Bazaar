@@ -71,6 +71,20 @@ export interface DictCampusVO {
   enabled: boolean
 }
 
+/**
+ * 五张字典的启用项聚合（对应后端 `DictAllVO`）。
+ *
+ * <p>只有 `/admin/dict/options` 返回这个形状；维护用的五个列表接口各返回自己的 VO 数组
+ * （含停用项），两者内容不同，不要互相替代。
+ */
+export interface DictAllVO {
+  categories: DictCategoryVO[]
+  grades: DictGradeVO[]
+  meetPoints: DictMeetPointVO[]
+  colleges: DictCollegeVO[]
+  campuses: DictCampusVO[]
+}
+
 /* ── 入参 ── */
 
 export interface DictCategorySaveReq {
@@ -214,5 +228,16 @@ export const dictApi = {
       url: `/admin/dict/campus/${id}/status`,
       method: 'POST',
       data: { enabled } satisfies DictStatusReq
-    })
+    }),
+
+  /* ── 只读下发（筛选下拉用） ── */
+
+  /**
+   * 五张字典的启用项，登录即可读（**不挂 `content.edit`**）。
+   *
+   * <p>商品 / 用户 / 报表页的筛选下拉走这一条：那几页是四个角色共用的，
+   * 用上面的维护列表会让运营与审核员的下拉直接 403。
+   * 后端走 60 秒缓存，重复调用不会每次都查库。
+   */
+  options: () => request<DictAllVO>({ url: '/admin/dict/options' })
 }
