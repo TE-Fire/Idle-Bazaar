@@ -17,7 +17,7 @@ public enum DictErrorCode implements IErrorCode {
 
     DICT_NOT_FOUND(6001, "字典项不存在"),
     DICT_NAME_DUPLICATE(6002, "同层级下已存在同名记录"),
-    DICT_PARENT_INVALID(6003, "上级分类不存在，或它本身不是一级分类"),
+    DICT_PARENT_INVALID(6003, "上级分类本身不是一级分类"),
     DICT_PARENT_DISABLED(6004, "上级分类已停用，不能挂到它下面"),
     DICT_CAMPUS_INVALID(6005, "所属校区不存在或已停用"),
     ;

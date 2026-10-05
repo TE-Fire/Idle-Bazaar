@@ -7,7 +7,6 @@ import com.campus.core.dto.req.DictCampusSaveReq;
 import com.campus.core.dto.req.DictCategorySaveReq;
 import com.campus.core.dto.req.DictCollegeSaveReq;
 import com.campus.core.dto.req.DictGradeSaveReq;
-import com.campus.core.dto.req.DictGradeStatusReq;
 import com.campus.core.dto.req.DictMeetPointSaveReq;
 import com.campus.core.dto.req.DictStatusReq;
 import com.campus.core.dto.resp.DictCampusVO;
@@ -111,8 +110,7 @@ public class DictAdminController {
     @PostMapping("/grade/{code}/status")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
     public Result<Void> updateGradeStatus(@PathVariable("code") String code,
-                                          @Valid @RequestBody DictGradeStatusReq req) {
-        req.setCode(code);
+                                          @Valid @RequestBody DictStatusReq req) {
         dictService.updateGradeStatus(code, req.getEnabled());
         return Result.ok();
     }
