@@ -17,6 +17,11 @@ public enum ItemErrorCode implements IErrorCode {
     ITEM_SOLD_OUT(1103, "手慢了，商品已被他人买走"),
     ITEM_PENDING_REVIEW(1104, "商品正在审核中"),
     ITEM_CATEGORY_MISMATCH(1105, "仅支持对比同一分类下的商品"),
+
+    /* ── 1106 起是管理端专用（business/03 A-B4） ── */
+
+    ITEM_CANNOT_OFFLINE(1106, "当前状态不能下架（仅待审核 / 在售可下架）"),
+    ITEM_CANNOT_DELETE(1107, "在售或已售出的商品不能删除，请先下架"),
     ;
 
     @Override

@@ -1,5 +1,6 @@
 package com.campus.admin.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.campus.common.constant.PermCodes;
 import com.campus.common.result.Result;
@@ -9,6 +10,7 @@ import com.campus.core.dto.req.DictCollegeSaveReq;
 import com.campus.core.dto.req.DictGradeSaveReq;
 import com.campus.core.dto.req.DictMeetPointSaveReq;
 import com.campus.core.dto.req.DictStatusReq;
+import com.campus.core.dto.resp.DictAllVO;
 import com.campus.core.dto.resp.DictCampusVO;
 import com.campus.core.dto.resp.DictCategoryVO;
 import com.campus.core.dto.resp.DictCollegeVO;
@@ -36,8 +38,13 @@ import java.util.List;
  * <p>权限：全部挂 `content.edit`。该权限点 2026-09-30 起已从运营角色移除，只有超管持有——
  * 字典一改三端同步变，写权限必须收口。不需要新造权限码，改的是角色授权。
  *
- * <p>读接口也挂权限：管理端字典列表只给维护者看，没有只读角色也要看字典列表的场景。
- * 学生端那一路走 `/api/dict/all`（免登录）。
+ * <p><b>读接口分两档</b>：
+ * <ul>
+ *   <li>{@code /admin/dict/options}——只挂登录校验。商品 / 用户 / 报表页的筛选下拉都要用字典，
+ *       而那几页是四个角色共用的；挂在 `content.edit` 上会让运营与审核员的下拉直接 403。</li>
+ *   <li>其余列表接口——挂 `content.edit`，只给维护者看完整字典（含停用项）。</li>
+ * </ul>
+ * 学生端那一路走 `/api/dict/all`（免登录，只下发启用项）。
  *
  * <p>新增与编辑是两个接口，body 里没有 id：改哪一条由 URL 路径的 `{id}` 决定，
  * Service 对应拆成 `createXxx(req)` / `updateXxx(id, req)`。
@@ -52,6 +59,21 @@ import java.util.List;
 public class DictAdminController {
 
     private final DictService dictService;
+
+    /* ── 只读下发（筛选下拉用，登录即可） ── */
+
+    /**
+     * 五张字典的启用项，给商品 / 用户 / 报表页的筛选下拉用。
+     *
+     * <p>与下面的维护列表分开：`options` 只下发启用项且走 60 秒缓存（见 `DictService#all`），
+     * 维护列表要看到停用项与排序值，内容本来就不一样，不该共用。
+     */
+    @Operation(summary = "字典只读下发", description = "登录即可读；只含启用项，供筛选下拉使用")
+    @GetMapping("/options")
+    @SaCheckLogin(type = StpAdminUtil.TYPE)
+    public Result<DictAllVO> options() {
+        return Result.ok(dictService.all());
+    }
 
     /* ── 分类 ── */
 
