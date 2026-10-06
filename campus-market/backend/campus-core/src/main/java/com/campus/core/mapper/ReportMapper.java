@@ -15,7 +15,7 @@ import java.util.List;
  *
  * <p>上一版只有聚合计数方法、刻意不 extends BaseMapper（当时 A-B3 未开工，
  * 建实体等于替下个模块做设计决定）。A-B3 开工后实体已落地，这里补上
- * {@link BaseMapper}：举报处置要按主键做条件更新（notes/09 W3 的并发兜底）。
+ * {@link BaseMapper}：举报处置要按主键做条件更新（notes/09 附录 A.2 的并发控制）。
  *
  * <p>计数是**实时**的，与 `item_audit.report_count`（进队快照）不是一个口径——
  * 后者给权重公式用、不随时间变化；这个给运营看「又被举报了」。

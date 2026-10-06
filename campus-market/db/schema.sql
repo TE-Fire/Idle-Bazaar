@@ -180,6 +180,8 @@ CREATE TABLE item (
   KEY idx_filter (status, grade, campus_id, published_at) COMMENT '成色+校区筛选',
   KEY idx_seller (seller_id, status) COMMENT '我发布的',
   KEY idx_published (status, published_at) COMMENT '最新发布/热度排序',
+  KEY idx_admin_list (deleted, create_time, id) COMMENT '管理端列表：默认按创建时间倒序分页',
+  KEY idx_admin_status (deleted, status, create_time, id) COMMENT '管理端列表：按状态筛选分页与统计',
   FULLTEXT KEY ft_search (title, description) WITH PARSER ngram COMMENT '关键词搜索（ngram=2）'
 ) ENGINE=InnoDB COMMENT='商品（核心表，无"已预定"状态，付款才占位）';
 

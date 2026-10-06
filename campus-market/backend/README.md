@@ -109,7 +109,14 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 
 - [x] ~~图形验证码下发接口~~ **已完成**（2026-09-29）：`GET /admin/auth/captcha` 返回 key + PNG base64，
       登录 / 注册 / 找回密码三处共用；同批新增注册、找回密码、超管分配角色接口。详见 `tech/01` 5.7
-- [ ] `@OpLog` 注解与 AOP（操作日志落 `sys_operation_log`，见 `tech/01` 5.4）
-- [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3）
+- [x] ~~`@OpLog` 注解与 AOP（操作日志落 `sys_operation_log`，见 `tech/01` 5.4）~~ **已完成**（2026-10-06）：
+      管理端 22 个写接口全部挂上，异步落库走自定义线程池 `opLogExecutor`（有界队列 + 拒绝打 ERROR）。
+      实现与实测见 `notes/11`
+- [x] ~~A9 操作日志查询接口~~ **已完成**（2026-10-06）：`GET /admin/log/list`（`log.view`），
+      分页 + 模块 / 关键词 / 结果 / 日期区间筛选；`OperationLogController` + `OperationLogService` +
+      `OperationLogReq` / `OperationLogVO`。**只读**（审计表不提供删改），且**不挂 `@OpLog`**——
+      查日志不该自己产生日志。前端 `OperationLogView.vue` 同批从 mock 换成真接口，
+      `module` / `opType` 的中文标签由前端维护（后端只出英文码）。
+- [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3；注意 `OP_LOG` 已明确不启用）
 - [ ] MinIO 真正接入（实现类已就绪，改 `minio.enabled=true`）
 - [ ] 业务模块：item / order / review / user / message / dict / stats

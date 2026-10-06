@@ -16,6 +16,7 @@ import com.campus.core.dto.resp.DictCategoryVO;
 import com.campus.core.dto.resp.DictCollegeVO;
 import com.campus.core.dto.resp.DictGradeVO;
 import com.campus.core.dto.resp.DictMeetPointVO;
+import com.campus.core.oplog.OpLog;
 import com.campus.core.satoken.StpAdminUtil;
 import com.campus.core.service.DictService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -50,7 +51,14 @@ import java.util.List;
  * Service 对应拆成 `createXxx(req)` / `updateXxx(id, req)`。
  * 成色是例外——`code` 是业务主键（A–D，真数据），不是路由用的代理键，所以留在 body 里。
  *
- * <p>写接口的 `@OpLog` 待该注解落地后统一补（CR 清单第 15 条：不留裸 TODO）。
+ * <p><b>写接口的 `@OpLog` 已补齐</b>：14 个写接口，`module = content`，
+ * `type` 按「表 + 动作」命名（`CATEGORY_CREATE` / `CAMPUS_STATUS` …）。
+ * 全部 `saveDiff = true`：字典的变更内容就是入参本身（名称、排序、启用位），
+ * 脱敏快照足够复盘「谁把哪个分类停了」。
+ *
+ * <p><b>成色两个接口没有 bizId</b>：`biz_id` 是 bigint，而成色的主键是业务码 A–D，
+ * 硬塞不进去（SpEL 求值会失败，只留一条 warn）。成色的定位信息在 `after_value` 里，
+ * 前端日志页展示时也从内容里取，不影响排查。
  */
 @Tag(name = "管理端 · 字典维护")
 @RestController
@@ -87,6 +95,7 @@ public class DictAdminController {
     @Operation(summary = "新增分类", description = "parentId 为空=一级；非空时父级必须存在、启用且本身是一级")
     @PostMapping("/category")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "CATEGORY_CREATE", desc = "新增分类", saveDiff = true)
     public Result<Long> createCategory(@Valid @RequestBody DictCategorySaveReq req) {
         return Result.ok(dictService.createCategory(req));
     }
@@ -94,6 +103,7 @@ public class DictAdminController {
     @Operation(summary = "编辑分类", description = "改名 / 改图标 / 改排序 / 改上级；同名会报 6002")
     @PutMapping("/category/{id}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "CATEGORY_UPDATE", bizId = "#id", desc = "编辑分类", saveDiff = true)
     public Result<Void> updateCategory(@PathVariable("id") Long id,
                                        @Valid @RequestBody DictCategorySaveReq req) {
         dictService.updateCategory(id, req);
@@ -103,6 +113,7 @@ public class DictAdminController {
     @Operation(summary = "启停分类", description = "停用一级分类会连带停用其下二级；启用不连带")
     @PostMapping("/category/{id}/status")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "CATEGORY_STATUS", bizId = "#id", desc = "启停分类", saveDiff = true)
     public Result<Void> updateCategoryStatus(@PathVariable("id") Long id,
                                              @Valid @RequestBody DictStatusReq req) {
         dictService.updateCategoryStatus(id, req.getEnabled());
@@ -121,6 +132,7 @@ public class DictAdminController {
     @Operation(summary = "新增 / 编辑成色", description = "按 code（A–D）定位，不存在则新增；color 为空时取 #8E8E93")
     @PutMapping("/grade/{code}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "GRADE_SAVE", desc = "保存成色", saveDiff = true)
     public Result<Void> saveGrade(@PathVariable("code") String code,
                                   @Valid @RequestBody DictGradeSaveReq req) {
         req.setCode(code);
@@ -131,6 +143,7 @@ public class DictAdminController {
     @Operation(summary = "启停成色", description = "按 code 定位；停用后该成色不出现在发布页")
     @PostMapping("/grade/{code}/status")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "GRADE_STATUS", desc = "启停成色", saveDiff = true)
     public Result<Void> updateGradeStatus(@PathVariable("code") String code,
                                           @Valid @RequestBody DictStatusReq req) {
         dictService.updateGradeStatus(code, req.getEnabled());
@@ -149,6 +162,7 @@ public class DictAdminController {
     @Operation(summary = "新增面交点", description = "campusId 必须存在且启用")
     @PostMapping("/meet-point")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "MEET_POINT_CREATE", desc = "新增面交点", saveDiff = true)
     public Result<Long> createMeetPoint(@Valid @RequestBody DictMeetPointSaveReq req) {
         return Result.ok(dictService.createMeetPoint(req));
     }
@@ -156,6 +170,7 @@ public class DictAdminController {
     @Operation(summary = "编辑面交点")
     @PutMapping("/meet-point/{id}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "MEET_POINT_UPDATE", bizId = "#id", desc = "编辑面交点", saveDiff = true)
     public Result<Void> updateMeetPoint(@PathVariable("id") Long id,
                                         @Valid @RequestBody DictMeetPointSaveReq req) {
         dictService.updateMeetPoint(id, req);
@@ -165,6 +180,7 @@ public class DictAdminController {
     @Operation(summary = "启停面交点")
     @PostMapping("/meet-point/{id}/status")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "MEET_POINT_STATUS", bizId = "#id", desc = "启停面交点", saveDiff = true)
     public Result<Void> updateMeetPointStatus(@PathVariable("id") Long id,
                                               @Valid @RequestBody DictStatusReq req) {
         dictService.updateMeetPointStatus(id, req.getEnabled());
@@ -183,6 +199,7 @@ public class DictAdminController {
     @Operation(summary = "新增学院", description = "campusId 为空表示未指定校区（落库 0）")
     @PostMapping("/college")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "COLLEGE_CREATE", desc = "新增学院", saveDiff = true)
     public Result<Long> createCollege(@Valid @RequestBody DictCollegeSaveReq req) {
         return Result.ok(dictService.createCollege(req));
     }
@@ -190,6 +207,7 @@ public class DictAdminController {
     @Operation(summary = "编辑学院")
     @PutMapping("/college/{id}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "COLLEGE_UPDATE", bizId = "#id", desc = "编辑学院", saveDiff = true)
     public Result<Void> updateCollege(@PathVariable("id") Long id,
                                       @Valid @RequestBody DictCollegeSaveReq req) {
         dictService.updateCollege(id, req);
@@ -199,6 +217,7 @@ public class DictAdminController {
     @Operation(summary = "启停学院")
     @PostMapping("/college/{id}/status")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "COLLEGE_STATUS", bizId = "#id", desc = "启停学院", saveDiff = true)
     public Result<Void> updateCollegeStatus(@PathVariable("id") Long id,
                                             @Valid @RequestBody DictStatusReq req) {
         dictService.updateCollegeStatus(id, req.getEnabled());
@@ -217,6 +236,7 @@ public class DictAdminController {
     @Operation(summary = "新增校区")
     @PostMapping("/campus")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "CAMPUS_CREATE", desc = "新增校区", saveDiff = true)
     public Result<Long> createCampus(@Valid @RequestBody DictCampusSaveReq req) {
         return Result.ok(dictService.createCampus(req));
     }
@@ -224,6 +244,7 @@ public class DictAdminController {
     @Operation(summary = "编辑校区")
     @PutMapping("/campus/{id}")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "CAMPUS_UPDATE", bizId = "#id", desc = "编辑校区", saveDiff = true)
     public Result<Void> updateCampus(@PathVariable("id") Long id,
                                      @Valid @RequestBody DictCampusSaveReq req) {
         dictService.updateCampus(id, req);
@@ -233,6 +254,7 @@ public class DictAdminController {
     @Operation(summary = "启停校区", description = "停用会连带停用该校区下的面交点与学院；启用不连带")
     @PostMapping("/campus/{id}/status")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.CONTENT_EDIT)
+    @OpLog(module = "content", type = "CAMPUS_STATUS", bizId = "#id", desc = "启停校区", saveDiff = true)
     public Result<Void> updateCampusStatus(@PathVariable("id") Long id,
                                            @Valid @RequestBody DictStatusReq req) {
         dictService.updateCampusStatus(id, req.getEnabled());

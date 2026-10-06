@@ -8,6 +8,7 @@ import com.campus.core.entity.AdminRole;
 import com.campus.core.entity.AdminUser;
 import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
+import com.campus.core.oplog.OpLog;
 import com.campus.core.satoken.StpAdminUtil;
 import com.campus.core.service.AdminAccountService;
 import com.campus.core.dto.resp.AdminUserVO;
@@ -28,6 +29,10 @@ import java.util.List;
  *
  * <p>注册只负责「建档」，**角色在这里分配**——这条分界是权限模型的安全前提：
  * 注册接口不接受 roleId，也就没人能自己给自己审核权（business/03 已决 2026-09-29）。
+ *
+ * <p>唯一的写接口 {@code assignRole} 挂 `@OpLog`（`module = system`）。
+ * 这是最该留痕的一类操作：改角色等于改权限，`roleId` 进 `after_value`，
+ * 事后能回答「这条审核权是什么时候、由谁给的」。
  */
 @Tag(name = "管理端 · 管理员账号")
 @RestController
@@ -59,6 +64,8 @@ public class AdminUserController {
     @Operation(summary = "分配角色并启用", description = "把 status 置为启用；不允许分配 SUPER")
     @PostMapping("/{adminId}/role")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.SETTINGS_EDIT)
+    @OpLog(module = "system", type = "ASSIGN_ROLE", bizId = "#adminId",
+            desc = "分配角色", saveDiff = true)
     public Result<Void> assignRole(@PathVariable("adminId") Long adminId,
                                    @RequestParam("roleId") Long roleId) {
         adminAccountService.assignRole(adminId, roleId);

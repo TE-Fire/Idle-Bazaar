@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * A7 内容管理 · 五张字典（business/03 A-B6 / F-A7，接口清单见 notes/07 §4）
+ * A7 内容管理 · 五张字典（business/03 A-B6 / F-A7，接口清单见 notes/07 附录 A.1）
  *
  * <p>数据全部来自 `/admin/dict/**`，**读接口也挂 `content.edit`**：
  * 本页对运营 / 审核员 / 只读角色是整页不可达（菜单不显示，直连接口返回 1002）。

@@ -8,6 +8,7 @@ import com.campus.core.dto.req.ItemOfflineReq;
 import com.campus.core.dto.req.ReportHandleReq;
 import com.campus.core.dto.req.ReviewRejectReq;
 import com.campus.core.dto.resp.ReviewQueueVO;
+import com.campus.core.oplog.OpLog;
 import com.campus.core.satoken.StpAdminUtil;
 import com.campus.core.service.ReviewAdminService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -37,7 +38,10 @@ import org.springframework.web.bind.annotation.RestController;
  * <p><b>强制下架与商品页共用同一个 Service 方法</b>：两处处置结果必须一致，
  * 这里只多一道「单据仍是待审核」的前置校验（重复处置 → 3001）。
  *
- * <p>写接口的 `@OpLog` 待该注解落地后统一补（CR 清单第 11b：不留裸 TODO）。
+ * <p>写接口的 `@OpLog` 已补齐，五个写接口各一条：`APPROVE` / `REJECT` /
+ * `FORCE_OFF` / `REPORT_HANDLE` / `APPEAL_JUDGE`，`module = review`。
+ * 注意它能记到的只是「过了鉴权之后的成败」——权限拒绝由 `SaInterceptor` 在
+ * 进入方法前拦下（1002），早于切面，所以「谁试图越权」要看访问日志，不在本表。
  */
 @Tag(name = "管理端 · 审核队列")
 @RestController
@@ -61,6 +65,7 @@ public class ReviewAdminController {
             description = "商品「待审核 → 在售」并写 published_at；审核单据转「已通过」，记处置人与首审时间。")
     @PostMapping("/item/{auditId}/pass")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.REVIEW_JUDGE)
+    @OpLog(module = "review", type = "APPROVE", bizId = "#auditId", desc = "审核通过")
     public Result<Void> pass(@PathVariable("auditId") Long auditId) {
         reviewService.pass(auditId);
         return Result.ok();
@@ -70,6 +75,7 @@ public class ReviewAdminController {
             description = "商品「待审核 → 审核未过」并记原因（卖家据此修改后重提）；审核单据转「已驳回」。")
     @PostMapping("/item/{auditId}/reject")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.REVIEW_JUDGE)
+    @OpLog(module = "review", type = "REJECT", bizId = "#auditId", desc = "审核驳回", saveDiff = true)
     public Result<Void> reject(@PathVariable("auditId") Long auditId,
                                @Valid @RequestBody ReviewRejectReq req) {
         reviewService.reject(auditId, req);
@@ -81,6 +87,7 @@ public class ReviewAdminController {
                     + "终态，要恢复只能走申诉。")
     @PostMapping("/item/{auditId}/force-offline")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.REVIEW_FORCE_OFF)
+    @OpLog(module = "review", type = "FORCE_OFF", bizId = "#auditId", desc = "强制下架（审核入口）", saveDiff = true)
     public Result<Void> forceOffline(@PathVariable("auditId") Long auditId,
                                      @Valid @RequestBody ItemOfflineReq req) {
         reviewService.forceOffline(auditId, req);
@@ -92,6 +99,7 @@ public class ReviewAdminController {
                     + "成立时 reason（处置依据）必填。不做独立的「受理」步骤，裁决一步到位。")
     @PostMapping("/report/{reportId}/handle")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.REVIEW_JUDGE)
+    @OpLog(module = "review", type = "REPORT_HANDLE", bizId = "#reportId", desc = "举报裁决", saveDiff = true)
     public Result<Void> handleReport(@PathVariable("reportId") Long reportId,
                                      @Valid @RequestBody ReportHandleReq req) {
         reviewService.handleReport(reportId, req);
@@ -103,6 +111,7 @@ public class ReviewAdminController {
                     + "复审人不得是原处置人（F-A4），命中返回 3002。")
     @PostMapping("/appeal/{appealId}/judge")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.REVIEW_APPEAL)
+    @OpLog(module = "review", type = "APPEAL_JUDGE", bizId = "#appealId", desc = "申诉复审", saveDiff = true)
     public Result<Void> judgeAppeal(@PathVariable("appealId") Long appealId,
                                     @Valid @RequestBody AppealJudgeReq req) {
         reviewService.judgeAppeal(appealId, req);

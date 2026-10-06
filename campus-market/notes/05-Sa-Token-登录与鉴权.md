@@ -255,7 +255,7 @@ List<String> perms = StpAdminUtil.stpLogic.getPermissionList();
 ### 7.4 `getPermissionList` 的性能取舍
 
 当前每次鉴权查 2 次库（`admin_user` + `admin_role_perm`）。注释里已说明可接受：管理员数量是个位数，
-且 `admin_role_perm` 全表只有 36 行（16+6+10+4）。
+且 `admin_role_perm` 全表只有 39 行（17+7+10+5）。
 
 好处是**角色变更立即生效、零失效代码**：`assignRole()` 里连 `kickout` 都没调，改完下一次请求读到就是新权限。
 
@@ -277,14 +277,14 @@ List<String> perms = StpAdminUtil.stpLogic.getPermissionList();
 
 ## 九、本项目的权限模型与覆盖现状
 
-四个角色 × 16 个权限点（`db/schema.sql` 种子数据，`business/03` F-A1 矩阵）：
+四个角色 × 17 个权限点（`db/schema.sql` 种子数据，`business/03` F-A1 矩阵）：
 
 | 角色 | role_code | 权限点 |
 |---|---|---|
-| 超级管理员 | SUPER (2001) | 全部 16 个 |
-| 审核员 | REVIEWER (2002) | dashboard/report/item.view/review.* —— **无 user.ban、无 settings.edit** |
-| 运营 | OPERATOR (2003) | item.view/item.offline/user.view/user.verify/order.*/log.view —— **无 review.judge、无 content.edit**（字典 2026-09-30 起仅超管） |
-| 只读 | READONLY (2004) | dashboard.view/report.view/item.view/user.view |
+| 超级管理员 | SUPER (2001) | 全部 17 个 |
+| 审核员 | REVIEWER (2002) | dashboard/report/item.view/review.*（view、judge、forceoff、appeal 四个全有）—— **无 user.ban、无 settings.edit** |
+| 运营 | OPERATOR (2003) | dashboard/report/item.view/item.offline/user.view/user.verify/order.*/review.view/log.view —— **无 review.judge、无 content.edit**（字典 2026-09-30 起仅超管） |
+| 只读 | READONLY (2004) | dashboard.view/report.view/item.view/user.view/review.view |
 
 覆盖现状与风险：
 

@@ -115,7 +115,7 @@ public class ReviewAdminService {
      * @param kind 可选过滤：`item` / `report` / `appeal`；空或非法值之外的其它值按「全部」处理
      *
      * <p>关联数据用「批量回填」而不是逐行查：队列最多几百条，
-     * 每条再查 5 次库就是几千次往返。见 notes/08 §六定的模式。
+     * 每条再查 5 次库就是几千次往返。见 notes/08 附录 A.2 定的模式。
      */
     public ReviewQueueVO queue(String kind) {
         QueueKindEnum filter = parseKind(kind);

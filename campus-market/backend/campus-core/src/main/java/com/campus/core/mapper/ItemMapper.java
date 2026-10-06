@@ -35,10 +35,14 @@ public interface ItemMapper extends BaseMapper<Item> {
      * 各分类的已成交均价（只统计 `trade_order.status = 4` 已完成）。
      *
      * <p>全量 GROUP BY 而不按当前页的 categoryId 过滤：分类只有几十个，
-     * 已成交订单量级也很小，一次算完比每页算一次更简单，结果形状还稳定。
+     * 结果形状稳定，算一次就能给整页复用。
+     *
+     * <p>**调用方必须走缓存**（`ItemAdminService#categoryAvgPrices()`）：这条是全表聚合，
+     * 成本随订单历史增长、不随分页下降，实测 5 万订单要 380–1000ms。加索引也救不了——
+     * 瓶颈在按 `item_id` 回表取 `category_id`，加候选索引反而让优化器换错 JOIN 驱动方向。
      *
      * <p>没成交的分类**不出现在结果里**，调用方按「查不到就是 0」处理——
-     * 前端 `isPriceAbnormal` 里 `avg <= 0` 会直接返回 false，不会误标红。
+     * 前端 `isPriceAbnormal` 里 `avg &lt;= 0` 会直接返回 false，不会误标红。
      */
     @Select("SELECT i.category_id AS category_id, AVG(o.amount) AS avg_price " +
             "FROM trade_order o " +

@@ -369,18 +369,64 @@ export const ARBITRATE_ACTIONS = [
 
 /* ───────────────────────── 六、系统设置（A-B9） ───────────────────────── */
 
-export interface OperationLogItem {
-  id: string
-  operator: string
-  /** 模块名：商品 / 用户 / 审核 / 订单 / 内容 / 系统 */
-  module: string
-  action: string
-  target: string
-  /** 处置依据（驳回原因等），可为空 */
-  basis?: string
-  ip: string
-  at: string
+/**
+ * 操作日志「英文码 → 中文标签」映射（**前端维护**，2026-10-06 决策）
+ *
+ * <p>为什么放在前端而不在后端 VO 里翻译：`opType` 是随业务持续增加的**长尾**——
+ * 每加一个写接口就可能多一个 `type`（当前 22 个），后端每加一个都得跟着改翻译层。
+ * 放这里加一行即可。两张表都用 `Record<string, string>` 且**兜底显示原码**，
+ * 漏配的后果是「看到一个英文码」而不是空白——不追求完整性，只求不丢信息。
+ *
+ * <p>码值以后端 `@OpLog(type = "...")` 为准：**改注解时要同步改这里**。
+ * 中文用业务动作自己的说法（「强制下架」），不按英文码直译（不写「关闭货架」）。
+ *
+ * <p>与 `description` 的分工：`description` 是注解上的接口级说明，更具体
+ * （审核入口的强制下架是「强制下架（审核入口）」）；这里给的是**同类动作的统一短标签**，
+ * 用于列表快速扫读。两者不完全一致不算 bug。
+ */
+export const LOG_MODULE_LABELS: Record<string, string> = {
+  item: '商品',
+  review: '审核',
+  content: '内容',
+  system: '系统',
+  /** 预留：订单模块的介入裁决还没落地（business/03 F-A11 ⑤） */
+  order: '订单'
 }
+
+export const OP_TYPE_LABELS: Record<string, string> = {
+  /* item */
+  OFF_SHELF: '强制下架',
+  DELETE: '删除商品',
+
+  /* review */
+  APPROVE: '审核通过',
+  REJECT: '审核驳回',
+  FORCE_OFF: '审核下架',
+  REPORT_HANDLE: '举报处置',
+  APPEAL_JUDGE: '申诉裁决',
+
+  /* content（四个字典共用一个 module，靠 type 区分是改哪张表） */
+  CATEGORY_CREATE: '新增分类',
+  CATEGORY_UPDATE: '编辑分类',
+  CATEGORY_STATUS: '启停分类',
+  GRADE_SAVE: '保存成色',
+  GRADE_STATUS: '启停成色',
+  MEET_POINT_CREATE: '新增面交点',
+  MEET_POINT_UPDATE: '编辑面交点',
+  MEET_POINT_STATUS: '启停面交点',
+  COLLEGE_CREATE: '新增学院',
+  COLLEGE_UPDATE: '编辑学院',
+  COLLEGE_STATUS: '启停学院',
+  CAMPUS_CREATE: '新增校区',
+  CAMPUS_UPDATE: '编辑校区',
+  CAMPUS_STATUS: '启停校区',
+
+  /* system */
+  ASSIGN_ROLE: '分配角色'
+}
+
+/** 模块筛选下拉的取值；从标签表派生，避免两处各写一遍 */
+export const LOG_MODULES = Object.keys(LOG_MODULE_LABELS)
 
 /** 敏感词（sys_sensitive_word）：命中即进高风险队列 */
 export interface SensitiveWord {
