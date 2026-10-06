@@ -343,7 +343,58 @@ INSERT INTO report (id,reporter_id,target_type,target_id,reason,evidence,status,
 (8005,3009,1,4050,'价格异常',NULL,2,NULL,NULL,NULL,NULL,'2026-09-25 19:08:00','2026-09-18 17:31:00',0),
 (8006,3005,1,4022,'联系方式外露',NULL,3,1,NULL,2101,'2026-09-25 19:00:00','2026-09-25 12:15:00','2026-09-19 18:06:00',0);
 -- 申诉（3 行）
+--
+-- ⚠ biz_id 的口径（notes/09 问题 5 选 A，别再写成「一律指 item.id」）：
+--     biz_type=1 商品审核 → item.id    2 举报 → report.id    3 订单纠纷 → trade_order.id
+--   9003 原写 biz_id=4008（item id）与 biz_type=2 自相矛盾，已改为 8006（那条已裁决成立的举报）。
+--
+-- ⚠ 申诉的前提是「存在一次可申诉的处置」，所以 biz_id 必须指向**真的被处置过**的商品：
+--   9001 → 4030（item_audit 7030 status=4 强制下架，商品现为 7）→ 撤销应恢复成 3
+--   9002 → 4040（item_audit 7040 status=3 驳回，商品现为 6）    → 撤销应恢复成 2
+--   applicant_id 也跟着换成被处置商品的卖家（3006 / 3004），否则「卖家申诉自己的商品」不成立。
+--   两条的原处置人都是 2101（super），F-A4「原处置人不得复审自己的单」因此是可演示的：
+--   super 复审会被拒（3002），要用 reviewer(2102)。
 INSERT INTO appeal (id,applicant_id,biz_type,biz_id,reason,evidence,status,handler_id,handle_note,handle_time,create_time,update_time,deleted) VALUES
-(9001,3008,1,4041,'已补充实物照片，申请复审',NULL,1,NULL,NULL,NULL,'2026-09-27 22:51:00','2026-09-20 19:06:00',0),
-(9002,3012,1,4049,'已补充实物照片，申请复审',NULL,1,NULL,NULL,NULL,'2026-09-23 13:47:00','2026-09-26 22:10:00',0),
-(9003,3008,2,4008,'已补充实物照片，申请复审',NULL,2,2102,'原判定证据充分，维持','2026-09-28 16:34:00','2026-09-20 08:22:00','2026-09-23 10:01:00',0);
+(9001,3006,1,4030,'描述已删除敏感词，申请恢复上架',NULL,1,NULL,NULL,NULL,'2026-09-27 22:51:00','2026-09-20 19:06:00',0),
+(9002,3004,1,4040,'已删除联系方式，申请重新审核',NULL,1,NULL,NULL,NULL,'2026-09-23 13:47:00','2026-09-26 22:10:00',0),
+(9003,3010,2,8006,'商品为正品转让，申请撤销举报处置',NULL,2,2102,'原判定证据充分，维持','2026-09-28 16:34:00','2026-09-20 08:22:00','2026-09-23 10:01:00',0);
+
+-- ════════════════════════════════════════════════════════════
+-- 队列口径修正（唯一一处不「确定性」的地方，有意而为）
+--
+-- 上面所有时间都锚定在 2026-09-29，但队列的等待补偿是 floor(等待小时 / 12)，
+-- 距导入日越远这个数越大：到 10 月再演示，待处理单据的等待补偿是 14–66 分，
+-- 会完全压过「举报次数 / 图片风险 / 信用扣减」，队列退化成「按等待时长排序」，
+-- F-A2 的判据（按权重排序，不按时间）当场看不出效果。
+--
+-- 所以只把**仍在队列里**的单据时间改成相对导入时刻的 0–2.5 天前：
+--   item_audit.status=1 / report.status IN (1,2) / appeal.status=1
+-- 已处置的历史单据保持 9 月不动——SLA 首审时长与报表要的正是那段历史。
+-- ════════════════════════════════════════════════════════════
+
+-- 商品审核进队时间：6h / 31h / 14h / 46h / 20h 前 → 等待补偿 0 / 2 / 1 / 3 / 1
+UPDATE item_audit SET enter_queue_at = DATE_SUB(NOW(), INTERVAL 6 HOUR)  WHERE id = 7001;
+UPDATE item_audit SET enter_queue_at = DATE_SUB(NOW(), INTERVAL 31 HOUR) WHERE id = 7005;
+UPDATE item_audit SET enter_queue_at = DATE_SUB(NOW(), INTERVAL 14 HOUR) WHERE id = 7010;
+UPDATE item_audit SET enter_queue_at = DATE_SUB(NOW(), INTERVAL 46 HOUR) WHERE id = 7048;
+UPDATE item_audit SET enter_queue_at = DATE_SUB(NOW(), INTERVAL 20 HOUR) WHERE id = 7058;
+
+-- 基础权重分按 F-A2 重算（不含等待补偿）：
+--   report_count × 3 + ROUND(image_risk / 10) + credit_deduct + price_abnormal × 5
+-- INSERT 里原有的 7–78 是「0–100 风险分」的口径，与公式不符，一律以这里为准。
+-- 顺带把 7058 的举报快照改成 1：item 4058 确有 1 条举报（8003），进队快照应是 1 不是 0。
+UPDATE item_audit SET report_count = 1 WHERE id = 7058;
+UPDATE item_audit
+SET priority_score = report_count * 3 + ROUND(image_risk / 10) + credit_deduct + price_abnormal * 5
+WHERE deleted = 0;
+
+-- 举报工单创建时间：8h / 26h / 40h / 16h / 52h 前（8006 已处置，不动）
+UPDATE report SET create_time = DATE_SUB(NOW(), INTERVAL 8 HOUR)  WHERE id = 8001;
+UPDATE report SET create_time = DATE_SUB(NOW(), INTERVAL 26 HOUR) WHERE id = 8002;
+UPDATE report SET create_time = DATE_SUB(NOW(), INTERVAL 40 HOUR) WHERE id = 8003;
+UPDATE report SET create_time = DATE_SUB(NOW(), INTERVAL 16 HOUR) WHERE id = 8004;
+UPDATE report SET create_time = DATE_SUB(NOW(), INTERVAL 52 HOUR) WHERE id = 8005;
+
+-- 申诉提交时间：4h / 28h 前（9003 已裁决，不动）
+UPDATE appeal SET create_time = DATE_SUB(NOW(), INTERVAL 4 HOUR)  WHERE id = 9001;
+UPDATE appeal SET create_time = DATE_SUB(NOW(), INTERVAL 28 HOUR) WHERE id = 9002;

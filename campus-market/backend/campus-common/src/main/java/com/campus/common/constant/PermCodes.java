@@ -1,7 +1,7 @@
 package com.campus.common.constant;
 
 /**
- * 管理端权限点常量（16 个）。
+ * 管理端权限点常量（17 个）。
  *
  * <p>关键约定：这里的字符串必须与前端 data-perm、数据库 admin_role_perm.perm_code
  * 三方完全一致，任何一处拼错都会造成「前端隐藏了但后端没拦」的安全裂缝。
@@ -29,6 +29,8 @@ public final class PermCodes {
     public static final String USER_BAN = "user.ban";
 
     /* ── 审核 ── */
+    /** 进审核队列页、看队列与详情的只读权限点；四个角色都有（与 item.view 同一模式） */
+    public static final String REVIEW_VIEW = "review.view";
     public static final String REVIEW_JUDGE = "review.judge";
     public static final String REVIEW_FORCE_OFF = "review.forceoff";
     public static final String REVIEW_APPEAL = "review.appeal";
@@ -47,7 +49,7 @@ public final class PermCodes {
             DASHBOARD_VIEW, REPORT_VIEW,
             ITEM_VIEW, ITEM_OFFLINE, ITEM_DELETE,
             USER_VIEW, USER_VERIFY, USER_BAN,
-            REVIEW_JUDGE, REVIEW_FORCE_OFF, REVIEW_APPEAL,
+            REVIEW_VIEW, REVIEW_JUDGE, REVIEW_FORCE_OFF, REVIEW_APPEAL,
             ORDER_REFUND, ORDER_ARBITRATE,
             CONTENT_EDIT, SETTINGS_EDIT, LOG_VIEW
     };

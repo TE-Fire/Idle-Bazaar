@@ -1,5 +1,7 @@
 package com.campus.core.mapper;
 
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.campus.core.entity.Report;
 import lombok.Data;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -9,17 +11,17 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * 举报（`report`）的聚合查询。
+ * 举报（`report`）的数据访问。
  *
- * <p>只声明商品列表需要的计数方法，**不 extends BaseMapper**：
- * 举报实体与举报处置流程属 A-B3（举报与申诉），本期不做，
- * 现在建实体等于替下个模块做设计决定。A-B3 开工时在这里补实体与 BaseMapper。
+ * <p>上一版只有聚合计数方法、刻意不 extends BaseMapper（当时 A-B3 未开工，
+ * 建实体等于替下个模块做设计决定）。A-B3 开工后实体已落地，这里补上
+ * {@link BaseMapper}：举报处置要按主键做条件更新（notes/09 W3 的并发兜底）。
  *
  * <p>计数是**实时**的，与 `item_audit.report_count`（进队快照）不是一个口径——
  * 后者给权重公式用、不随时间变化；这个给运营看「又被举报了」。
  */
 @Mapper
-public interface ReportMapper {
+public interface ReportMapper extends BaseMapper<Report> {
 
     /** 按商品统计举报数的行类型（Mapper 内部用，不是对外的 API 契约） */
     @Data
