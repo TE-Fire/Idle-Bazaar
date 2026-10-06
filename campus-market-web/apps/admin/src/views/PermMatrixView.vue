@@ -90,7 +90,7 @@ onMounted(load)
         {{ user.realName || user.adminId }}
       </span>
       <span class="matrix__role" :data-role="roleMeta.label">{{ roleMeta.label }}</span>
-      <span class="matrix__count">持有 <b>{{ ownedCount }}</b> / 16 个权限点</span>
+      <span class="matrix__count">持有 <b>{{ ownedCount }}</b> / 17 个权限点</span>
       <a-button type="link" size="small" @click="refreshPerms">刷新权限点</a-button>
     </div>
 

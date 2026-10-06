@@ -78,16 +78,21 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '用户管理', perm: PERM_CODES.USER_VIEW }
       },
       {
-        // A5 审核队列（F-A2 / F-A3 / F-A4）：管理端每日最大工作量，权重排序 + 连续审核
+        /*
+         * A5 审核队列（F-A2 / F-A3 / F-A4）：管理端每日最大工作量，权重排序 + 连续审核。
+         * 菜单门禁用 review.view（17 个点里补的只读点，四种角色都有）——
+         * 此前借 review.judge 做门禁，只读角色看不到这一页，与 F-A1「只读角色能看全部数据」冲突。
+         * 页面内的「通过 / 驳回 / 下架 / 申诉裁决」按钮仍各挂各的写权限（v-perm）。
+         */
         path: 'review',
         name: 'review',
         component: () => import('@/views/ReviewView.vue'),
-        meta: { title: '审核队列', perm: PERM_CODES.REVIEW_JUDGE }
+        meta: { title: '审核队列', perm: PERM_CODES.REVIEW_VIEW }
       },
       {
         /*
          * A6 订单管理（A-B7 / F-A6）：纠纷裁决看商品快照。
-         * 16 个权限点里没有 order.view，菜单级只能借 order.refund 做门禁——
+         * 17 个权限点里没有 order.view，菜单级只能借 order.refund 做门禁——
          * 代价是只读角色看不到订单页。要打通需后端补一个 order.view，记进待办。
          */
         path: 'orders',

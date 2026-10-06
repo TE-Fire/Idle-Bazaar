@@ -1,5 +1,5 @@
 /**
- * 管理端权限点常量（16 个）
+ * 管理端权限点常量（17 个）
  *
  * <p>三方同名约定：本文件的字符串 == 后端 `PermCodes.java` 常量 == 数据库
  * `admin_role_perm.perm_code` == 原型 `data-perm`。任何一处拼错都会造成
@@ -25,6 +25,8 @@ export const PERM_CODES = {
   USER_BAN: 'user.ban',
 
   /* ── 审核 ── */
+  /** 进审核队列页、看队列与详情的只读点；四个角色都有（与 item.view 同一模式） */
+  REVIEW_VIEW: 'review.view',
   REVIEW_JUDGE: 'review.judge',
   REVIEW_FORCE_OFF: 'review.forceoff',
   REVIEW_APPEAL: 'review.appeal',
@@ -55,6 +57,7 @@ export const PERM_LABELS: Record<PermCode, string> = {
   [PERM_CODES.USER_VIEW]: '查看用户',
   [PERM_CODES.USER_VERIFY]: '学号认证审核',
   [PERM_CODES.USER_BAN]: '封禁用户',
+  [PERM_CODES.REVIEW_VIEW]: '查看审核队列',
   [PERM_CODES.REVIEW_JUDGE]: '审核判定',
   [PERM_CODES.REVIEW_FORCE_OFF]: '强制下架',
   [PERM_CODES.REVIEW_APPEAL]: '申诉复核',
@@ -78,7 +81,12 @@ export const PERM_GROUPS: ReadonlyArray<{ group: string; codes: PermCode[] }> = 
   },
   {
     group: '审核',
-    codes: [PERM_CODES.REVIEW_JUDGE, PERM_CODES.REVIEW_FORCE_OFF, PERM_CODES.REVIEW_APPEAL]
+    codes: [
+      PERM_CODES.REVIEW_VIEW,
+      PERM_CODES.REVIEW_JUDGE,
+      PERM_CODES.REVIEW_FORCE_OFF,
+      PERM_CODES.REVIEW_APPEAL
+    ]
   },
   { group: '订单', codes: [PERM_CODES.ORDER_REFUND, PERM_CODES.ORDER_ARBITRATE] },
   {

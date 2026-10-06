@@ -1,19 +1,23 @@
 /**
  * A5 审核队列的 mock 数据（business/03 F-A2 / F-A3 / F-A4）
  *
- * <p>三种来源（商品审核 / 举报处理 / 申诉复审）统一压成 `QueueTask` 一种形状，
- * 才能共用同一套「权重排序 + Drawer 连续审核」。这是 A5 能做成单页的前提。
+ * <p>**只有看板在用**：`DashboardView` 的「待处置队列」角标要按来源计数、按等待时长算积压，
+ * 而看板整页还是 mock（A8 未落地），所以这里继续供一份夹具。
+ * 审核队列页（`ReviewView.vue`）已经接 `/admin/review/queue`，不再读这个文件。
  *
- * <p>权重不是写死的，**由 `calcWeight` 从原始字段算出**（见 @campus/shared）：
- * 举报×3 + 风险分归一化 + 信用扣减 + 价格异常 + 等待补偿。
- * 好处是页面上能逐项解释「它为什么排第一」，论文里也能直接引用公式。
+ * <p>夹具的类型就是接口的形状（`ReviewTaskVO`），**不再另定一套 mock 类型**——
+ * 两套形状意味着看板与队列页对「一条待审核任务」的理解可能不同，
+ * 等看板接接口时才会发现字段对不上（notes/09 §8 的「别留两套」）。
  *
- * <p>队列**必须按权重排序，不能按时间**——按时间等于让风险最高的单子排在后面（F-A2 判据）。
+ * <p>排序**不在这里**：队列顺序由后端给（类型优先 + 组内权重降序 + 实时等待补偿），
+ * 前端再实现一遍排序就等于把最容易漂移的口径写了两处。
  */
 
-import { calcWeight, type QueueKind, type QueueTask } from '@campus/shared'
+import { calcWeight } from '@campus/shared'
+import type { QueueKind, ReviewTaskVO } from '@campus/api'
 import { ITEMS } from './items'
-import { hoursBetween, minutesBetween } from './now'
+import { categoryName } from './dict'
+import { hoursBetween } from './now'
 
 /** 举报原因（预设，与驳回原因同源，便于统计归类） */
 export const REPORT_REASONS = [
@@ -39,8 +43,9 @@ interface Seed {
   itemId: string
   submitAt: string
   reason?: string
-  /** 申诉：原处置人与原处置结果（换人复审要用） */
+  /** 申诉：原处置人、原处置结果（换人复审要用） */
   handledBy?: string
+  handledByName?: string
   handledResult?: string
 }
 
@@ -61,17 +66,34 @@ const SEEDS: Seed[] = [
   { id: 'q11', kind: 'report', itemId: 'i2003', submitAt: '2026-09-30T09:00:00+08:00', reason: '价格异常（疑似诈骗）' },
 
   // 申诉复审：优先级高于普通审核（F-A4）
-  { id: 'q12', kind: 'appeal', itemId: 'i2017', submitAt: '2026-09-28T10:00:00+08:00', reason: '已删除联系方式与二维码，请求复审', handledBy: '审核员·李', handledResult: '强制下架 + 扣分 15' },
-  { id: 'q13', kind: 'appeal', itemId: 'i2018', submitAt: '2026-09-29T12:00:00+08:00', reason: '商品为本人正品，可提供购买凭证', handledBy: '审核员·李', handledResult: '驳回（图片不实）' }
+  {
+    id: 'q12',
+    kind: 'appeal',
+    itemId: 'i2017',
+    submitAt: '2026-09-28T10:00:00+08:00',
+    reason: '已删除联系方式与二维码，请求复审',
+    handledBy: '2102',
+    handledByName: '审核员·李',
+    handledResult: '已强制下架'
+  },
+  {
+    id: 'q13',
+    kind: 'appeal',
+    itemId: 'i2018',
+    submitAt: '2026-09-29T12:00:00+08:00',
+    reason: '商品为本人正品，可提供购买凭证',
+    handledBy: '2102',
+    handledByName: '审核员·李',
+    handledResult: '已驳回'
+  }
 ]
 
-export const QUEUE_TASKS: QueueTask[] = SEEDS.map((s) => {
+export const QUEUE_TASKS: ReviewTaskVO[] = SEEDS.map((s) => {
   const item = ITEMS.find((i) => i.id === s.itemId)
   if (!item) throw new Error(`mock 数据不一致：队列 ${s.id} 引用了不存在的商品 ${s.itemId}`)
 
-  const waitHours = Math.max(0, hoursBetween(s.submitAt))
-  // 权重与它的四个组成部分一起返回，这里拆开存：QueueTask.parts 只放组成（用于解释排序原因），
-  // 总分单独放 weight（用于排序）。不要把 calcWeight 的返回值直接断言成 WeightParts，会丢掉 weight。
+  const waitHours = Math.max(0, Math.round(hoursBetween(s.submitAt)))
+  // mock 的权重仍走 shared 的公式（后端那边是同一套口径的实现，两边都以 F-A2 为准）
   const { weight, ...parts } = calcWeight({
     reportCount: item.reportCount,
     riskScore: item.riskScore,
@@ -86,32 +108,27 @@ export const QUEUE_TASKS: QueueTask[] = SEEDS.map((s) => {
     kind: s.kind,
     itemId: item.id,
     itemTitle: item.title,
-    itemTints: item.tints,
-    itemPrice: item.price,
-    categoryAvgPrice: item.categoryAvgPrice,
+    categoryName: categoryName(item.categoryId),
+    description: item.description,
+    // mock 商品没有图片（骨架期用渐变占位），接接口后由后端下发 mainImage
+    mainImage: undefined,
+    images: [],
+    itemPrice: item.price.toFixed(2),
+    categoryAvgPrice: item.categoryAvgPrice.toFixed(2),
     sellerId: item.sellerId,
     sellerNick: item.sellerNick,
     sellerCredit: item.sellerCredit,
     reportCount: item.reportCount,
     riskScore: item.riskScore,
+    itemStatus: item.status,
     submitAt: s.submitAt,
+    waitHours,
     reason: s.reason,
+    evidence: undefined,
     handledBy: s.handledBy,
+    handledByName: s.handledByName,
     handledResult: s.handledResult,
     parts,
     weight
   }
 })
-
-/** 等待分钟数：SLA 与「等待时长」列都用它 */
-export const waitMinutesOf = (task: QueueTask): number => minutesBetween(task.submitAt)
-
-/** 申诉任务排在前面：F-A4 规定「申诉队列优先级高于普通审核」 */
-const KIND_ORDER: Record<QueueKind, number> = { appeal: 0, report: 1, item: 2 }
-
-export const sortedQueue = (tasks: QueueTask[] = QUEUE_TASKS): QueueTask[] =>
-  [...tasks].sort((a, b) => {
-    const byKind = KIND_ORDER[a.kind] - KIND_ORDER[b.kind]
-    if (byKind !== 0) return byKind
-    return b.weight - a.weight
-  })

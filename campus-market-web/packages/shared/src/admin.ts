@@ -1,13 +1,15 @@
 /**
  * 管理端业务枚举 / 模型（business/03 + design/03）
  *
- * <p>与 `item.ts` 同为**前端先行**版本：后端业务代码未落地（计划由作者自行实现），
- * 这里先把字典、状态、权重口径定死，后端枚举出来后以本文件为准对齐一次，
- * 不要两边各写一套。
+ * <p>**前端先行**的部分：用户、订单两域的后端还没落地（计划由作者自行实现），
+ * 这里先把状态与口径定死，后端枚举出来后以本文件为准对齐一次，不要两边各写一套。
+ * 字典 / 商品 / 审核三域已接真接口，它们的**数据结构**属于接口契约、定义在 `@campus/api`，
+ * 本文件只保留全端共用的枚举、文案与公式。
  *
- * <p>两条硬约定（沿用 item.ts）：
+ * <p>两条硬约定：
  *   ① `id` 一律 string（后端雪花 ID 转字符串，number 会精度丢失）；
- *   ② 金额单位**元**（number），后端若按分存必须在 api 层换算。
+ *   ② 已接接口的模块金额是**定长字符串**（`MoneyString`，看 `@campus/api` 的 `item.ts`）；
+ *      仍是 mock 的模块（用户 / 订单）暂时用 number，接接口时一并改。
  */
 
 /* ───────────────────────── 一、五张字典（A-B6 / F-A7） ───────────────────────── */
@@ -201,7 +203,13 @@ export type OfflineReason = (typeof OFFLINE_REASONS)[number]
 
 /* ───────────────────────── 四、审核 / 举报 / 申诉（A-B2 / A-B3 / F-A2~F-A4） ───────────────────────── */
 
-/** 队列里的一条任务，三种来源统一成一个形状才能共用「权重排序 + 连续审核」 */
+/**
+ * 队列里的一条任务，三种来源统一成一个形状才能共用「权重排序 + 连续审核」。
+ *
+ * <p>**任务的字段形状不在这里**：它是接口契约，随后端 `ReviewTaskVO` 走，
+ * 定义在 `@campus/api` 的 `review.ts`（`ReviewTaskVO`），字段名与后端的差异要一次对齐完。
+ * 本文件只留与**展示**有关的东西：来源枚举与中文名、权重公式、SLA 档位。
+ */
 export const QUEUE_KINDS = ['item', 'report', 'appeal'] as const
 export type QueueKind = (typeof QUEUE_KINDS)[number]
 
@@ -211,7 +219,7 @@ export const QUEUE_KIND_LABELS: Record<QueueKind, string> = {
   appeal: '申诉复审'
 }
 
-/** 权重分的四个组成部分，拆开存是为了在 UI 上能解释「为什么它排第一」 */
+/** 权重分的五个组成部分，拆开存是为了在 UI 上能解释「为什么它排第一」 */
 export interface WeightParts {
   /** 举报次数 × 3 */
   report: number
@@ -225,35 +233,14 @@ export interface WeightParts {
   wait: number
 }
 
-export interface QueueTask {
-  id: string
-  kind: QueueKind
-  itemId: string
-  itemTitle: string
-  itemTints: [string, string]
-  itemPrice: number
-  categoryAvgPrice: number
-  sellerId: string
-  sellerNick: string
-  sellerCredit: number
-  reportCount: number
-  riskScore: number
-  /** 进入队列的时间，SLA 与权重都依赖它 */
-  submitAt: string
-  /** 举报/申诉特有：原因与凭证 */
-  reason?: string
-  /** 申诉特有：原处置人与原处置结果（换人复审要用） */
-  handledBy?: string
-  handledResult?: string
-  /** 商品审核的等待时长（分钟），由 submitAt 与当前时间算出 */
-  parts: WeightParts
-  weight: number
-}
-
 /**
  * 审核队列权重公式（business/03 F-A2，可直接写进论文）
  *
  * <p>注意最后一项是**补偿而不是惩罚**：等待越久分越高，否则举报少但一直没人管的单子会永远沉底。
+ *
+ * <p>**队列页不调用它**（notes/09 问题 2）：排序与权重五项都由后端下发，
+ * 前端再算一次就会出现「排第一的那条解释出来的分不是最高」。
+ * 留在这里是因为它是一份可被论文直接引用的公式实现，也是权重口径的单一说明。
  */
 export const calcWeight = (input: {
   reportCount: number
