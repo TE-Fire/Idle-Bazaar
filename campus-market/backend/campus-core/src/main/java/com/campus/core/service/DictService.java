@@ -10,6 +10,7 @@ import com.campus.core.dto.req.DictCategorySaveReq;
 import com.campus.core.dto.req.DictCollegeSaveReq;
 import com.campus.core.dto.req.DictGradeSaveReq;
 import com.campus.core.dto.req.DictMeetPointSaveReq;
+import com.campus.core.dto.resp.DictAdminFullVO;
 import com.campus.core.dto.resp.DictAllVO;
 import com.campus.core.dto.resp.DictCampusVO;
 import com.campus.core.dto.resp.DictCategoryVO;
@@ -52,9 +53,10 @@ import java.util.stream.Collectors;
  * <p><b>新增与编辑是两个方法</b>：`createXxx(req)` / `updateXxx(id, req)`。
  * id 是 `updateXxx` 的必填参数（来自 URL 路径），方法内不判断它是否为空。
  *
- * <p><b>缓存</b>：只有 {@link #all()}（`/api/dict/all`）读缓存，管理端列表直查库——
- * 两者返回的内容不同（含不含停用项），不能共用一个 key。
- * 写操作统一调用 {@link #evictCache()} 失效。
+ * <p><b>缓存</b>：两套，各一个 key。{@link #all()}（`/api/dict/all`）只缓存<b>启用项</b>给发布页；
+ * {@link #categories()}/{@link #campuses()}/{@link #meetPoints()}/{@link #colleges()} 走
+ * {@code ADMIN_FULL} 缓存<b>全量（含停用项）</b>，给管理端列表与字典页——两者返回内容不同，不能共用 key。
+ * 写操作统一调 {@link #evictCache()}，两个 key 一起失效，所以管理端改完字典仍即时可见。
  *
  * <p><b>事务</b>：只有「停用一级分类连带子级」「停用校区连带面交点与学院」这类多条 UPDATE
  * 用 `TransactionTemplate`。单条 INSERT / UPDATE 不加事务，它本身是原子的。
@@ -82,15 +84,9 @@ public class DictService {
 
     /* ══ 一、分类（两级树） ══════════════════════════════════ */
 
-    /** 管理端列表：含停用项，按 sort、id 排序 */
+    /** 管理端列表：含停用项，按 sort、id 排序。走 {@code ADMIN_FULL} 缓存 */
     public List<DictCategoryVO> categories() {
-        return categoryMapper.selectList(new LambdaQueryWrapper<DictCategory>()
-                        .eq(DictCategory::getDeleted, 0)
-                        .orderByAsc(DictCategory::getSort)
-                        .orderByAsc(DictCategory::getId))
-                .stream()
-                .map(this::toCategoryVO)
-                .toList();
+        return adminFull().getCategories();
     }
 
     /** 新增分类，返回新 id。`parentId` 不传 = 一级（库里存 0），传了 = 二级并校验父级 */
@@ -212,14 +208,7 @@ public class DictService {
     /* ══ 三、面交点 ═════════════════════════════════════════ */
 
     public List<DictMeetPointVO> meetPoints() {
-        Map<Long, String> campusNames = campusNameMap();
-        return meetPointMapper.selectList(new LambdaQueryWrapper<DictMeetPoint>()
-                        .eq(DictMeetPoint::getDeleted, 0)
-                        .orderByAsc(DictMeetPoint::getSort)
-                        .orderByAsc(DictMeetPoint::getId))
-                .stream()
-                .map(r -> toMeetPointVO(r, campusNames))
-                .toList();
+        return adminFull().getMeetPoints();
     }
 
     /** 新增面交点，返回新 id。`campusId` 必填，不传或传 0 时抛 6006 */
@@ -268,14 +257,7 @@ public class DictService {
     /* ══ 四、学院 ═══════════════════════════════════════════ */
 
     public List<DictCollegeVO> colleges() {
-        Map<Long, String> campusNames = campusNameMap();
-        return collegeMapper.selectList(new LambdaQueryWrapper<DictCollege>()
-                        .eq(DictCollege::getDeleted, 0)
-                        .orderByAsc(DictCollege::getSort)
-                        .orderByAsc(DictCollege::getId))
-                .stream()
-                .map(r -> toCollegeVO(r, campusNames))
-                .toList();
+        return adminFull().getColleges();
     }
 
     /** 新增学院，返回新 id。`campusId` 不传 = 未指定校区（库里存 0） */
@@ -326,13 +308,7 @@ public class DictService {
     /* ══ 五、校区（引用链顶端） ══════════════════════════════ */
 
     public List<DictCampusVO> campuses() {
-        return campusMapper.selectList(new LambdaQueryWrapper<DictCampus>()
-                        .eq(DictCampus::getDeleted, 0)
-                        .orderByAsc(DictCampus::getSort)
-                        .orderByAsc(DictCampus::getId))
-                .stream()
-                .map(this::toCampusVO)
-                .toList();
+        return adminFull().getCampuses();
     }
 
     /** 新增校区，返回新 id */
@@ -449,6 +425,64 @@ public class DictService {
         return vo;
     }
 
+    /**
+     * 管理端全量字典（含停用项）：分类 / 校区 / 面交 / 学院，给 {@code categories()} 等四个读方法共用。
+     *
+     * <p>走 Redis 缓存（{@code ADMIN_FULL}），与 {@link #all()} 的启用项缓存是两个 key——
+     * 管理端要看到停用项、写操作提交后 {@link #evictCache()} 立刻失效，不能共用。
+     * 读穿 + 异常降级直查库，口径与 {@link #all()} 一致：Redis 抖动不该让管理端列表 500。
+     */
+    private DictAdminFullVO adminFull() {
+        Object cached = null;
+        try {
+            cached = redisTemplate.opsForValue().get(DictRedisKeys.ADMIN_FULL);
+        } catch (Exception e) {
+            log.warn("[dict] 读管理端全量缓存失败，降级直查库", e);
+        }
+        if (cached instanceof DictAdminFullVO vo) {
+            return vo;
+        }
+        DictAdminFullVO fresh = loadAdminFull();
+        try {
+            redisTemplate.opsForValue().set(DictRedisKeys.ADMIN_FULL, fresh, CACHE_TTL);
+        } catch (Exception e) {
+            log.warn("[dict] 写管理端全量缓存失败，本次直查结果仍然可用", e);
+        }
+        return fresh;
+    }
+
+    /**
+     * 四张表的全量（含停用项）一次查齐：先查校区建好名称映射，再查面交 / 学院时直接复用，
+     * 避免 {@code meetPoints()}/{@code colleges()} 各自再查一次校区表。
+     */
+    private DictAdminFullVO loadAdminFull() {
+        List<DictCampus> campuses = campusMapper.selectList(new LambdaQueryWrapper<DictCampus>()
+                .eq(DictCampus::getDeleted, 0)
+                .orderByAsc(DictCampus::getSort)
+                .orderByAsc(DictCampus::getId));
+        Map<Long, String> campusNames = campuses.stream()
+                .collect(Collectors.toMap(DictCampus::getId, DictCampus::getName, (a, b) -> a));
+
+        DictAdminFullVO vo = new DictAdminFullVO();
+        vo.setCategories(categoryMapper.selectList(new LambdaQueryWrapper<DictCategory>()
+                        .eq(DictCategory::getDeleted, 0)
+                        .orderByAsc(DictCategory::getSort)
+                        .orderByAsc(DictCategory::getId))
+                .stream().map(this::toCategoryVO).toList());
+        vo.setCampuses(campuses.stream().map(this::toCampusVO).toList());
+        vo.setMeetPoints(meetPointMapper.selectList(new LambdaQueryWrapper<DictMeetPoint>()
+                        .eq(DictMeetPoint::getDeleted, 0)
+                        .orderByAsc(DictMeetPoint::getSort)
+                        .orderByAsc(DictMeetPoint::getId))
+                .stream().map(r -> toMeetPointVO(r, campusNames)).toList());
+        vo.setColleges(collegeMapper.selectList(new LambdaQueryWrapper<DictCollege>()
+                        .eq(DictCollege::getDeleted, 0)
+                        .orderByAsc(DictCollege::getSort)
+                        .orderByAsc(DictCollege::getId))
+                .stream().map(r -> toCollegeVO(r, campusNames)).toList());
+        return vo;
+    }
+
     /* ══ 七、缓存失效与事务 ══════════════════════════════════ */
 
     /**
@@ -479,6 +513,7 @@ public class DictService {
     private void deleteCacheKey() {
         try {
             redisTemplate.delete(DictRedisKeys.ALL);
+            redisTemplate.delete(DictRedisKeys.ADMIN_FULL);
         } catch (Exception e) {
             log.warn("[dict] 删除缓存失败，{} 秒后随 TTL 过期", CACHE_TTL.toSeconds(), e);
         }

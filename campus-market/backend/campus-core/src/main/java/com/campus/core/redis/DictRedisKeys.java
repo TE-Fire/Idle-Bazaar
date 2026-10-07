@@ -1,14 +1,16 @@
 package com.campus.core.redis;
 
 /**
- * 字典缓存 key。整个模块只有一个：`cm:dict:all`。
+ * 字典缓存 key。本模块两套缓存，各一个 key，返回内容不同所以不共用：
  *
- * <p>字典的读分两种，返回内容不同，不能共用一个 key：
- * 管理端 `/admin/dict/**` 要看到停用项、改完要立刻看到新值，直查库；
- * 学生端 `/api/dict/all` 只下发启用项，走缓存。既然只有后者需要缓存，就不必给五张表各建一个 key。
+ * <ul>
+ *   <li>{@link #ALL}：五张字典的<b>启用项</b>聚合（`DictAllVO`），学生端 `/api/dict/all` 用。</li>
+ *   <li>{@link #ADMIN_FULL}：分类/校区/面交/学院的<b>全量（含停用项）</b>聚合（`DictAdminFullVO`），
+ *       管理端 `/admin/dict/**` 与商品/审核列表回填用。管理端要看到停用项，启用项缓存缺了它们会解析成 null。</li>
+ * </ul>
  *
- * <p>TTL 60s 不是主要的失效手段，写操作提交后会主动 del。
- * 它只在 del 失败或 Redis 短暂不可用时，限制脏数据的存活时间。
+ * <p>写操作（create / update / 启停）提交后统一 {@code evictCache()}，两个 key 一并 del。
+ * TTL 60s 不是主要失效手段，只在 del 失败或 Redis 短暂不可用时，限制脏数据的存活时间。
  */
 public final class DictRedisKeys {
 
@@ -16,6 +18,9 @@ public final class DictRedisKeys {
 
     /** 五张字典的启用项聚合，值是 `DictAllVO` 的 JSON */
     public static final String ALL = MODULE + "all";
+
+    /** 管理端全量字典（含停用项），值是 `DictAdminFullVO` 的 JSON */
+    public static final String ADMIN_FULL = MODULE + "admin:full";
 
     private DictRedisKeys() {
     }
