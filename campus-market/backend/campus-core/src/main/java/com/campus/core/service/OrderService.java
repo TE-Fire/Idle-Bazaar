@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -231,6 +232,42 @@ public class OrderService {
                 .set(TradeOrder::getStatus, OrderStatusEnum.CANCELED.getCode())
                 .set(TradeOrder::getCancelBy, type.getCode())
                 .set(TradeOrder::getCancelReason, reason)));
+    }
+
+    /**
+     * 超时未付款订单的补偿扫描（`tech/01` §9.2 的兜底环节，决策 1 选定本期就用它承担超时取消）。
+     *
+     * <p>每 10 分钟一次，取消 `expire_time` 已过、仍是待付款的订单。
+     * 取消本身带条件更新：并发真实付款成功时状态已不是待付款，这里的更新自然落空，
+     * 不会出现「付款成功后被超时任务取消」。
+     */
+    @Scheduled(fixedDelay = 10 * 60 * 1000L)
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelExpired() {
+        List<TradeOrder> expired = orderMapper.selectList(new LambdaQueryWrapper<TradeOrder>()
+                .eq(TradeOrder::getStatus, OrderStatusEnum.WAIT_PAY.getCode())
+                .le(TradeOrder::getExpireTime, LocalDateTime.now()));
+        int count = 0;
+        for (TradeOrder order : expired) {
+            count += cancelOne(order, CancelTypeEnum.SYSTEM_TIMEOUT, "30 分钟未付款，系统自动取消");
+        }
+        if (count > 0) {
+            log.info("[order] 超时取消待付款订单 {} 笔", count);
+        }
+    }
+
+    /**
+     * 单笔取消。**状态校验写在 WHERE 里而不是先查后判**：
+     * 两个入口同时操作同一笔订单时，先查后判的两个请求都会通过，后一个会覆盖前一个的结果。
+     * 影响行数 0 即表示状态已被别人改走，本次作废。
+     */
+    private int cancelOne(TradeOrder order, CancelTypeEnum type, String reason) {
+        return orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, order.getId())
+                .eq(TradeOrder::getStatus, order.getStatus())
+                .set(TradeOrder::getStatus, OrderStatusEnum.CANCELED.getCode())
+                .set(TradeOrder::getCancelBy, type.getCode())
+                .set(TradeOrder::getCancelReason, reason));
     }
 
     /** Redis 前置拦截；不可用时降级放行（功能不受影响，只是 DB 压力上升） */
