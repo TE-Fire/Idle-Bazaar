@@ -117,12 +117,15 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 - [x] 商品 item：管理端 CRUD、审核、强制下架、成色；列表「分页主表 + 批量回填」
 - [x] 审核 review：管理端队列（商品审核 / 举报 / 申诉三来源并入）+ 六个处置接口
 - [x] 用户 user：管理端账号 / 角色 / 权限
-- [ ] 订单 order（**无任何 Controller**；`tech/01` §9 已设计：下单锁库存、支付、`ORDER_TIMEOUT` 延迟消息、超时取消）—— **建议下一步**
-- [ ] 消息 message（`msg_message` 表已建、无 Controller；`tech/01` §10 已设计 `zone` 分区）
+- [ ] 订单 order（**无任何 Controller**；业务说明见 `notes/13`，技术方案见 `tech/01` §9：
+      下单不锁货、付款才占位两级校验、超时取消、退款与纠纷）—— **当前进行中**
+- [ ] 消息 message（`msg_message` 表已建、无 Controller；`tech/01` §9.4 已设计 `zone` 分区）
 - [ ] 统计 stats（A8 报表，未落地）
 
-未决项：学生端（C 端）发布/浏览商品、提交举报/申诉的接口尚未实现，
-当前审核队列只依赖演示数据；Web 用户端 / 小程序属 `business/01`、`business/02`，范围待定。
+学生端（C 端 `/api/**`）随订单一并开工，范围与接口清单见 `notes/13` 第七节：
+发布 / 浏览商品、下单与支付占位、退款、举报与申诉提交。
+学生端鉴权已就绪（`StpUserUtil`，token `satoken-user`，7 天），无需新建登录。
+这三个接口落地后，审核队列才有真实单据来源，不再只依赖演示数据。
 
 中间件（非业务，独立推进）：
 - [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3；`OP_LOG` 已明确不启用）
