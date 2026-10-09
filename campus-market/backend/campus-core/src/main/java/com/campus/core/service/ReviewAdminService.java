@@ -23,9 +23,11 @@ import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.ItemImage;
 import com.campus.core.entity.Report;
+import com.campus.core.entity.TradeOrder;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.AuditStatusEnum;
 import com.campus.core.enums.ItemStatusEnum;
+import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.enums.QueueKindEnum;
 import com.campus.core.enums.ReportStatusEnum;
 import com.campus.core.errcode.ReviewErrorCode;
@@ -36,6 +38,7 @@ import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
+import com.campus.core.mapper.TradeOrderMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -84,6 +87,11 @@ public class ReviewAdminService {
     /** 申诉 `biz_type`：1 商品审核 2 举报 3 订单纠纷 */
     private static final int BIZ_ITEM = 1;
     private static final int BIZ_REPORT = 2;
+    private static final int BIZ_ORDER = 3;
+
+    /** 申诉裁决结论：`appeal.status` 直接复用这两个值 */
+    private static final int APPEAL_UPHOLD = 2;
+    private static final int APPEAL_REVOKE = 3;
 
     private final ItemMapper itemMapper;
     private final ItemImageMapper itemImageMapper;
@@ -92,7 +100,9 @@ public class ReviewAdminService {
     private final AppealMapper appealMapper;
     private final AppUserMapper appUserMapper;
     private final AdminUserMapper adminUserMapper;
+    private final TradeOrderMapper tradeOrderMapper;
     private final ItemAdminService itemAdminService;
+    private final OrderService orderService;
     private final DictService dictService;
 
     /* ══ 一、队列 ═══════════════════════════════════════════ */
@@ -131,16 +141,17 @@ public class ReviewAdminService {
                 .eq(Appeal::getDeleted, 0))
                 : List.of();
 
-        // ③ 申诉的 biz_id 可能指向举报，批量取出被引用的举报，供后续解析商品
+        // ③ 申诉的 biz_id 是被申诉对象的 id，按 biz_type 分两条路一次查齐，避免逐条回库
         Map<Long, Report> appealReports = reportsById(appeals);
+        Map<Long, TradeOrder> appealOrders = ordersById(appeals);
 
         // ④ 汇聚所有单据指向的商品 id：审核取 item_id，举报取 target_id，
-        //    申诉须经 report.target_id 间接取得（订单纠纷无解，跳过）
+        //    申诉要绕一层——商品审核直接就是商品 id，举报与订单纠纷须转一次（订单 → item_id）
         List<Long> itemIds = new ArrayList<>();
         audits.forEach(a -> itemIds.add(a.getItemId()));
         reports.forEach(r -> itemIds.add(r.getTargetId()));
         appeals.forEach(a -> {
-            Long itemId = appealItemId(a, appealReports);
+            Long itemId = appealItemId(a, appealReports, appealOrders);
             if (itemId != null) {
                 itemIds.add(itemId);
             }
@@ -153,9 +164,9 @@ public class ReviewAdminService {
         List<ReviewTaskVO> tasks = new ArrayList<>();
         audits.forEach(a -> tasks.add(itemTask(a, fill)));
         reports.forEach(r -> tasks.add(reportTask(r, fill)));
-        appeals.forEach(a -> tasks.add(appealTask(a, appealReports, fill)));
+        appeals.forEach(a -> tasks.add(appealTask(a, appealReports, appealOrders, fill)));
 
-        // ⑦ 丢弃解析不出商品（如订单纠纷）的单据，避免单条异常拖垮整列
+        // ⑦ 丢弃解析不出商品的单据（引用对象已被物理清理时才会发生），避免单条异常拖垮整列
         tasks.removeIf(Objects::isNull);
 
         // ⑧ 三级排序：类型顺序 → 权重降序 → 进队时间升序（稳定序）
@@ -291,7 +302,7 @@ public class ReviewAdminService {
     public void judgeAppeal(Long appealId, AppealJudgeReq req) {
         long begin = System.currentTimeMillis();
         Integer result = req.getResult();
-        BizAssert.isTrue(result != null && (result == 2 || result == 3),
+        BizAssert.isTrue(result != null && (result == APPEAL_UPHOLD || result == APPEAL_REVOKE),
                 CommonErrorCode.PARAM_ERROR, "复审结论只能是 2 维持 / 3 撤销");
 
         Appeal appeal = appealMapper.selectOne(new LambdaQueryWrapper<Appeal>()
@@ -309,7 +320,17 @@ public class ReviewAdminService {
         LocalDateTime now = LocalDateTime.now();
         String note = trim(req.getNote());
 
-        if (result == 3) {
+        // 订单纠纷与针对商品处置的申诉是两种不同的纠正对象：前者要恢复的是订单，
+        // 商品本身可能从未被处置过，交给 revoke 会误改商品状态
+        if (isOrderAppeal(appeal)) {
+            OrderStatusEnum target = (result == APPEAL_REVOKE)
+                    ? OrderStatusEnum.REFUNDED
+                    : OrderStatusEnum.COMPLETED;
+            orderService.settleDispute(appeal.getBizId(), target);
+            note = append(note, target == OrderStatusEnum.REFUNDED
+                    ? "裁定买家胜诉，订单转入已退款"
+                    : "裁定卖家胜诉，订单转入已完成");
+        } else if (result == APPEAL_REVOKE) {
             note = revoke(appeal, note);
         }
 
@@ -342,8 +363,9 @@ public class ReviewAdminService {
         return vo;
     }
 
-    private ReviewTaskVO appealTask(Appeal appeal, Map<Long, Report> appealReports, Fill fill) {
-        Long itemId = appealItemId(appeal, appealReports);
+    private ReviewTaskVO appealTask(Appeal appeal, Map<Long, Report> appealReports,
+                                    Map<Long, TradeOrder> appealOrders, Fill fill) {
+        Long itemId = appealItemId(appeal, appealReports, appealOrders);
         if (itemId == null) {
             return null;
         }
@@ -505,7 +527,11 @@ public class ReviewAdminService {
 
     /**
      * 申诉原处置信息（换人复审用）。biz_type=1 取该商品最近一条已处置审核记录，
-     * biz_type=2 取被引用举报的处置人。biz_type=3（订单纠纷）无来源，对应申诉不附原处置信息。
+     * biz_type=2 取被引用举报的处置人。
+     *
+     * <p>**订单纠纷（biz_type=3）没有原处置人**：它是买卖双方谈不拢后由系统转入的，
+     * 此前不存在任何管理员处置。`originHandlerOf` 因此返回 null，F-A4 的换人校验对这类申诉自动放宽，
+     * 这不是漏掉，而是它本来就没有「自己复审自己」的对象。
      */
     private Map<Long, Origin> origins(List<Appeal> appeals, Map<Long, Report> appealReports, List<ItemAudit> all) {
         if (appeals.isEmpty()) {
@@ -571,8 +597,31 @@ public class ReviewAdminService {
                 .collect(Collectors.toMap(Report::getId, Function.identity(), (a, b) -> a));
     }
 
-    /** 申诉指向的商品 id；订单纠纷（biz_type = 3）本期返回 null */
-    private Long appealItemId(Appeal appeal, Map<Long, Report> appealReports) {
+    /** 申诉引用的订单（biz_type = 3 时 biz_id 是 trade_order.id），一次查齐避免逐条回库 */
+    private Map<Long, TradeOrder> ordersById(List<Appeal> appeals) {
+        List<Long> ids = appeals.stream()
+                .filter(a -> a.getBizType() != null && a.getBizType() == BIZ_ORDER)
+                .map(Appeal::getBizId)
+                .distinct()
+                .toList();
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        return tradeOrderMapper.selectList(new LambdaQueryWrapper<TradeOrder>()
+                        .in(TradeOrder::getId, ids)
+                        .eq(TradeOrder::getDeleted, 0))
+                .stream()
+                .collect(Collectors.toMap(TradeOrder::getId, Function.identity(), (a, b) -> a));
+    }
+
+    /**
+     * 申诉指向的商品 id。biz_type=1 直接就是商品；2 与 3 都要转一层——
+     * 举报打到商品上（`report.target_id`），订单纠纷则由 `order.item_id` 反查。
+     *
+     * <p>**订单纠纷此前被刻意返回 null（不进队列）**，理由是当时没有订单可引用；订单模块落地后这条分支成立，
+     * 纠纷单据得以与管理端其余两类申诉共用同一条处置队列（notes/13 第五节）。
+     */
+    private Long appealItemId(Appeal appeal, Map<Long, Report> appealReports, Map<Long, TradeOrder> appealOrders) {
         if (appeal.getBizType() == null) {
             return null;
         }
@@ -582,6 +631,10 @@ public class ReviewAdminService {
         if (appeal.getBizType() == BIZ_REPORT) {
             Report r = appealReports.get(appeal.getBizId());
             return r == null ? null : r.getTargetId();
+        }
+        if (appeal.getBizType() == BIZ_ORDER) {
+            TradeOrder o = appealOrders.get(appeal.getBizId());
+            return o == null ? null : o.getItemId();
         }
         return null;
     }
@@ -616,7 +669,7 @@ public class ReviewAdminService {
      * @return 追加了恢复说明的处置备注
      */
     private String revoke(Appeal appeal, String note) {
-        Long itemId = appealItemId(appeal, reportsById(List.of(appeal)));
+        Long itemId = appealItemId(appeal, reportsById(List.of(appeal)), ordersById(List.of(appeal)));
         if (itemId == null) {
             return append(note, "申诉成立，但该申诉不是针对商品处置（biz_type=" + appeal.getBizType() + "），商品未变更");
         }
@@ -700,6 +753,10 @@ public class ReviewAdminService {
                     "队列类型不合法：" + kind);
         }
         return k;
+    }
+
+    private boolean isOrderAppeal(Appeal appeal) {
+        return appeal.getBizType() != null && appeal.getBizType() == BIZ_ORDER;
     }
 
     private long waitHours(LocalDateTime since) {

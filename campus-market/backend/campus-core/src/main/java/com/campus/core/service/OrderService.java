@@ -30,7 +30,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * 学生端交易（下单 / 付款占位 / 取消），口径见 notes/13，并发方案见 `tech/01` §9.1。
+ * 学生端交易全链路（下单 / 付款占位 / 核销 / 收货 / 取消与退款 / 纠纷裁决），口径见 notes/13，
  *
  * <p><b>无预定机制是本类的立足点</b>：下单只写一条待付款订单，商品保持在售、可被他人同时下单。
  * 所有权判定的唯一时刻是付款成功的那一刻，因此 {@link #pay} 是唯一有并发竞争的方法，
@@ -48,6 +48,14 @@ public class OrderService {
 
     /** 待付款超时时长，与 `idx_expire(status, expire_time)` 的扫描口径一致 */
     private static final int PAY_TIMEOUT_MINUTES = 30;
+
+    /** 卖家处理退款申请的时限，超时由 {@link #autoRefund} 自动同意（notes/13 第四节） */
+    private static final int AUTO_REFUND_HOURS = 24;
+
+    private static final String AUTO_REFUND_REASON = "卖家超时未处理，系统自动同意退款";
+
+    /** 裁决留痕统一文案：让 `cancel_reason` 在同为终态的订单里能区分出「被裁决」这一来源 */
+    private static final String DISPUTE_SETTLED_REASON = "管理端裁决结案";
 
     /** Lua 返回值：抢到标记 */
     private static final int OCCUPY_WON = 1;
@@ -268,6 +276,176 @@ public class OrderService {
                 .set(TradeOrder::getStatus, OrderStatusEnum.CANCELED.getCode())
                 .set(TradeOrder::getCancelBy, type.getCode())
                 .set(TradeOrder::getCancelReason, reason));
+    }
+
+    /* ══ 四、履约：核销与确认收货 ══════════════════════════════ */
+
+    /**
+     * 扫码核销：待面交 → 已验货。
+     *
+     * <p>核销码一单一张（`uk_verify_code` 唯一约束），所以只要码对得上，**任一方扫码即成立**；
+     * `verify_by` 记的是实际扫码的人，用于复盘而不是授权——当初若是「各持一码」的设计，
+     * 那个唯一约束就不该存在（notes/13 第二节）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void verify(Long orderId, String code, Long userId) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(isParty(order, userId), OrderErrorCode.NOT_ORDER_PARTY);
+        BizAssert.isTrue(order.getVerifyCode() != null && order.getVerifyCode().equals(code),
+                OrderErrorCode.VERIFY_CODE_INVALID);
+
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .eq(TradeOrder::getStatus, OrderStatusEnum.WAIT_MEET.getCode())
+                .set(TradeOrder::getStatus, OrderStatusEnum.VERIFIED.getCode())
+                .set(TradeOrder::getVerifyTime, LocalDateTime.now())
+                .set(TradeOrder::getVerifyBy, userId));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有待面交的订单可以核销");
+    }
+
+    /**
+     * 买家确认收货：已验货 → 已完成。
+     *
+     * <p>必须先经过核销。跳过这一步直接确认收货，订单就会缺失「双方确实碰过面」的记录，
+     * 后续纠纷就只剩双方各执一词——那正是 {@code verify_by} / {@code verify_time} 存在的意义。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void receive(Long orderId, Long buyerId) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(buyerId.equals(order.getBuyerId()), OrderErrorCode.ORDER_NOT_OWNER);
+
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .eq(TradeOrder::getStatus, OrderStatusEnum.VERIFIED.getCode())
+                .set(TradeOrder::getStatus, OrderStatusEnum.COMPLETED.getCode()));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有已验货的订单可以确认收货");
+    }
+
+    /* ══ 五、逆向：取消 / 退款 / 纠纷 ══════════════════════════ */
+
+    /**
+     * 取消订单。**付款前后语义不同**（notes/13 第四节）：待付款时直接作废，因为钱没进过这道流程；
+     * 已付款后再取消，实质是发起退款申请，必须落到退款中等卖家处理，而不能直接作废——
+     * 否则货款已经「付」出、订单却显示为已取消，卖家无从应对。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void cancel(Long orderId, Long userId, String reason) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(isParty(order, userId), OrderErrorCode.ORDER_NOT_OWNER);
+
+        OrderStatusEnum status = OrderStatusEnum.fromCode(order.getStatus());
+        BizAssert.isTrue(!status.isFrozen(), OrderErrorCode.ORDER_STATUS_INVALID,
+                "纠纷中订单已冻结，请等待管理端裁决");
+        BizAssert.isTrue(!status.isTerminal(), OrderErrorCode.ORDER_STATUS_INVALID);
+
+        CancelTypeEnum by = userId.equals(order.getBuyerId()) ? CancelTypeEnum.BUYER : CancelTypeEnum.SELLER;
+        String text = trim(reason);
+
+        if (status == OrderStatusEnum.WAIT_PAY) {
+            BizAssert.isTrue(cancelOne(order, by, text) == 1, OrderErrorCode.ORDER_STATUS_INVALID);
+            return;
+        }
+        if (status == OrderStatusEnum.WAIT_MEET || status == OrderStatusEnum.VERIFIED) {
+            int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                    .eq(TradeOrder::getId, orderId)
+                    .eq(TradeOrder::getStatus, order.getStatus())
+                    .set(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
+                    .set(TradeOrder::getCancelBy, by.getCode())
+                    .set(TradeOrder::getCancelReason, text));
+            BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
+            return;
+        }
+        BizAssert.isTrue(false, OrderErrorCode.ORDER_STATUS_INVALID, "退款申请已在等待卖家处理");
+    }
+
+    /**
+     * 卖家处理退款申请：同意 → 已退款，拒绝 → 纠纷中（冻结，转管理端裁决）。
+     *
+     * <p>**退款是一次状态迁移而不是资金退回**——本平台不走真实资金流，界面文案也应避免
+     * 「款项已退回账户」这类暗示存在结算的表述（notes/13 第四节）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void handleRefund(Long orderId, Long sellerId, boolean agree, String note) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(sellerId.equals(order.getSellerId()), OrderErrorCode.ORDER_NOT_OWNER);
+
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
+                .set(TradeOrder::getStatus, agree
+                        ? OrderStatusEnum.REFUNDED.getCode()
+                        : OrderStatusEnum.DISPUTING.getCode())
+                .set(TradeOrder::getCancelReason, trim(note)));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "没有待处理的退款申请");
+    }
+
+    /**
+     * 卖家 {@value #AUTO_REFUND_HOURS} 小时未处理退款申请，系统自动同意。
+     *
+     * <p>起算时间取 `update_time`：表里没有专门的退款申请时间列，而订单停留在退款中期间不会有别处改动它，
+     * 此刻 `update_time` 就等于那次状态迁移的时刻。这是借用的语义，将来若这条分支上再长出别的写操作，
+     * 应当补一列而不是继续借用它。
+     */
+    @Scheduled(fixedDelay = 30 * 60 * 1000L)
+    @Transactional(rollbackFor = Exception.class)
+    public void autoRefund() {
+        LocalDateTime deadline = LocalDateTime.now().minusHours(AUTO_REFUND_HOURS);
+        List<TradeOrder> pending = orderMapper.selectList(new LambdaQueryWrapper<TradeOrder>()
+                .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
+                .le(TradeOrder::getUpdateTime, deadline));
+        int count = 0;
+        for (TradeOrder order : pending) {
+            count += orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                    .eq(TradeOrder::getId, order.getId())
+                    .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
+                    .set(TradeOrder::getStatus, OrderStatusEnum.REFUNDED.getCode())
+                    .set(TradeOrder::getCancelReason, AUTO_REFUND_REASON));
+        }
+        if (count > 0) {
+            log.info("[order] 卖家超时未处理，系统自动同意退款 {} 笔", count);
+        }
+    }
+
+    /**
+     * 把管理端的纠纷裁决结果落到订单上（由 {@link ReviewAdminService#judgeAppeal} 调用）。
+     *
+     * <p>**库里没有「纠纷已裁决」这个状态码**，结果必须映射到已有终态：买家赢→已退款，卖家赢→已完成。
+     * 单独留一个「已裁决」会让订单既不完成也不退款，钱货去向反而说不清（notes/13 第二节）。
+     *
+     * @param target 裁决后的目标状态，只允许 {@link OrderStatusEnum#REFUNDED} 与 {@link OrderStatusEnum#COMPLETED}
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void settleDispute(Long orderId, OrderStatusEnum target) {
+        BizAssert.isTrue(target == OrderStatusEnum.REFUNDED || target == OrderStatusEnum.COMPLETED,
+                CommonErrorCode.PARAM_ERROR, "纠纷裁决结果只能是已退款或已完成");
+
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(OrderStatusEnum.fromCode(order.getStatus()) == OrderStatusEnum.DISPUTING,
+                OrderErrorCode.ORDER_STATUS_INVALID, "只有纠纷中的订单需要裁决");
+
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .eq(TradeOrder::getStatus, OrderStatusEnum.DISPUTING.getCode())
+                .set(TradeOrder::getStatus, target.getCode())
+                .set(TradeOrder::getCancelReason, DISPUTE_SETTLED_REASON));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
+    }
+
+    /* ══ 六、内部工具 ═════════════════════════════════════════ */
+
+    private TradeOrder requireOrder(Long orderId) {
+        return BizAssert.notNull(orderMapper.selectOne(new LambdaQueryWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .eq(TradeOrder::getDeleted, 0)), OrderErrorCode.ORDER_NOT_FOUND);
+    }
+
+    /** 买卖双方任一方都算当事人：面交是双方行为，不能只认买家 */
+    private boolean isParty(TradeOrder order, Long userId) {
+        return userId.equals(order.getBuyerId()) || userId.equals(order.getSellerId());
+    }
+
+    private String trim(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 
     /** Redis 前置拦截；不可用时降级放行（功能不受影响，只是 DB 压力上升） */

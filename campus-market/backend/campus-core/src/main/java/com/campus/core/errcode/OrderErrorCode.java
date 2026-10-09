@@ -21,6 +21,10 @@ public enum OrderErrorCode implements IErrorCode {
     ITEM_NOT_ON_SALE(2006, "该商品当前不可购买"),
     /** 不允许卖家给自己下单，否则会出现「自己和自己面交」的订单 */
     BUY_SELF(2007, "不能购买自己发布的商品"),
+
+    VERIFY_CODE_INVALID(2008, "核销码不正确"),
+    /** 核销不鉴权谁扫的码（一单一码），但扫码人必须是这笔订单的当事人 */
+    NOT_ORDER_PARTY(2009, "不是该订单的买卖双方，无权操作"),
     ;
 
     @Override
