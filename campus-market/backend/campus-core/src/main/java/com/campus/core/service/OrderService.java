@@ -2,9 +2,12 @@ package com.campus.core.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campus.common.asserts.BizAssert;
 import com.campus.common.exception.BizException;
 import com.campus.common.exception.CommonErrorCode;
+import com.campus.common.result.PageResult;
+import com.campus.core.dto.resp.OrderVO;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.TradeOrder;
 import com.campus.core.enums.CancelTypeEnum;
@@ -431,7 +434,60 @@ public class OrderService {
         BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
     }
 
-    /* ══ 六、内部工具 ═════════════════════════════════════════ */
+    /* ══ 六、查询 ═════════════════════════════════════════════ */
+
+    /** 我买到的 / 我卖出的，走 `idx_buyer` / `idx_seller` */
+    public PageResult<OrderVO> mine(Long userId, boolean asSeller, OrderStatusEnum status,
+                                    long pageNum, long pageSize) {
+        LambdaQueryWrapper<TradeOrder> q = new LambdaQueryWrapper<>();
+        if (asSeller) {
+            q.eq(TradeOrder::getSellerId, userId);
+        } else {
+            q.eq(TradeOrder::getBuyerId, userId);
+        }
+        q.eq(TradeOrder::getDeleted, 0);
+        if (status != null) {
+            q.eq(TradeOrder::getStatus, status.getCode());
+        }
+        q.orderByDesc(TradeOrder::getCreateTime).orderByDesc(TradeOrder::getId);
+
+        Page<TradeOrder> page = orderMapper.selectPage(new Page<>(pageNum, pageSize), q);
+        List<OrderVO> list = page.getRecords().stream().map(this::toVO).toList();
+        return PageResult.of(list, page.getTotal(), pageNum, pageSize);
+    }
+
+    public OrderVO detail(Long orderId, Long userId) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(isParty(order, userId), OrderErrorCode.ORDER_NOT_OWNER);
+        return toVO(order);
+    }
+
+    private OrderVO toVO(TradeOrder o) {
+        OrderVO vo = new OrderVO();
+        vo.setId(o.getId());
+        vo.setOrderNo(o.getOrderNo());
+        vo.setItemId(o.getItemId());
+        vo.setBuyerId(o.getBuyerId());
+        vo.setSellerId(o.getSellerId());
+        vo.setAmount(o.getAmount());
+        vo.setStatus(OrderStatusEnum.fromCode(o.getStatus()));
+        vo.setMeetPointId(o.getMeetPointId());
+        vo.setMeetTime(o.getMeetTime());
+        vo.setVerifyCode(o.getVerifyCode());
+        vo.setVerifyTime(o.getVerifyTime());
+        vo.setExpireTime(o.getExpireTime());
+        vo.setPayTime(o.getPayTime());
+        vo.setCancelBy(o.getCancelBy());
+        vo.setCancelReason(o.getCancelReason());
+        vo.setItemTitle(o.getItemTitle());
+        vo.setItemPrice(o.getItemPrice());
+        vo.setItemGrade(o.getItemGrade());
+        vo.setItemMainImage(o.getItemMainImage());
+        vo.setCreateTime(o.getCreateTime());
+        return vo;
+    }
+
+    /* ══ 七、内部工具 ═════════════════════════════════════════ */
 
     private TradeOrder requireOrder(Long orderId) {
         return BizAssert.notNull(orderMapper.selectOne(new LambdaQueryWrapper<TradeOrder>()
