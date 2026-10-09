@@ -55,27 +55,15 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 管理端审核队列（A-B2 商品审核 + A-B3 举报与申诉，流程见 notes/09）。
+ * 管理端审核队列：将商品审核、举报、申诉三类待处置单据合并为一条排序队列（流程见 notes/09）。
  *
- * <p><b>三种来源压成一条队列</b>：商品审核（`item_audit.status = 1`）、举报（`report.status IN (1,2)`）、
- * 申诉（`appeal.status = 1`）各有各的表，但共用一套「权重排序 + 连续审核」交互，
- * 所以在**这里**合成，不在前端合成——排序口径是最不能漂移的东西，分成三个接口前端就得再排一次。
+ * <p>三类单据共用「权重排序 + 连续处置」交互，在后端合成以保证排序口径唯一，避免前端二次排序导致口径漂移。
+ * 排序规则为类型优先（申诉 > 举报 > 商品审核，见 {@link QueueKindEnum}）+ 组内权重降序；
+ * 权重含实时等待补偿，排序不使用库内 {@code priority_score}（其数值为前四项之和的冗余快照）。
  *
- * <p><b>排序 = 类型优先 + 组内权重降序</b>：申诉整体先于举报，举报先于商品审核
- * （见 {@link QueueKindEnum} 的 `order`）。组内按 {@link #weight} 降序，
- * 权重含实时的等待补偿，**不能只用库里的 `priority_score`**——那是进队时的基础分，
- * 只用它会让风险最高的老单沉底，正是 F-A2 要避免的。
- *
- * <p><b>强制下架复用 {@link ItemAdminService#forceOffline}</b>：商品页与审核页是同一个动作的两个入口，
- * 结果必须完全一致（status → 7 + 一条审核记录），两套实现必然漂移。
- *
- * <p><b>并发兜底用条件更新，不是先查后改</b>：所有处置都是
- * `WHERE id = ? AND status = 待处置`，影响行数 0 就抛 3001。
- * 先 `SELECT` 再 `UPDATE` 在两个人同时点按钮时两个都会成功，后一个会静默覆盖前一个的处置结果。
- *
- * <p><b>`handle_cost_ms` 的口径</b>：记的是**服务端处理这次处置动作的耗时**，不是审核员阅读单据的时长。
- * 要后者得由前端在打开 Drawer 时上报时间戳（多一个接口 + 时钟对齐），本期不做；
- * 这个数留给 A8 报表做「操作效率」时会被替换成更准的口径，注释在此避免误读。
+ * <p>强制下架复用 {@link ItemAdminService#forceOffline}，与商品管理页为同一实现，保证两入口处置结果一致。
+ * 所有处置以条件更新（{@code WHERE id = ? AND status = 待处置}）执行，影响行数为 0 即视为已被其他管理员处置，
+ * 避免并发重复处置。{@code handle_cost_ms} 记录服务端处置动作耗时，非审核员阅读时长。
  */
 @Slf4j
 @Service
@@ -110,23 +98,26 @@ public class ReviewAdminService {
     /* ══ 一、队列 ═══════════════════════════════════════════ */
 
     /**
-     * 合并队列（不分页）。
+     * 合并队列（不分页）。流程：三表分别取待处置单据 → 汇聚商品 id → 批量回填关联数据
+     * → 三类工厂映射为统一任务 → 丢弃无法解析单据 → 三级排序 → 组装响应。
      *
-     * @param kind 可选过滤：`item` / `report` / `appeal`；空或非法值之外的其它值按「全部」处理
+     * <p>关联数据采用「一次批量回填」而非逐行查询（见 notes/08 附录 A.2）：队列规模虽小，
+     * 逐行回查会放大为上千次库往返。
      *
-     * <p>关联数据用「批量回填」而不是逐行查：队列最多几百条，
-     * 每条再查 5 次库就是几千次往返。见 notes/08 附录 A.2 定的模式。
+     * @param kind 过滤类型 {@code item} / {@code report} / {@code appeal}；为空或非法值按全部处理
      */
     public ReviewQueueVO queue(String kind) {
+        // ① 解析类型过滤参数（空 / 非法值 → 全部）
         QueueKindEnum filter = parseKind(kind);
 
-        List<ItemAudit> audits = filter == null || filter == QueueKindEnum.ITEM
+        // ② 三表分别按进队条件取单据
+        List<ItemAudit> audits = (filter == null || filter == QueueKindEnum.ITEM)
                 ? itemAuditMapper.selectList(new LambdaQueryWrapper<ItemAudit>()
                 .eq(ItemAudit::getStatus, AuditStatusEnum.PENDING.getCode())
                 .eq(ItemAudit::getDeleted, 0))
                 : List.of();
 
-        List<Report> reports = filter == null || filter == QueueKindEnum.REPORT
+        List<Report> reports = (filter == null || filter == QueueKindEnum.REPORT)
                 ? reportMapper.selectList(new LambdaQueryWrapper<Report>()
                 .in(Report::getStatus, List.of(ReportStatusEnum.WAITING.getCode(),
                         ReportStatusEnum.PROCESSING.getCode()))
@@ -134,15 +125,17 @@ public class ReviewAdminService {
                 .eq(Report::getDeleted, 0))
                 : List.of();
 
-        List<Appeal> appeals = filter == null || filter == QueueKindEnum.APPEAL
+        List<Appeal> appeals = (filter == null || filter == QueueKindEnum.APPEAL)
                 ? appealMapper.selectList(new LambdaQueryWrapper<Appeal>()
                 .eq(Appeal::getStatus, AppealStatusEnum.WAITING.getCode())
                 .eq(Appeal::getDeleted, 0))
                 : List.of();
 
-        // 申诉的 biz_id 要绕一层才拿得到商品：先把它引用到的 report 一次查齐
+        // ③ 申诉的 biz_id 可能指向举报，批量取出被引用的举报，供后续解析商品
         Map<Long, Report> appealReports = reportsById(appeals);
 
+        // ④ 汇聚所有单据指向的商品 id：审核取 item_id，举报取 target_id，
+        //    申诉须经 report.target_id 间接取得（订单纠纷无解，跳过）
         List<Long> itemIds = new ArrayList<>();
         audits.forEach(a -> itemIds.add(a.getItemId()));
         reports.forEach(r -> itemIds.add(r.getTargetId()));
@@ -153,20 +146,25 @@ public class ReviewAdminService {
             }
         });
 
+        // ⑤ 一次性批量回填关联数据（商品 / 卖家 / 举报数 / 权重快照 / 图片 / 均价 / 分类名 / 申诉原处置）
         Fill fill = buildFill(itemIds, appeals, appealReports);
 
+        // ⑥ 三类工厂统一映射为 ReviewTaskVO（共性字段走 baseTask，各自补差异字段）
         List<ReviewTaskVO> tasks = new ArrayList<>();
         audits.forEach(a -> tasks.add(itemTask(a, fill)));
         reports.forEach(r -> tasks.add(reportTask(r, fill)));
         appeals.forEach(a -> tasks.add(appealTask(a, appealReports, fill)));
-        // 队列里可能有解析不出商品的申诉（订单纠纷，本期不做），它们没有 VO
+
+        // ⑦ 丢弃解析不出商品（如订单纠纷）的单据，避免单条异常拖垮整列
         tasks.removeIf(Objects::isNull);
 
+        // ⑧ 三级排序：类型顺序 → 权重降序 → 进队时间升序（稳定序）
         tasks.sort(Comparator
                 .comparingInt((ReviewTaskVO t) -> t.getKind().getOrder())
                 .thenComparing(Comparator.comparingInt(ReviewTaskVO::getWeight).reversed())
-                .thenComparing(ReviewTaskVO::getSubmitAt));
+                .thenComparing(Comparator.nullsLast(Comparator.comparing(ReviewTaskVO::getSubmitAt))));
 
+        // ⑨ 组装响应（含 SLA 概览）
         ReviewQueueVO vo = new ReviewQueueVO();
         vo.setList(tasks);
         vo.setSla(sla(tasks));
@@ -177,9 +175,7 @@ public class ReviewAdminService {
 
     /**
      * 通过：商品 2 → 3（上架），审核单据 → 2。
-     *
-     * <p>商品必须先处于「待审核」才允许通过：单据是待审核、商品却已经在售，
-     * 说明有别的地方改过状态，此时照着单据把它改成在售会覆盖掉别人的处置结果，所以拦住（3004）。
+     * 商品须处于待审核，否则状态已被他处改动，拦截至 REVIEW_ITEM_NOT_PENDING（3004），避免覆盖。
      */
     @Transactional(rollbackFor = Exception.class)
     public void pass(Long auditId) {
@@ -202,9 +198,7 @@ public class ReviewAdminService {
     }
 
     /**
-     * 驳回：商品 2 → 6（审核未过），审核单据 → 3 并记原因。
-     *
-     * <p>原因必填（`@NotBlank`）由 Controller 的 `@Valid` 拦，这里不再判空。
+     * 驳回：商品 2 → 6（审核未过），审核单据 → 3 并记录原因。原因必填由 Controller 的 @Valid 校验。
      */
     @Transactional(rollbackFor = Exception.class)
     public void reject(Long auditId, ReviewRejectReq req) {
@@ -228,13 +222,9 @@ public class ReviewAdminService {
     }
 
     /**
-     * 强制下架：转调 {@link ItemAdminService#forceOffline}。
-     *
-     * <p>这里只做「单据必须还是待审核」这一层前置校验（重复处置 → 3001），
-     * 商品侧的状态判断与审核留痕都在上游方法里——它是商品页与审核页共用的唯一实现。
-     *
-     * <p>`handle_cost_ms` 这一路不写：上游方法还有商品页入口，两边口径要一致，
-     * 而「处置动作耗时」这个口径本来就只在本类的三个处置方法里记，不值得为它给上游加参数。
+     * 强制下架：转调 {@link ItemAdminService#forceOffline}（商品页与审核页共用实现）。
+     * 仅前置校验单据仍为待审核（重复处置 → REVIEW_HANDLED）。该路不记 handle_cost_ms，
+     * 因上游还承载商品页入口，耗时口径须两入口一致。
      */
     @Transactional(rollbackFor = Exception.class)
     public void forceOffline(Long auditId, ItemOfflineReq req) {
@@ -245,15 +235,9 @@ public class ReviewAdminService {
     /* ══ 三、举报处置 ═══════════════════════════════════════ */
 
     /**
-     * 举报裁决：`result = 1` 成立 → 商品走强制下架；`2` 不成立 → 商品不动。
-     *
-     * <p>不做独立的「受理」步骤（notes/09 问题 4）：裁决时一步到位把 `status` 写成 3。
-     *
-     * <p>成立 → 一律强制下架（→ 7），不区分轻重（notes/09 问题 9）：
-     * 「整改后自行上架」的 4 是卖家自己下架的语义，平台处置混进去就分不清是谁下的架。
-     *
-     * <p>商品若处于不可下架的状态（已售出等），上游会抛 1106，整笔回滚——
-     * 举报单保持「待处理」，不会出现「裁决成立但商品没动」的半截状态。
+     * 举报裁决：result=1 成立 → 商品强制下架；result=2 不成立 → 商品不动。
+     * 一步到位写 status=3，无独立受理步骤。成立一律强制下架（→7），不区分轻重，
+     * 以免与卖家自行下架（4）语义混淆。商品不可下架时上游抛 1106，整笔回滚，举报单保持待处理。
      */
     @Transactional(rollbackFor = Exception.class)
     public void handleReport(Long reportId, ReportHandleReq req) {
@@ -299,15 +283,9 @@ public class ReviewAdminService {
     /* ══ 四、申诉裁决 ═══════════════════════════════════════ */
 
     /**
-     * 申诉裁决：2 维持（商品不动）/ 3 撤销（按原处置反向恢复商品）。
-     *
-     * <p><b>换人复审（F-A4）</b>：复审人不得是原处置人，命中抛 3002。
-     * 原处置人从申诉指向的那次处置上取：`biz_type = 1` → 该商品最近一条已处置的审核单据，
-     * `biz_type = 2` → 那条举报的 `handler_id`。
-     *
-     * <p><b>撤销的恢复规则</b>：商品当前是「已强制下架」才恢复成「在售」、是「审核未过」才恢复成「待审核」。
-     * 其它状态（已售出 / 卖家自下）不动——商品已经卖出去了，恢复上架没有意义，
-     * 也不该把卖家自己的操作撤掉。恢复结果写进 `handle_note`，复盘时能看出为什么没恢复。
+     * 申诉裁决：result=2 维持（商品不动）/ 3 撤销（按原处置反向恢复）。
+     * 换人复审（F-A4）：复审人不得为原处置人，否则 REVIEW_APPEAL_SAME_HANDLER（3002）。
+     * 撤销仅恢复平台处置过的状态（强制下架→在售、审核未过→待审核），其余状态不变，原因写入 handle_note。
      */
     @Transactional(rollbackFor = Exception.class)
     public void judgeAppeal(Long appealId, AppealJudgeReq req) {
@@ -387,13 +365,9 @@ public class ReviewAdminService {
     }
 
     /**
-     * 三种任务共用的字段：商品、卖家、权重。
-     *
-     * <p><b>权重全部取自该商品最新一条审核记录的快照 + 本单据自己的进队时间</b>：
-     * 快照不随后续变化，正在处理的单子不会因为又来一条举报就换位置；
-     * 等待补偿用本单据的时间，所以同一商品从三条通道进来可以有不同的等待分。
-     *
-     * @return 商品不存在时为 null（数据不一致时跳过这一条，而不是让整个队列 500）
+     * 三类任务的共性字段组装：商品、卖家、权重。
+     * 权重取自该商品最新审核记录快照 + 本单据进队时间（见 {@link #fillWeight}）。
+     * 商品不存在时返回 null，交由调用方丢弃，而非中断整列。
      */
     private ReviewTaskVO baseTask(QueueKindEnum kind, Long bizId, Long itemId, LocalDateTime submitAt, Fill fill) {
         Item item = fill.items.get(itemId);
@@ -431,10 +405,8 @@ public class ReviewAdminService {
     }
 
     /**
-     * 算权重五项与总分（business/03 F-A2）。
-     *
-     * <p>五项之和**恒等于** `weight`：UI 要逐项解释「为什么它排第一」，
-     * 总分若另算一处就会出现「排第一的那条解释出来的分不是最高」。
+     * 计算权重五项与总分。前四项取自商品最新审核记录快照，第五项等待补偿按进队时间实算。
+     * 总分由五项相加，不读 {@code priority_score}（同一公式的冗余快照），以保证「五项之和 = 总分」不变量。
      */
     private void fillWeight(ReviewTaskVO vo, ItemAudit snapshot, LocalDateTime submitAt) {
         long waitHours = waitHours(submitAt);
@@ -450,6 +422,11 @@ public class ReviewAdminService {
         vo.setWaitHours((int) waitHours);
     }
 
+    /**
+     * SLA 概览。due = 等待 ≥ 2h 且 < 24h（已超时但未积压）；overdue = 等待 ≥ 24h；
+     * avgHandleSeconds 为目标常量（30s），非 handle_cost_ms 统计值。三项统计不区分单据类型，
+     * 故「申诉 48h 内复审」承诺未在概览体现，本期未落地。
+     */
     private ReviewSlaVO sla(List<ReviewTaskVO> tasks) {
         ReviewSlaVO s = new ReviewSlaVO();
         s.setPending(tasks.size());
@@ -465,6 +442,7 @@ public class ReviewAdminService {
 
     /* ══ 六、批量回填 ═══════════════════════════════════════ */
 
+    /** 批量回填：以商品 id 集合为入口，一次查齐队列所需的全部关联数据，供后续组装零回库。 */
     private Fill buildFill(List<Long> itemIds, List<Appeal> appeals, Map<Long, Report> appealReports) {
         Fill fill = new Fill();
         List<Long> ids = itemIds.stream().distinct().toList();
@@ -472,23 +450,26 @@ public class ReviewAdminService {
             return fill;
         }
 
+        // 商品主体
         fill.items = itemMapper.selectList(new LambdaQueryWrapper<Item>()
                         .in(Item::getId, ids)
                         .eq(Item::getDeleted, 0))
                 .stream()
                 .collect(Collectors.toMap(Item::getId, Function.identity(), (a, b) -> a));
 
+        // 卖家（取商品集合中出现的 seller_id）
         fill.users = appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
                         .in(AppUser::getId, fill.items.values().stream().map(Item::getSellerId).distinct().toList())
                         .eq(AppUser::getDeleted, 0))
                 .stream()
                 .collect(Collectors.toMap(AppUser::getId, Function.identity(), (a, b) -> a));
 
+        // 商品累计举报数（实时）
         fill.reportCounts = reportMapper.countByItem(ids).stream()
                 .collect(Collectors.toMap(ReportMapper.ItemReportCountRow::getItemId,
                         ReportMapper.ItemReportCountRow::getCnt, (a, b) -> a));
 
-        // 一个商品可以有多条审核记录（重提会再进队），要的是时间线上最后一条
+        // 权重快照：取每件商品时间线最后一条审核记录（重提会产生多条）
         List<ItemAudit> all = itemAuditMapper.selectList(new LambdaQueryWrapper<ItemAudit>()
                 .in(ItemAudit::getItemId, ids)
                 .eq(ItemAudit::getDeleted, 0));
@@ -496,6 +477,7 @@ public class ReviewAdminService {
                 .collect(Collectors.toMap(ItemAudit::getItemId, Function.identity(),
                         (a, b) -> a.getCreateTime().compareTo(b.getCreateTime()) >= 0 ? a : b));
 
+        // 商品图片（按商品分组）
         Map<Long, List<ItemImage>> rawImages = itemImageMapper.selectList(new LambdaQueryWrapper<ItemImage>()
                         .in(ItemImage::getItemId, ids)
                         .eq(ItemImage::getDeleted, 0)
@@ -507,23 +489,23 @@ public class ReviewAdminService {
         rawImages.forEach((itemId, list) ->
                 fill.images.put(itemId, list.stream().map(this::toImageVO).toList()));
 
+        // 分类均价（全量，绕过单商品回填）
         fill.avgPrices = itemMapper.avgPriceByCategory().stream()
                 .collect(Collectors.toMap(ItemMapper.CategoryAvgRow::getCategoryId,
                         ItemMapper.CategoryAvgRow::getAvgPrice, (a, b) -> a));
 
-        // 分类名是全量小表，一次查完比按 id 过滤更简单（与 ItemAdminService 同一口径）
+        // 分类名（全量小表）
         fill.categoryNames = dictService.categories().stream()
                 .collect(Collectors.toMap(DictCategoryVO::getId, DictCategoryVO::getName, (a, b) -> a));
 
+        // 申诉原处置信息（换人复审用）
         fill.origins = origins(appeals, appealReports, all);
         return fill;
     }
 
     /**
-     * 申诉的「原处置人 + 原处置结果」，换人复审要用（F-A4）。
-     *
-     * <p>`biz_type = 3`（订单纠纷）取不到——订单模块还没做，
-     * 这类申诉在队列里不带原处置信息，F-A4 的校验对它自动放宽（`originHandlerOf` 返回 null）。
+     * 申诉原处置信息（换人复审用）。biz_type=1 取该商品最近一条已处置审核记录，
+     * biz_type=2 取被引用举报的处置人。biz_type=3（订单纠纷）无来源，对应申诉不附原处置信息。
      */
     private Map<Long, Origin> origins(List<Appeal> appeals, Map<Long, Report> appealReports, List<ItemAudit> all) {
         if (appeals.isEmpty()) {
@@ -628,11 +610,8 @@ public class ReviewAdminService {
     /* ══ 七、撤销：恢复商品 ═════════════════════════════════ */
 
     /**
-     * 撤销原判：把商品从平台处置的结果恢复回去。
-     *
-     * <p>只处理两种「平台处置过」的状态，其余不动，并把原因写进 `handle_note`
-     * ——卖家看到的是「申诉成立但商品未变更」而不是什么都没有，
-     * 复盘时也能看出当时商品处于什么状态。
+     * 撤销原判：将平台处置结果反向恢复。仅处理强制下架 / 审核未过两种状态，其余不变，
+     * 恢复说明追加至 handle_note，便于复盘。
      *
      * @return 追加了恢复说明的处置备注
      */
@@ -676,10 +655,7 @@ public class ReviewAdminService {
     /* ══ 八、内部工具 ════════════════════════════════════════ */
 
     /**
-     * 审核单据的条件更新：只有仍是「待审核」才改得动。
-     *
-     * <p>影响行数 0 → 3001（已被别人处置）。这比先查后改可靠：
-     * 两个管理员同时点按钮时，先查后改两个都会走到这里，后一个会静默覆盖前一个的结果。
+     * 审核单据条件更新：仅当仍为待审核才改得动，影响行数 0 → REVIEW_HANDLED（已被处置）。
      */
     private void updateAudit(Long auditId, AuditStatusEnum target, long adminId, LocalDateTime now,
                              long begin, String reason, String remark) {
@@ -711,7 +687,9 @@ public class ReviewAdminService {
                 .eq(Item::getDeleted, 0)), ReviewErrorCode.REVIEW_TASK_NOT_FOUND);
     }
 
-    /** kind 过滤参数：空 / 无法识别都按「全部」处理——筛选项是前端给的，不给前端报错的机会 */
+    /**
+     * 解析类型过滤参数。空值按全部处理；非空但非法值抛参数异常。
+     */
     private QueueKindEnum parseKind(String kind) {
         if (kind == null || kind.isBlank()) {
             return null;
@@ -751,7 +729,7 @@ public class ReviewAdminService {
         return v;
     }
 
-    /** 队列组装用的一次性关联数据。字段可变，组装完即丢弃 */
+    /** 队列组装用的单次关联数据容器，组装完即丢弃。 */
     private static class Fill {
         private Map<Long, Item> items = Map.of();
         private Map<Long, AppUser> users = Map.of();

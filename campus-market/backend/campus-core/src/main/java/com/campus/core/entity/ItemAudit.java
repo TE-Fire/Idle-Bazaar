@@ -33,22 +33,25 @@ public class ItemAudit {
     /** 1待审核 2已通过 3已驳回 4已强制下架 */
     private Integer status;
 
-    /** 基础权重分（不含等待衰减，查询时实时补偿） */
+    /**
+     * 基础权重分（不含等待补偿）。冗余快照：队列排序由 {@code fillWeight} 实时重算，不读此字段，
+     * 以免与四项明细漂移。演示数据按同公式填充，供将来 SQL 层排序 / 报表使用。
+     */
     private Integer priorityScore;
 
     /** 举报次数快照（权重 ×3） */
     private Integer reportCount;
 
-    /** 图片风险分 0–100（权重 ×2） */
+    /** 图片风险分 0–100，归一化计入权重：ROUND(值 ÷ 10)，即 0–10 分 */
     private Integer imageRisk;
 
-    /** 0否 1是（+5 分） */
+    /** 价格异常标记 0否 1是（价格偏离同类均价 3 倍以上，计入权重 +5） */
     private Integer priceAbnormal;
 
-    /** (100 − 信用分) / 10 */
+    /** 信用扣减：(100 − 信用分) / 10 */
     private Integer creditDeduct;
 
-    /** 进队时间（SLA 响应时效起点） */
+    /** 进队时间，SLA 响应时效起点 */
     private LocalDateTime enterQueueAt;
 
     /** 首次处置时间（首审时长 = 该值 − 进队时间） */
@@ -57,7 +60,7 @@ public class ItemAudit {
     /** 处置人管理员 id */
     private Long handlerId;
 
-    /** 单条处置耗时，前端埋点上报 */
+    /** 单条处置耗时（服务端动作耗时，非阅读时长） */
     private Integer handleCostMs;
 
     private String rejectReason;

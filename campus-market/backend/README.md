@@ -107,16 +107,23 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 
 ## 七、已知待办
 
-- [x] ~~图形验证码下发接口~~ **已完成**（2026-09-29）：`GET /admin/auth/captcha` 返回 key + PNG base64，
-      登录 / 注册 / 找回密码三处共用；同批新增注册、找回密码、超管分配角色接口。详见 `tech/01` 5.7
-- [x] ~~`@OpLog` 注解与 AOP（操作日志落 `sys_operation_log`，见 `tech/01` 5.4）~~ **已完成**（2026-10-06）：
-      管理端 22 个写接口全部挂上，异步落库走自定义线程池 `opLogExecutor`（有界队列 + 拒绝打 ERROR）。
-      实现与实测见 `notes/11`
-- [x] ~~A9 操作日志查询接口~~ **已完成**（2026-10-06）：`GET /admin/log/list`（`log.view`），
-      分页 + 模块 / 关键词 / 结果 / 日期区间筛选；`OperationLogController` + `OperationLogService` +
-      `OperationLogReq` / `OperationLogVO`。**只读**（审计表不提供删改），且**不挂 `@OpLog`**——
-      查日志不该自己产生日志。前端 `OperationLogView.vue` 同批从 mock 换成真接口，
-      `module` / `opType` 的中文标签由前端维护（后端只出英文码）。
-- [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3；注意 `OP_LOG` 已明确不启用）
+基础设施：
+- [x] 图形验证码下发接口（2026-09-29）：`GET /admin/auth/captcha`，登录/注册/找回密码共用
+- [x] `@OpLog` 注解与 AOP 异步落库（2026-10-06）：管理端 22 个写接口挂上，线程池 `opLogExecutor`
+- [x] A9 操作日志查询接口（2026-10-06）：`GET /admin/log/list`（`log.view`），只读、不挂 `@OpLog`
+
+业务模块（后端，均指管理端 /admin/**）：
+- [x] 字典 dict：学生端 `/api/dict/all` 走缓存；管理端全量字典走独立缓存 `cm:dict:admin:full`（含停用项）
+- [x] 商品 item：管理端 CRUD、审核、强制下架、成色；列表「分页主表 + 批量回填」
+- [x] 审核 review：管理端队列（商品审核 / 举报 / 申诉三来源并入）+ 六个处置接口
+- [x] 用户 user：管理端账号 / 角色 / 权限
+- [ ] 订单 order（**无任何 Controller**；`tech/01` §9 已设计：下单锁库存、支付、`ORDER_TIMEOUT` 延迟消息、超时取消）—— **建议下一步**
+- [ ] 消息 message（`msg_message` 表已建、无 Controller；`tech/01` §10 已设计 `zone` 分区）
+- [ ] 统计 stats（A8 报表，未落地）
+
+未决项：学生端（C 端）发布/浏览商品、提交举报/申诉的接口尚未实现，
+当前审核队列只依赖演示数据；Web 用户端 / 小程序属 `business/01`、`business/02`，范围待定。
+
+中间件（非业务，独立推进）：
+- [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3；`OP_LOG` 已明确不启用）
 - [ ] MinIO 真正接入（实现类已就绪，改 `minio.enabled=true`）
-- [ ] 业务模块：item / order / review / user / message / dict / stats
