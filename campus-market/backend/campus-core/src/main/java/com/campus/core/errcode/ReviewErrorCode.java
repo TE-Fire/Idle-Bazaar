@@ -26,6 +26,14 @@ public enum ReviewErrorCode implements IErrorCode {
      * 这里拦住而不是照着单据把商品改成「在售」，避免覆盖掉别人的处置结果。
      */
     REVIEW_ITEM_NOT_PENDING(3004, "商品不在待审核状态"),
+
+    /** 3005 起是学生端提交举报 / 申诉的校验 */
+    /** 同一人对同一对象已有未处理单据。不拦的话队列会被同一条投诉刷屏，把权重排序冲乱 */
+    REPORT_DUPLICATE(3005, "你已举报过该对象，请等待处理结果"),
+    CANNOT_REPORT_SELF(3006, "不能举报自己发布的商品"),
+    /** 申诉是对「针对自己的处置」发起的，与单据无关者不可申诉 */
+    APPEAL_NOT_ALLOWED(3007, "不可对该单据发起申诉，或已申诉过"),
+    ORDER_NOT_PARTY(3008, "只能对与自己相关的订单发起纠纷"),
     ;
 
     @Override
