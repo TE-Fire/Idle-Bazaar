@@ -22,6 +22,10 @@ public enum ItemErrorCode implements IErrorCode {
 
     ITEM_CANNOT_OFFLINE(1106, "当前状态不能下架（仅待审核 / 在售可下架）"),
     ITEM_CANNOT_DELETE(1107, "在售或已售出的商品不能删除，请先下架"),
+
+    /** 1108 起是学生端专用：区分「资源不存在」与「存在但不是你的」，
+     *  后者一律返回 1108 而不是 1101，避免把所有权信息泄漏成是否存在的信息 */
+    ITEM_NOT_OWNER(1108, "只能操作自己发布的商品"),
     ;
 
     @Override
