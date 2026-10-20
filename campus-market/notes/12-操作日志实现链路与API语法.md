@@ -10,9 +10,9 @@
 
 异步落库带来一个硬约束：线程池线程里读不到任何请求上下文。这就是 `OpLogRecord` 存在的根本原因——它是一份在请求线程上抓好、之后绝不再改的快照（用 Java 的 `record` 类型表达「不可变」语义）。切面把 adminId、module、opType、bizId、描述、脱敏后的变更内容、成败、错误码、耗时、客户端 IP、UA、traceId 全部塞进它，写器那边只读这份快照，不碰任何上下文。
 
-切面挂在 Controller 的写方法上，而不是 Service。原因在于一个 Service 方法常被两个入口复用（例如 `ItemAdminService#forceOffline` 同时服务于商品页和审核队列），挂 Service 会丢掉「从哪个入口来」这一信息；而权限点与入口一一对应，挂在 Controller 才能既记到入口来源、又和 `@SaCheckPermission` 成对出现。一个连带结论是：权限被拒的访问记不进本表——`@SaCheckPermission` 由 `SaInterceptor` 在 `preHandle` 早于方法切面校验，越权请求根本进不到切面，这条线索只能从访问日志与异常日志反查。
+切面标注在 Controller 的写方法上，而不是 Service 方法上。原因在于一个 Service 方法常被两个入口复用（例如 `ItemAdminService#forceOffline` 同时服务于商品页和审核队列），标注在 Service 上会丢掉「从哪个入口来」这一信息；而权限点与入口一一对应，标注在 Controller 上才能既记到入口来源、又和 `@SaCheckPermission` 成对出现。一个连带结论是：权限被拒的访问记不进本表——`@SaCheckPermission` 由 `SaInterceptor` 在 `preHandle` 早于方法切面校验，越权请求根本进不到切面，这条线索只能从访问日志与异常日志反查。
 
-落库的时机要分成功与失败两条路，且两条路刻意不对称。**成功时若当前有活动事务，注册 `afterCommit`，等事务真提交才写**：万一外层把事务回滚了，「从没发生过的操作」就不该留在日志里。**失败时立即提交、不挂 afterCommit**：失败的事务必然回滚，挂上去反而会把「这次失败」一起抹掉，而我们要的恰恰是「谁反复失败」这条线索。两种挂法下语义都成立：注解挂在 Controller（当前用法）时事务早已提交，两条分支等价；挂在 `@Transactional` 的 Service 方法上时两条分支各自正确。
+落库时机的判断依据不只是成败，还有「当前线程有没有活动事务」这一维度，两条路的具体语义在「线程池与事务边界：OpLogWriter」一节展开。一句话概括：**成功且线程上确实有事务在进行时，把写操作注册为事务提交后的回调**，事务回滚就不留「从没发生过的操作」；**其余情况一律当场交给线程池立即写**——失败的尝试本身就是该留下的记录，它不在业务事务里，回滚影响不到它。
 
 ## 实现所需的 API 语法
 
@@ -112,7 +112,7 @@ public record OpLogRecord(
 
 ### 线程池与事务边界：OpLogWriter
 
-写器先把「成功且处于活动事务」的情况注册成 `afterCommit`，其余立即提交，再统一 `execute` 进线程池：
+这一节要解决的问题是：**这条日志什么时候真正写进数据库，与业务事务的成败建立什么关系**。诉求有两个方向相反的方面——业务回滚了，「从没发生过的操作」不该留痕；业务失败了，「有人试过并失败」恰恰要留下。一个时机满足不了两边，所以 `record()` 分两条路。
 
 ```java
 public void record(OpLogRecord record) {
@@ -128,14 +128,37 @@ public void record(OpLogRecord record) {
 
 private void submit(OpLogRecord record) {
     try {
-        opLogExecutor.execute(() -> write(record));   // 后台线程落库
+        opLogExecutor.execute(() -> write(record));   // 交给池线程，立即返回
     } catch (Exception e) {
-        log.error("[oplog] 提交异步落库失败，本条丢弃 ...");  // 拒绝策略触发时此处捕获
+        // 兜的是 execute 自身抛出的运行时异常（执行器未初始化或已销毁）。
+        // 队列满不会走到这里——OpLogRejectedHandler 只打 ERROR 然后返回，不抛。
+        log.error("[oplog] 提交异步落库失败，本条丢弃 ...");
     }
 }
 ```
 
-`TransactionSynchronizationManager` 是 Spring 提供的「当前线程事务状态」访问器。`isSynchronizationActive()` 判断当前线程有没有活动事务同步，`registerSynchronization` 注册一个回调，事务提交后才触发。这两个 API 是「日志随事务成败」能力的关键。
+**`if` 的两个条件用 `&&` 连接，缺一不可**。`record.success()` 是快照里的成败标记；`TransactionSynchronizationManager.isSynchronizationActive()` 是静态无参方法，问的是「当前线程此刻是否处于一个允许注册事务回调的活动事务中」。这个类内部用 ThreadLocal 存放当前线程的事务资源与同步器列表，因此它是线程绑定的——事务在哪个线程上开启，就只有那个线程看得见。除了决定分支，这个判断还有一层作用：`registerSynchronization` 在同步未激活时会抛 `IllegalStateException`，所以它同时是前置守卫。
+
+`registerSynchronization` 也是静态方法，作用是把参数对象加进当前线程的同步器列表，**此时不执行任何数据库操作**。`TransactionSynchronization` 是接口而非抽象类，声明了 `beforeCommit`、`afterCommit`、`beforeCompletion`、`afterCompletion(int status)`、`flush`、`suspend`、`resume` 等方法；从 Spring 5 起这些方法全部带 default 空实现，所以 `new TransactionSynchronization() { ... }` 这个匿名内部类只覆写 `afterCommit` 一个就合法。匿名内部类在方法体内引用形参 `record`，要求 `record` 满足 effectively final——自 Java 8 起不要求显式写 `final`，只要求从未重新赋值，此处成立。`return;` 不能省：注册完必须结束方法，否则会继续执行下面的 `submit`，同一条日志落两次。
+
+事务收尾时同步器的回调顺序是 `beforeCommit` → 真正 commit → `afterCommit` → `afterCompletion`。**回滚时只有 `afterCompletion(STATUS_ROLLED_BACK)`，`afterCommit` 不会被调用**——这正是不把失败记录也注册成回调的原因：注册了就永远不会执行，而失败线索恰恰最该留下。
+
+成功记录之所以「等提交后才写」，靠的不是「写了再撤销」，而是**在提交之前根本没有写过**。注册回调只是一次内存中的登记，真正的 `INSERT` 要等事务提交成功、`afterCommit()` 被回调时，才由 `submit` 转给线程池。事务若回滚，这条日志连「写进数据库」这一步都没发生，不存在「要不要删掉」的问题。
+
+失败记录之所以不会被回滚抹掉，是因为它**从头到尾都不在业务事务里面**。事务是绑定在「请求线程 + 它借到的那条连接」上的局部状态，`ROLLBACK` 是发给那条连接的命令，只撤销该连接上尚未提交的改动。日志的 `INSERT` 跑在线程池线程上，用的是连接池里**另一条**连接，且是自动提交模式，插进去即落盘。请求线程回滚自己的连接时，这条日志早已持久化——不是「回滚时特意跳过了它」，而是**回滚这个动作作用不到它**。
+
+判断依据有两个维度，因此组合出四种情况，而不是「成功一条、失败一条」那么简单。第二个维度——当前线程有没有活动事务——与业务成败无关，取决于注解标注在哪一层。标注在 Controller 上时，方法内的事务在 `pjp.proceed()` 返回前就已提交并解绑，`isSynchronizationActive()` 恒为 false；标注在带 `@Transactional` 的 Service 方法上时，`@OpLog` 切面与事务通知处于同一代理链，先后由 `@Order` 决定，只有切面位于事务通知内层时该值才为 true（本项目没有这种标注，故不展开）。
+
+| 业务结果 | 注解标注位置 | 进入哪个分支 | 真正写库的时机 |
+|---|---|---|---|
+| 成功 | Service 事务方法 | 注册 afterCommit | 事务提交成功之后 |
+| 成功 | Controller | 立即 `submit` | 当场（业务此时已提交完毕） |
+| 失败 | Service 事务方法 | 立即 `submit` | 当场（池线程另一条连接，随后回滚影响不到它） |
+| 失败 | Controller | 立即 `submit` | 当场 |
+
+四种情况并非四套逻辑：只有第一行是延迟写，其余三行都汇到同一个 `submit`，代码结构实际是「一个延迟分支 + 一个兜底出口」。**本项目当前落在第 2 行与第 4 行**——`@OpLog` 全部标注在 Controller 方法上，成功记录也是立即写。它之所以等价于「提交后才写」，是因为它写的时候业务已经提交完毕，靠的是注解位置带来的时序，不是 `afterCommit`。那段延迟逻辑是为将来把注解标注到 Service 事务方法上预留的正确语义。
+
+`submit` 用 `opLogExecutor.execute(Runnable)` 把任务交给线程池后立即返回，不阻塞调用方；lambda `() -> write(record)` 匹配 `Runnable`（无参、无返回值），`write` 返回 void 且内部自行 catch，因此合法。线程池线程执行 `write` 时从连接池另取一条连接做单条 `INSERT`，没有事务包裹，这就是失败记录得以存活的实际原因。
 
 线程池本身单独建一个 `@Bean`，而不是用 `@Async` 默认执行器——因为日志这种「可以丢但不该拖累别人」的任务若混进共用池，库一慢就把共用队列占满，反过来影响别的异步任务。规格上 core 1 / max 2 / 有界队列 512，拒绝策略是「丢弃 + ERROR」而非退回请求线程（`CallerRunsPolicy` 会让用户请求替日志多等一次数据库往返，方向反了）：
 
@@ -190,7 +213,7 @@ private JsonNode mask(JsonNode node) {
 
 ## 小结
 
-这套设施的思路可以收束为一句话：**在请求线程上用 AspectJ 拦截写接口、用 SpEL 把业务 id 求出来、把所有上下文抓成不可变快照，再交给一个独立线程池异步落库，落库时机跟随事务成败，内容先脱敏**。涉及的 API 全落在四个包里——AspectJ（`@Aspect`/`@Around`/`ProceedingJoinPoint`）、Spring 表达式（`SpelExpressionParser`/`MethodBasedEvaluationContext`/`ParameterNameDiscoverer`）、Spring 事务与并发（`TransactionSynchronizationManager`/`ThreadPoolTaskExecutor`）、Jackson 树模型（`JsonNode`）。读侧查询只是常规 `selectPage` + 条件拼装，不在本笔记重点之内。
+这套设施的思路可以收束为一句话：**在请求线程上用 AspectJ 拦截写接口、用 SpEL 把业务 id 求出来、把所有上下文抓成不可变快照，再交给一个独立线程池异步落库，落库时机按成败与有无活动事务分流，内容先脱敏**。涉及的 API 全落在四个包里——AspectJ（`@Aspect`/`@Around`/`ProceedingJoinPoint`）、Spring 表达式（`SpelExpressionParser`/`MethodBasedEvaluationContext`/`ParameterNameDiscoverer`）、Spring 事务与并发（`TransactionSynchronizationManager`/`ThreadPoolTaskExecutor`）、Jackson 树模型（`JsonNode`）。读侧查询只是常规 `selectPage` + 条件拼装，不在本笔记重点之内。
 
 ---
 
