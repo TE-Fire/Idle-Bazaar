@@ -10,12 +10,7 @@ import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
 
-/**
- * 商品图（`item_image`，≤9 张）。
- *
- * <p>`sort = 0` 是主图，与 `item.main_image` 指向同一张——前者用于详情轮播，
- * 后者是列表页免查图表的冗余字段。
- */
+/** 商品图（`item_image`，≤9 张）。sort=0 是主图，与 item.main_image 同一张 */
 @Data
 @Accessors(chain = true)
 @TableName("item_image")

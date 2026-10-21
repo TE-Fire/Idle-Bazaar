@@ -19,14 +19,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * 学生端商品：发布、浏览、编辑、下架（接口清单见 `notes/13` 第七节）。
+ * 学生端商品：发布、浏览、编辑、下架（接口清单见 notes/13 第七节）。
  *
- * <p><b>不挂 `@OpLog`</b>：操作日志记的是管理员行为（`AdminContext` 取不到学生），
- * 学生行为由它产生的数据本身承载——订单、举报、申诉都带着自己的时间线，不需要再抄一份日志。
- *
- * <p><b>没有登录拦截器兜底</b>：`AdminWebConfig` 只拦 `/admin/**`，这里靠
- * {@link UserContext#getUserId()} 在未登录时抛 `NotLoginException`（全局转成 1001）。
- * 浏览免登录可以省一个过滤器，写操作自然被兜住。
+ * <p>不加 @OpLog：操作日志记管理员行为，学生行为由订单、举报、申诉自身的时间线承载。
+ * 无登录拦截器兜底（AdminWebConfig 只拦 /admin/**），靠 UserContext 未登录抛
+ * NotLoginException（全局转 1001）；浏览免登录，写操作自然被兜住。
  */
 @Tag(name = "学生端 · 商品")
 @RestController

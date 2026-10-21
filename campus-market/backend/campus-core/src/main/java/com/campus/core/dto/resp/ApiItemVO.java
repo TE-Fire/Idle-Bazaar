@@ -10,15 +10,9 @@ import java.util.List;
 /**
  * 学生端商品视图（列表与详情共用）。
  *
- * <p><b>不复用 `ItemListVO`</b>：那是管理端的形状，`reportCount` 与 `riskScore` 是处置侧的
- * 治理数据（被举报几次、机器判定的风险分），下发到 C 端等于把风控细节摊给普通用户。
- * 这里刻意只留交易所需字段。
- *
- * <p><b>`images` 只有详情有</b>：列表页用 `mainImage` 就够，把九张图挂在每一行上会让列表响应
- * 膨胀一个数量级。
- *
- * <p>价格字段按 `item` 原样命名（`originPrice`，不是管理端 VO 里的 `originalPrice`）——
- * 新的合同不必继承那个笔误。
+ * <p>不复用管理端 ItemListVO：reportCount / riskScore 是处置侧治理数据，不下发 C 端。
+ * `images` 仅详情有（列表用 mainImage）。价格字段按 item 原样命名 originPrice，
+ * 不继承管理端 VO 的 originalPrice。
  */
 @Data
 public class ApiItemVO {

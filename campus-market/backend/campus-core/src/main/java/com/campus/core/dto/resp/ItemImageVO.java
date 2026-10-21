@@ -3,9 +3,7 @@ package com.campus.core.dto.resp;
 import lombok.Data;
 
 /**
- * 商品图（`item_image` 一行）。
- *
- * <p>前端详情页轮播用。`sort` 带上是为了让前端不必自己猜哪张是主图。
+ * 商品图（`item_image` 一行）。详情页轮播用；带 `sort`，前端不必自己猜主图。
  */
 @Data
 public class ItemImageVO {

@@ -45,21 +45,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 字典模块五张表的读写（business/03 F-A7，流程见 notes/07）。
+ * 字典五张表的读写（business/03 F-A7，流程见 notes/07）。权限由 Controller 的
+ * `@SaCheckPermission(content.edit)` 收口，本类不重复判断。
  *
- * <p><b>权限</b>：由 Controller 的 `@SaCheckPermission(content.edit)` 收口，本类不重复判断。
- * 本类也可能被内部任务调用，权限判断分散到多处容易漏。
+ * <p>两套缓存各一个 key：{@link #all()} 只含启用项（发布页），ADMIN_FULL 含停用项
+ * （管理端）——商品可引用已停用项，只缓存启用项会让历史商品名称解析成 null，不能合并。
+ * 写操作统一 {@link #evictCache()}，两个 key 一起失效。
  *
- * <p><b>新增与编辑是两个方法</b>：`createXxx(req)` / `updateXxx(id, req)`。
- * id 是 `updateXxx` 的必填参数（来自 URL 路径），方法内不判断它是否为空。
- *
- * <p><b>缓存</b>：两套，各一个 key。{@link #all()}（`/api/dict/all`）只缓存<b>启用项</b>给发布页；
- * {@link #categories()}/{@link #campuses()}/{@link #meetPoints()}/{@link #colleges()} 走
- * {@code ADMIN_FULL} 缓存<b>全量（含停用项）</b>，给管理端列表与字典页——两者返回内容不同，不能共用 key。
- * 写操作统一调 {@link #evictCache()}，两个 key 一起失效，所以管理端改完字典仍即时可见。
- *
- * <p><b>事务</b>：只有「停用一级分类连带子级」「停用校区连带面交点与学院」这类多条 UPDATE
- * 用 `TransactionTemplate`。单条 INSERT / UPDATE 不加事务，它本身是原子的。
+ * <p>新增与编辑是分开的两个方法；只有「停用一级连带子级」这类多条 UPDATE 用编程式事务。
  */
 @Slf4j
 @Service
@@ -128,8 +121,8 @@ public class DictService {
     }
 
     /**
-     * 启停分类。停用一级分类时连带停用它的子分类，避免出现「父停用、子仍可选」的状态。
-     * 启用不连带：启用是放宽限制，不该一次放宽一大批子分类。
+     * 启停分类。停用一级分类连带停用其子分类，避免「父停用、子仍可选」；启用不连带
+     * （启用是放宽限制，不该一次放宽一大批）。
      */
     public void updateCategoryStatus(Long id, boolean enabled) {
         DictCategory row = requireCategory(id);
@@ -160,10 +153,8 @@ public class DictService {
     }
 
     /**
-     * 按 `code` 新增或编辑成色（存在则改，不存在则插）。
-     *
-     * <p>不拆成 create / update：四档成色是固定集合（A–D），空库初次维护时若只认编辑，
-     * 就得先手工插数据才能改文案。
+     * 按 `code` 新增或编辑成色（存在则改）。不拆 create / update：四档成色是固定集合，
+     * 空库初次维护时若只认编辑，得先手工插数据。
      */
     public void saveGrade(DictGradeSaveReq req) {
         String code = req.getCode().trim().toUpperCase(Locale.ROOT);
@@ -337,8 +328,7 @@ public class DictService {
     }
 
     /**
-     * 启停校区。停用时连带停用该校区下的面交点与学院，避免出现「校区停用、面交点仍可选」。
-     * 启用不连带，理由同分类。
+     * 启停校区。停用连带停用该校区下的面交点与学院，理由同分类。
      */
     public void updateCampusStatus(Long id, boolean enabled) {
         requireCampus(id);
@@ -363,10 +353,8 @@ public class DictService {
     /* ══ 六、只读下发（走缓存） ══════════════════════════════ */
 
     /**
-     * 五张字典的启用项聚合，给 `/api/dict/all` 用。
-     *
-     * <p>Redis 读写异常时不抛错，改为直接查库返回。字典是发布页的依赖项，
-     * Redis 一次抖动就让发布页 500 不划算。
+     * 五张字典的启用项聚合，给 `/api/dict/all` 用。读穿 + 异常降级直查库：
+     * Redis 一次抖动不该让发布页 500。
      */
     public DictAllVO all() {
         Object cached = null;
@@ -426,11 +414,8 @@ public class DictService {
     }
 
     /**
-     * 管理端全量字典（含停用项）：分类 / 校区 / 面交 / 学院，给 {@code categories()} 等四个读方法共用。
-     *
-     * <p>走 Redis 缓存（{@code ADMIN_FULL}），与 {@link #all()} 的启用项缓存是两个 key——
-     * 管理端要看到停用项、写操作提交后 {@link #evictCache()} 立刻失效，不能共用。
-     * 读穿 + 异常降级直查库，口径与 {@link #all()} 一致：Redis 抖动不该让管理端列表 500。
+     * 管理端全量字典（含停用项），{@link #categories()} 等四个读方法共用。与 {@link #all()}
+     * 两个 key、互不合并（理由见类注释）；读穿 + 异常降级，口径与 {@link #all()} 一致。
      */
     private DictAdminFullVO adminFull() {
         Object cached = null;
@@ -452,8 +437,8 @@ public class DictService {
     }
 
     /**
-     * 四张表的全量（含停用项）一次查齐：先查校区建好名称映射，再查面交 / 学院时直接复用，
-     * 避免 {@code meetPoints()}/{@code colleges()} 各自再查一次校区表。
+     * 四张表的全量（含停用项）一次查齐：先查校区建名称映射，面交 / 学院直接复用，
+     * 避免各自再查一次校区表。
      */
     private DictAdminFullVO loadAdminFull() {
         List<DictCampus> campuses = campusMapper.selectList(new LambdaQueryWrapper<DictCampus>()
@@ -486,10 +471,8 @@ public class DictService {
     /* ══ 七、缓存失效与事务 ══════════════════════════════════ */
 
     /**
-     * 失效 `/api/dict/all` 的缓存。事务内注册 afterCommit，提交成功后才删；事务外立即删。
-     *
-     * <p>先提交数据库、再删缓存这个顺序不能反。反过来（事务内写缓存）有两个问题：
-     * 事务回滚后 Redis 里已是新值；事务提交后 Redis 写入失败则两边不一致。
+     * 失效两个缓存 key。事务内注册 afterCommit，提交成功后才删：回滚则不删，
+     * 缓存旧值与回滚后的库一致；事务外立即删。
      */
     private void evictCache() {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
@@ -505,10 +488,7 @@ public class DictService {
     }
 
     /**
-     * 删除缓存 key，不重新计算。
-     *
-     * <p>重算要重新查五张表并组装序列化，删只需一次 DEL，下次读取时重建。
-     * 另外并发下两次写的先后顺序无法保证，重算有可能把旧快照写回缓存。
+     * 删 key 不重算：重算要重新查五张表并序列化，且并发下可能把旧快照写回缓存。
      */
     private void deleteCacheKey() {
         try {
@@ -554,10 +534,9 @@ public class DictService {
     }
 
     /**
-     * 校验父级分类，只在 `parentId` 非 0（二级分类）时调用。查的是父级那条记录。
+     * 校验父级分类，仅 parentId 非 0（二级分类）时调用。
      *
-     * @param selfId 被编辑的分类 id，用于拒绝自环——`parent_id = 自身 id`
-     *               会让前端按 parentId 组装树时死循环
+     * @param selfId 被编辑的分类 id，用于拒绝自环（前端按 parentId 组装树会死循环）
      */
     private void requireParent(long parentIdInDb, Long selfId) {
         if (selfId != null) {

@@ -13,17 +13,11 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 商品（`item`，核心表）。
+ * 商品（`item`）。
  *
- * <p><b>无「已预定」状态</b>（business/03 §4.1）：拍下只生成待付款订单，商品不锁定、先付款先得，
- * 付款成功才转「已售出」，其余待付款订单自动取消。占位判据只有付款一个。
- *
- * <p>`version` 是乐观锁：条件更新会变成
- * `UPDATE ... SET version = version + 1 WHERE id = ? AND version = ?`，以影响行数判抢到。
- * 管理端本期不用它（处置是单人操作、无并发），加上注解是为了 C 端付款占位时直接可用。
- *
- * <p>`main_image` 冗余主图：列表页不联 `item_image` 就能出缩略图。
- * 它是 `item_image` 中 `sort = 0` 那条的副本，改图时两处要一起改。
+ * <p>无「已预定」状态：拍下只生成待付款订单，付款成功才转已售出，其余待付款自动取消
+ * （business/03 §4.1）。`version` 乐观锁供 C 端付款占位用，管理端本期不用。
+ * `mainImage` 是 item_image 中 sort=0 的副本，改图时两处一起改。
  */
 @Data
 @Accessors(chain = true)

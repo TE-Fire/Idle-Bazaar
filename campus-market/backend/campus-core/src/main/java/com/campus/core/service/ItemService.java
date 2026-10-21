@@ -40,15 +40,11 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 学生端商品维护（发布 / 下架），与 `ItemAdminService` 的分工见 notes/13 第八节。
+ * 学生端商品维护（发布 / 浏览 / 编辑 / 下架），与管理端 {@link ItemAdminService} 分工。
  *
- * <p><b>发布必须同时插入 `item_audit`</b>，这是本类最容易漏的一步：
- * 只写 `item` 而状态设为待审核，商品会出现在管理端的商品列表里、却**永远不会出现在审核队列**，
- * 因为队列的取件条件是 `item_audit.status = 1`。漏掉这一步，前端发布功能在用户看来就是
- * 「发布成功但管理端找不到」，而后端没有任何报错。
- *
- * <p>校验上与 {@link ItemAdminService} 的另一处差异是所有权：这里的一切操作都以
- * `seller_id = 当前用户` 为前提，不属于自己的商品返回 1108 而不是「不存在」。
+ * <p>两个易错点：**发布必须同时插入 `item_audit`**（队列取件条件是 `status = 1`，
+ * 漏插不报错、商品却永不进审核队列）；本类一切操作以 `seller_id = 当前用户` 为前提，
+ * 非本人商品返回 1108 而不是「不存在」。
  */
 @Slf4j
 @Service
@@ -73,14 +69,7 @@ public class ItemService {
 
     private final CategoryAvgPriceCache categoryAvgPriceCache;
 
-    /**
-     * 发布商品，提交即送审。
-     *
-     * <p><b>不直接上架</b>（`business/01` F-W3 判据）：校园实名制下先审后发是平台信任机制的一部分，
-     * 因此这里落到 {@link ItemStatusEnum#PENDING} 而不是 `ON_SALE`。
-     *
-     * @return 新商品 id
-     */
+    /** 发布商品，提交即送审：落 PENDING 并插 `item_audit` 进队（先审后发，business/01 F-W3） */
     @Transactional(rollbackFor = Exception.class)
     public Long publish(Long sellerId, ItemPublishReq req) {
         AppUser seller = appUserMapper.selectById(sellerId);
@@ -111,10 +100,7 @@ public class ItemService {
         return item.getId();
     }
 
-    /**
-     * 卖家主动下架。与管理端强制下架是两件事：这里只允许在售品自用下架，
-     * 落到 {@link ItemStatusEnum#OFFLINE}（可重新上架）而不是平台处置的 7。
-     */
+    /** 卖家主动下架：仅限在售品，落 OFFLINE（可重新上架），区别于平台处置的 7 */
     @Transactional(rollbackFor = Exception.class)
     public void offline(Long sellerId, Long itemId) {
         Item item = itemMapper.selectById(itemId);
@@ -133,13 +119,9 @@ public class ItemService {
     /**
      * 搜索在售商品（关键词 / 分类 / 校区），分页。
      *
-     * <p><b>只出 ON_SALE</b>：待审核、已下架、被处置的商品一律不出。这不是为了保密，
-     * 而是详情页承载着交易入口——让一件尚未通过审核的商品挂上了「立即购买」是自相矛盾的。
-     *
-     * <p>关键词走 `LIKE`：`item.title` 上有 ngram 全文索引可用，但全文检索要写 `MATCH...AGAINST`
-     * 且对短关键词不友好，早引入只会让查询从这里开始分叉。真出现性能瓶颈再换不迟。
-     *
-     * <p>`categoryId` 兼容一级与二级：传一级时展开其下所有二级——首页金刚区点进来传的正是一级 id。
+     * <p>只出 ON_SALE：详情页承载交易入口，未过审商品挂「立即购买」自相矛盾。
+     * 关键词走 LIKE（ngram 索引在，但 MATCH...AGAINST 对短关键词不友好，暂不引入）。
+     * `categoryId` 传一级时展开其下所有二级（首页金刚区入口传的是一级 id）。
      */
     public PageResult<ApiItemVO> search(ItemListReq req) {
         long pageNum = req.getPageNum() == null || req.getPageNum() < 1 ? 1 : req.getPageNum();
@@ -170,12 +152,7 @@ public class ItemService {
         return PageResult.of(list, page.getTotal(), pageNum, pageSize);
     }
 
-    /**
-     * 商品详情，并累加浏览量。
-     *
-     * <p>浏览数直接自增而不做去重：它只是商品热度的粗略信号。要做到 UV 级别的精确就得再引入一张去重表，
-     * 为一个展示性质的数字付出一整套写入与清理成本并不划算。
-     */
+    /** 商品详情并累加浏览量；不去重（热度粗略信号，做到 UV 精确要另建去重表，不划算） */
     @Transactional(rollbackFor = Exception.class)
     public ApiItemVO detail(Long itemId) {
         Item item = itemMapper.selectById(itemId);
@@ -205,12 +182,8 @@ public class ItemService {
     /* ══ 三、编辑 ═════════════════════════════════════════════ */
 
     /**
-     * 编辑商品。**改价格或改成色必须重新送审**（`notes/13` 第七节）：
-     * 审核通过那次认定的正是价格与成色，二者一变，原先那条「已通过」的单据就不再能代表当前商品；
-     * 只改描述不重排队，因为那属于补充说明，不构成新的可售信息。
-     *
-     * <p>图片整体替换而不是增量追加：`ItemPublishReq.images` 是编辑后的完整清单，
-     * 按「新增/删除哪些」传列表会让前端必须维护差量，而这个差量我们能从库里算出来。
+     * 编辑商品：改价格或改成色回待审核重新进队（审核认定的正是这两项，notes/13 第七节），
+     * 只改描述免审。图片按入参整体替换，不传差量——差量能从库里算出来。
      */
     @Transactional(rollbackFor = Exception.class)
     public void update(Long sellerId, Long itemId, ItemPublishReq req) {
@@ -261,11 +234,8 @@ public class ItemService {
     }
 
     /**
-     * 插入审核的单据并算好四项权重快照。
-     *
-     * <p>四项是「进队那一刻的风险画像」，必须存下来而不是每次重算——
-     * 审核队列要靠它们排序，实时算会让正在处理的单子因后续数据变化而跳位置。
-     * 等待补偿是时间的函数，不入库，由 `ReviewAdminService` 查询时按 `enter_queue_at` 实时算。
+     * 插审核单据并算好四项权重快照。快照而非实时值：实时算会让队列中的单子因后续
+     * 数据变化跳位置；等待补偿是时间函数，由 ReviewAdminService 查询时实算。
      */
     private void enqueueAudit(Item item, AppUser seller) {
         int imageRisk = 0;
@@ -286,13 +256,8 @@ public class ItemService {
     }
 
     /**
-     * 价格异常：标价高于同类目成交均价 3 倍。
-     *
-     * <p>均价走 {@link CategoryAvgPriceCache} 共享缓存：这条查询是全量 GROUP BY，
-     * 5 万订单量级冷启动要 380–1000ms，而发布是用户在线等的一次请求。均价是整段历史的
-     * 分组平均，缓存最多滞后 5 分钟，不改变判定结果。
-     *
-     * <p>新品尚无成交时没有均价可比，判为不异常；冒把这个前提写成「异常」会让每个新品都 +5 分。
+     * 价格异常：标价高于同类目成交均价 3 倍。均价走共享缓存（CategoryAvgPriceCache），
+     * 滞后 ≤5 分钟不改变判定。新品无成交时没有均价可比，判为不异常。
      */
     private boolean isPriceAbnormal(Item item) {
         if (item.getCategoryId() == null || item.getPrice() == null) {
@@ -430,19 +395,11 @@ public class ItemService {
     }
 
     /**
-     * **成色 D 必须写描述**（A/B/C 不要求），发布与编辑两个入口共用这一条。
+     * 成色 D 必须写描述（A/B/C 不要求），发布与编辑共用。
      *
-     * <p>为什么单盯 D：A 全新未拆、B 几乎全新、C 轻微使用痕迹，买家看到档位就有稳定预期；
-     * D「明显使用痕迹」的「明显」具体显现在哪（划痕 / 掉漆 / 屏幕老化……），档位本身给不出
-     * 任何信息，唯一载体是描述。允许「D + 空描述」等于挂出一件「有毛病但不告诉你是啥」的商品，
-     * 正是管理端驳回原因里「成色描述不符」的标准形态；而订单快照制度要求纠纷介入时按下单时的
-     * 成色与描述取证（`business/03` F-A6），发布时堵住这个缺口，审核与纠纷两边都省事。
-     *
-     * <p>为什么放 Service 而不是 {@code @Valid}：这是跨字段规则——「当 grade = D 时 description
-     * 必填」，单字段注解表达不了。
-     *
-     * <p>为什么编辑也要查：改描述免审、改成色虽回待审核但重审不查这条，只堵发布一个入口，
-     * 等于留下「先发低档再改成 D」「D 档清空描述」两条绕过路径。
+     * <p>D 档「明显使用痕迹」具体显现在哪只能由描述承载，「D + 空描述」是管理端
+     * 「成色描述不符」的标准形态，纠纷又靠下单快照取证（business/03 F-A6）。
+     * 跨字段规则，单字段注解表达不了，故放 Service；编辑同样要查，否则留两条绕过路径。
      */
     private void requireGradeFlawDescribed(ItemPublishReq req) {
         BizAssert.isTrue(!("D".equalsIgnoreCase(req.getGrade()) && isBlank(req.getDescription())),
