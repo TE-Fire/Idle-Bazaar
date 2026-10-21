@@ -13,6 +13,7 @@ import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.Report;
 import com.campus.core.entity.TradeOrder;
 import com.campus.core.enums.AppealStatusEnum;
+import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.enums.ReportStatusEnum;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.errcode.OrderErrorCode;
@@ -136,6 +137,15 @@ public class ReportService {
             case 3 -> {
                 TradeOrder order = orderMapper.selectById(req.getBizId());
                 BizAssert.notNull(order, OrderErrorCode.ORDER_NOT_FOUND);
+                // 订单纠纷只能从 /api/order/{id}/dispute 进入状态机：这里只收纠纷中订单的
+                // 补充申诉，且一单一条——judgeAppeal 按 biz_id 取件，两条申诉会让同一纠纷裁两遍
+                BizAssert.isTrue(OrderStatusEnum.fromCode(order.getStatus()) == OrderStatusEnum.DISPUTING,
+                        OrderErrorCode.ORDER_STATUS_INVALID, "订单纠纷须通过纠纷入口发起");
+                Long exists = appealMapper.selectCount(new LambdaQueryWrapper<Appeal>()
+                        .eq(Appeal::getBizType, bizType)
+                        .eq(Appeal::getBizId, req.getBizId()));
+                BizAssert.isTrue(exists == null || exists == 0, ReviewErrorCode.APPEAL_NOT_ALLOWED,
+                        "该订单已有纠纷申诉");
                 owned = userId.equals(order.getBuyerId()) || userId.equals(order.getSellerId());
             }
             default -> throw new BizException(CommonErrorCode.PARAM_ERROR);

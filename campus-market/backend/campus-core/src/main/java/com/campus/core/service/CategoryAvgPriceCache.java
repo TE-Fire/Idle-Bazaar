@@ -22,7 +22,8 @@ import java.util.stream.Collectors;
  * Redis 抖动不该让页面 500。
  *
  * <p>缓存 List 不存 Map：JSON 对象 key 会变字符串，Long 取 key 静默返回 null。
- * TTL 5 分钟：均价是慢变量，进队判「3 倍」不受滞后影响；订单完成时 DEL 是后续项。
+ * TTL 5 分钟：均价是慢变量，进队判「3 倍」不受滞后影响；订单完成（status→4）时
+ * 由 {@link #evict()} 主动 DEL，不必等 TTL。
  */
 @Slf4j
 @Service
@@ -79,6 +80,15 @@ public class CategoryAvgPriceCache {
             redisTemplate.opsForValue().set(ItemRedisKeys.CATEGORY_AVG, rows, TTL);
         } catch (Exception e) {
             log.warn("[item] 写均价缓存失败，本次直查结果仍然可用", e);
+        }
+    }
+
+    /** 成交事实变化（订单完成）后失效；失败只意味着多滞后一个 TTL，不抛 */
+    public void evict() {
+        try {
+            redisTemplate.delete(ItemRedisKeys.CATEGORY_AVG);
+        } catch (Exception e) {
+            log.warn("[item] 失效均价缓存失败，等待 TTL 自愈", e);
         }
     }
 }

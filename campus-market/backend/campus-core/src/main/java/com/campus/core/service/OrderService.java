@@ -8,12 +8,15 @@ import com.campus.common.exception.BizException;
 import com.campus.common.exception.CommonErrorCode;
 import com.campus.common.result.PageResult;
 import com.campus.core.dto.resp.OrderVO;
+import com.campus.core.entity.Appeal;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.TradeOrder;
+import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.CancelTypeEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.errcode.OrderErrorCode;
+import com.campus.core.mapper.AppealMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.TradeOrderMapper;
 import com.campus.core.redis.ItemRedisKeys;
@@ -26,6 +29,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -59,6 +63,12 @@ public class OrderService {
 
     /** 裁决留痕统一文案：让 `cancel_reason` 在同为终态的订单里能区分出「被裁决」这一来源 */
     private static final String DISPUTE_SETTLED_REASON = "管理端裁决结案";
+
+    /** `appeal.biz_type = 订单纠纷(3)`，与 ReportService 申诉分流同口径 */
+    private static final int APPEAL_BIZ_ORDER = 3;
+
+    /** 纠纷默认理由：前端允许只发起不填理由，申诉单 reason 不能空着进队列 */
+    private static final String DISPUTE_DEFAULT_REASON = "订单纠纷，申请平台裁决";
 
     /** Lua 返回值：抢到标记 */
     private static final int OCCUPY_WON = 1;
@@ -115,6 +125,10 @@ public class OrderService {
     private final TradeOrderMapper orderMapper;
 
     private final ItemMapper itemMapper;
+
+    private final AppealMapper appealMapper;
+
+    private final CategoryAvgPriceCache categoryAvgPriceCache;
 
     /** 占位标记是纯字符串状态机，用 StringRedisTemplate 即可，不必绕一层 JSON 序列化 */
     private final StringRedisTemplate stringRedisTemplate;
@@ -322,6 +336,8 @@ public class OrderService {
                 .eq(TradeOrder::getStatus, OrderStatusEnum.VERIFIED.getCode())
                 .set(TradeOrder::getStatus, OrderStatusEnum.COMPLETED.getCode()));
         BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有已验货的订单可以确认收货");
+        // 成交成立：status=4 正是 avgPriceByCategory 的统计口径，均价缓存立即失效
+        categoryAvgPriceCache.evict();
     }
 
     /* ══ 五、逆向：取消 / 退款 / 纠纷 ══════════════════════════ */
@@ -371,15 +387,61 @@ public class OrderService {
     public void handleRefund(Long orderId, Long sellerId, boolean agree, String note) {
         TradeOrder order = requireOrder(orderId);
         BizAssert.isTrue(sellerId.equals(order.getSellerId()), OrderErrorCode.ORDER_NOT_OWNER);
+        // 本接口只受理「退款中」的申请：少了这道校验，对待面交订单误调拒绝分支会把它直接转成纠纷
+        BizAssert.isTrue(OrderStatusEnum.fromCode(order.getStatus()) == OrderStatusEnum.REFUNDING,
+                OrderErrorCode.ORDER_STATUS_INVALID, "没有待处理的退款申请");
 
+        if (agree) {
+            int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                    .eq(TradeOrder::getId, orderId)
+                    .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
+                    .set(TradeOrder::getStatus, OrderStatusEnum.REFUNDED.getCode())
+                    .set(TradeOrder::getCancelReason, trim(note)));
+            BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "没有待处理的退款申请");
+            // 退款成立：商品从已售出恢复在售（notes/13 O9 数据变化），占位标记同步重置
+            restoreItemOnRefund(order);
+            return;
+        }
+        // 拒绝即纠纷起点：冻结订单并同事务写申诉单，管理端才有件可裁（notes/13 O12）。
+        // 申请人取买家——退款诉求本由买家发起，被拒后要主张权利的也是他
+        String reason = trim(note);
+        openDispute(order, order.getBuyerId(), reason == null ? "卖家拒绝退款" : "卖家拒绝退款：" + reason);
+    }
+
+    /**
+     * 发起订单纠纷：订单转纠纷中(8) 冻结，同事务写一条 biz_type=3 的申诉单。
+     *
+     * <p>申诉单是管理端取件的唯一入口——只冻结订单不写单，纠纷在审核队列里不存在，
+     * 谁也裁不了，订单将永久停在纠纷中。因此状态迁移与写单必须在同一事务里。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void openDispute(Long orderId, Long userId, String reason) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(isParty(order, userId), OrderErrorCode.ORDER_NOT_OWNER);
+        openDispute(order, userId, reason);
+    }
+
+    /** 受理范围与 notes/13 O12 前置一致：待面交 / 已验货 / 退款中；终态与已冻结不可再起 */
+    private void openDispute(TradeOrder order, Long applicantId, String reason) {
+        OrderStatusEnum status = OrderStatusEnum.fromCode(order.getStatus());
+        BizAssert.isTrue(status == OrderStatusEnum.WAIT_MEET || status == OrderStatusEnum.VERIFIED
+                || status == OrderStatusEnum.REFUNDING, OrderErrorCode.ORDER_STATUS_INVALID,
+                "当前状态不能发起纠纷");
+
+        String text = trim(reason);
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
-                .eq(TradeOrder::getId, orderId)
-                .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
-                .set(TradeOrder::getStatus, agree
-                        ? OrderStatusEnum.REFUNDED.getCode()
-                        : OrderStatusEnum.DISPUTING.getCode())
-                .set(TradeOrder::getCancelReason, trim(note)));
-        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "没有待处理的退款申请");
+                .eq(TradeOrder::getId, order.getId())
+                .eq(TradeOrder::getStatus, order.getStatus())
+                .set(TradeOrder::getStatus, OrderStatusEnum.DISPUTING.getCode())
+                .set(TradeOrder::getCancelReason, text));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
+
+        appealMapper.insert(new Appeal()
+                .setApplicantId(applicantId)
+                .setBizType(APPEAL_BIZ_ORDER)
+                .setBizId(order.getId())
+                .setReason(text == null ? DISPUTE_DEFAULT_REASON : text)
+                .setStatus(AppealStatusEnum.WAITING.getCode()));
     }
 
     /**
@@ -398,11 +460,15 @@ public class OrderService {
                 .le(TradeOrder::getUpdateTime, deadline));
         int count = 0;
         for (TradeOrder order : pending) {
-            count += orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+            int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                     .eq(TradeOrder::getId, order.getId())
                     .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
                     .set(TradeOrder::getStatus, OrderStatusEnum.REFUNDED.getCode())
                     .set(TradeOrder::getCancelReason, AUTO_REFUND_REASON));
+            if (rows == 1) {
+                count++;
+                restoreItemOnRefund(order);
+            }
         }
         if (count > 0) {
             log.info("[order] 卖家超时未处理，系统自动同意退款 {} 笔", count);
@@ -432,6 +498,13 @@ public class OrderService {
                 .set(TradeOrder::getStatus, target.getCode())
                 .set(TradeOrder::getCancelReason, DISPUTE_SETTLED_REASON));
         BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
+        if (target == OrderStatusEnum.REFUNDED) {
+            // 买家赢：退款成立，商品恢复在售，与卖家同意退款同一后果（notes/13 O9）
+            restoreItemOnRefund(order);
+        } else {
+            // 卖家赢：成交成立，订单进入已成交统计，均价缓存随之失效
+            categoryAvgPriceCache.evict();
+        }
     }
 
     /* ══ 六、查询 ═════════════════════════════════════════════ */
@@ -498,6 +571,28 @@ public class OrderService {
     /** 买卖双方任一方都算当事人：面交是双方行为，不能只认买家 */
     private boolean isParty(TradeOrder order, Long userId) {
         return userId.equals(order.getBuyerId()) || userId.equals(order.getSellerId());
+    }
+
+    /**
+     * 退款成立后把商品从已售出恢复在售，并重置占位标记。
+     *
+     * <p>占位标记在付款成功时被置为**永久**的 SOLD（货既售出就该一直挡住后来者，故不设 TTL），
+     * 不重置的话恢复在售的商品会被 Lua 一直当已售挡下——货回来了却永远不能再卖。
+     * 条件更新限定 SOLD：这期间商品若已被平台强制下架，以平台处置为准，不抢回来。
+     */
+    private void restoreItemOnRefund(TradeOrder order) {
+        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
+                .eq(Item::getId, order.getItemId())
+                .eq(Item::getStatus, ItemStatusEnum.SOLD.getCode())
+                .set(Item::getStatus, ItemStatusEnum.ON_SALE.getCode()));
+        String stateKey = ItemRedisKeys.buildStateKey(order.getItemId());
+        try {
+            stringRedisTemplate.opsForValue().set(stateKey, ItemRedisKeys.STATE_ON_SALE,
+                    Duration.ofSeconds(ItemRedisKeys.STATE_TTL_SECONDS));
+        } catch (Exception e) {
+            // 标记没重置成功商品就暂时卖不掉，必须留 error 让运维看得见（TTL 救不了永久值）
+            log.error("[order] 退款后占位标记重置失败，商品可能暂时无法购买，key={}", stateKey, e);
+        }
     }
 
     private String trim(String s) {

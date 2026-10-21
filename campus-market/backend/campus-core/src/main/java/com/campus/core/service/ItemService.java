@@ -254,7 +254,7 @@ public class ItemService {
     /* ══ 三、编辑 ═════════════════════════════════════════════ */
 
     /**
-     * 编辑商品。草稿态商品也可编辑（继续编辑 / 送审）；已发布商品改价格或改成色回待审核
+     * 编辑商品。草稿态商品也可编辑（继续编辑 / 送审）；审核未过可修改后重提；已发布商品改价格或改成色回待审核
      * 重新进队（审核认定的正是这两项，notes/13 第七节），只改描述免审。
      * 图片按入参整体替换，不传差量——差量能从库里算出来。
      */
@@ -263,7 +263,8 @@ public class ItemService {
         Item item = requireOwned(sellerId, itemId);
         ItemStatusEnum status = ItemStatusEnum.fromCode(item.getStatus());
         BizAssert.isTrue(status == ItemStatusEnum.DRAFT || status == ItemStatusEnum.ON_SALE
-                || status == ItemStatusEnum.OFFLINE, ItemErrorCode.ITEM_CANNOT_EDIT);
+                || status == ItemStatusEnum.OFFLINE || status == ItemStatusEnum.REJECTED,
+                ItemErrorCode.ITEM_CANNOT_EDIT);
 
         // 草稿暂存：草稿态 + 勾选「存草稿」——先存着回头再补，不进队、豁免 D 档描述必填
         boolean draftSave = status == ItemStatusEnum.DRAFT && Boolean.TRUE.equals(req.getDraft());
@@ -273,11 +274,13 @@ public class ItemService {
 
         // 草稿送审：草稿态 + 未勾「存草稿」——首次离开草稿态，此前从没进过队，必须进
         boolean submitDraft = status == ItemStatusEnum.DRAFT && !draftSave;
+        // 审核未过：修改后重提——不论改什么，保存即回待审核重新进队（business/01 商品状态机）
+        boolean resubmit = status == ItemStatusEnum.REJECTED;
         // 核心字段变更：价格或成色变化——已发布商品只改这两项才回审，改其余字段照常免审
         boolean coreChanged = !Objects.equals(item.getPrice(), req.getPrice())
                 || !item.getGrade().equalsIgnoreCase(req.getGrade());
-        // 回待审核判定：草稿送审必进队；已发布商品（在售 / 已下架）看核心字段是否变更
-        boolean reaudit = submitDraft || (status != ItemStatusEnum.DRAFT && coreChanged);
+        // 回待审核判定：草稿送审、驳回重提必进队；已发布商品（在售 / 已下架）看核心字段是否变更
+        boolean reaudit = submitDraft || resubmit || (status != ItemStatusEnum.DRAFT && coreChanged);
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
 
         LambdaUpdateWrapper<Item> u = new LambdaUpdateWrapper<Item>()

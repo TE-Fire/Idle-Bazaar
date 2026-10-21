@@ -5,6 +5,7 @@ import com.campus.common.result.Result;
 import com.campus.core.context.UserContext;
 import com.campus.core.dto.req.OrderCancelReq;
 import com.campus.core.dto.req.OrderCreateReq;
+import com.campus.core.dto.req.OrderDisputeReq;
 import com.campus.core.dto.req.RefundHandleReq;
 import com.campus.core.dto.resp.OrderVO;
 import com.campus.core.enums.OrderStatusEnum;
@@ -63,6 +64,13 @@ public class OrderController {
     @PostMapping("/{id}/refund")
     public Result<Void> handleRefund(@PathVariable Long id, @Valid @RequestBody RefundHandleReq req) {
         orderService.handleRefund(id, UserContext.getUserId(), Boolean.TRUE.equals(req.getAgree()), req.getNote());
+        return Result.ok();
+    }
+
+    @Operation(summary = "发起订单纠纷", description = "待面交/已验货/退款中可发起；订单转纠纷中冻结，同事务写申诉单进审核队列")
+    @PostMapping("/{id}/dispute")
+    public Result<Void> dispute(@PathVariable Long id, @RequestBody(required = false) OrderDisputeReq req) {
+        orderService.openDispute(id, UserContext.getUserId(), req == null ? null : req.getReason());
         return Result.ok();
     }
 
