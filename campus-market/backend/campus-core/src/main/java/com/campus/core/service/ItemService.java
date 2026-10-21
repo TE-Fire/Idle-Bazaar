@@ -265,16 +265,18 @@ public class ItemService {
         BizAssert.isTrue(status == ItemStatusEnum.DRAFT || status == ItemStatusEnum.ON_SALE
                 || status == ItemStatusEnum.OFFLINE, ItemErrorCode.ITEM_CANNOT_EDIT);
 
-        // 纯草稿暂存豁免 D 档描述必填（允许「先存着，回头再补」）；送审与已发布编辑都要查
+        // 草稿暂存：草稿态 + 勾选「存草稿」——先存着回头再补，不进队、豁免 D 档描述必填
         boolean draftSave = status == ItemStatusEnum.DRAFT && Boolean.TRUE.equals(req.getDraft());
         if (!draftSave) {
             requireGradeFlawDescribed(req);
         }
 
-        // 草稿首次送审必进队（此前从没进过）；已发布商品仍只看价格 / 成色是否变化
+        // 草稿送审：草稿态 + 未勾「存草稿」——首次离开草稿态，此前从没进过队，必须进
         boolean submitDraft = status == ItemStatusEnum.DRAFT && !draftSave;
+        // 核心字段变更：价格或成色变化——已发布商品只改这两项才回审，改其余字段照常免审
         boolean coreChanged = !Objects.equals(item.getPrice(), req.getPrice())
                 || !item.getGrade().equalsIgnoreCase(req.getGrade());
+        // 回待审核判定：草稿送审必进队；已发布商品（在售 / 已下架）看核心字段是否变更
         boolean reaudit = submitDraft || (status != ItemStatusEnum.DRAFT && coreChanged);
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
 
