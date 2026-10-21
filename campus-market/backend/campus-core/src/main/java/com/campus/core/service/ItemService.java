@@ -83,8 +83,7 @@ public class ItemService {
     public Long publish(Long sellerId, ItemPublishReq req) {
         AppUser seller = appUserMapper.selectById(sellerId);
         BizAssert.notNull(seller, CommonErrorCode.NOT_FOUND);
-        BizAssert.isTrue(!("D".equalsIgnoreCase(req.getGrade()) && isBlank(req.getDescription())),
-                CommonErrorCode.PARAM_ERROR);
+        requireGradeFlawDescribed(req);
 
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
         Item item = new Item()
@@ -217,6 +216,9 @@ public class ItemService {
         ItemStatusEnum status = ItemStatusEnum.fromCode(item.getStatus());
         BizAssert.isTrue(status == ItemStatusEnum.ON_SALE || status == ItemStatusEnum.OFFLINE,
                 ItemErrorCode.ITEM_CANNOT_EDIT);
+
+        // 与 publish 同一规则：编辑同样可能把商品改成「D 档 + 空描述」，见 requireGradeFlawDescribed
+        requireGradeFlawDescribed(req);
 
         boolean coreChanged = !Objects.equals(item.getPrice(), req.getPrice())
                 || !item.getGrade().equalsIgnoreCase(req.getGrade());
@@ -423,5 +425,25 @@ public class ItemService {
 
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /**
+     * **成色 D 必须写描述**（A/B/C 不要求），发布与编辑两个入口共用这一条。
+     *
+     * <p>为什么单盯 D：A 全新未拆、B 几乎全新、C 轻微使用痕迹，买家看到档位就有稳定预期；
+     * D「明显使用痕迹」的「明显」具体显现在哪（划痕 / 掉漆 / 屏幕老化……），档位本身给不出
+     * 任何信息，唯一载体是描述。允许「D + 空描述」等于挂出一件「有毛病但不告诉你是啥」的商品，
+     * 正是管理端驳回原因里「成色描述不符」的标准形态；而订单快照制度要求纠纷介入时按下单时的
+     * 成色与描述取证（`business/03` F-A6），发布时堵住这个缺口，审核与纠纷两边都省事。
+     *
+     * <p>为什么放 Service 而不是 {@code @Valid}：这是跨字段规则——「当 grade = D 时 description
+     * 必填」，单字段注解表达不了。
+     *
+     * <p>为什么编辑也要查：改描述免审、改成色虽回待审核但重审不查这条，只堵发布一个入口，
+     * 等于留下「先发低档再改成 D」「D 档清空描述」两条绕过路径。
+     */
+    private void requireGradeFlawDescribed(ItemPublishReq req) {
+        BizAssert.isTrue(!("D".equalsIgnoreCase(req.getGrade()) && isBlank(req.getDescription())),
+                CommonErrorCode.PARAM_ERROR);
     }
 }
