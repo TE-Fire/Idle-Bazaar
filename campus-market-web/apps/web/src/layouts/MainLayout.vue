@@ -18,10 +18,12 @@ import { useRouter } from 'vue-router'
 import { CAMPUSES } from '@campus/shared'
 import { ChatDotRound, CopyDocument, Position, Top } from '@element-plus/icons-vue'
 import { useCompareStore } from '@/stores/compare'
+import { useUserStore } from '@/stores/user'
 import CompareBar from '@/components/CompareBar.vue'
 
 const router = useRouter()
 const compare = useCompareStore()
+const session = useUserStore()
 
 const keyword = ref('')
 
@@ -42,6 +44,12 @@ function onHot(word: string): void {
 
 function backTop(): void {
   window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+/** 退出登录：清本地会话回首页（后端注销失败也清，见 stores/user） */
+async function logout(): Promise<void> {
+  await session.logout()
+  void router.push({ name: 'home' })
 }
 </script>
 
@@ -78,7 +86,12 @@ function backTop(): void {
           </RouterLink>
           <a class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</a>
           <a class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</a>
-          <RouterLink :to="{ name: 'login' }" class="lnk">登录</RouterLink>
+          <!-- 登录态：未登录显示入口，已登录显示昵称 + 我的商品 + 退出 -->
+          <RouterLink v-if="!session.isLogin" :to="{ name: 'login' }" class="lnk">登录</RouterLink>
+          <template v-else>
+            <RouterLink :to="{ name: 'my-items' }" class="lnk">{{ session.nickname || '我的' }}</RouterLink>
+            <a class="lnk" @click="logout">退出</a>
+          </template>
         </nav>
       </div>
     </header>

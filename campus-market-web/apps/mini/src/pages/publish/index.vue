@@ -2,38 +2,118 @@
 /**
  * M3 发布闲置（design/02 §六，P0）
  *
- * <p>与 Web 端 P3 的区别：桌面靠**拖拽 + 实时预览**兑现价值，小程序只能靠
- * `uni.chooseMedia` 选图（≤9），所以这里的重点是**选图后立刻能看到缩略图与封面**，
- * 而不是拖拽排序。表单字段与 Web 端一致，枚举取自 `@campus/shared`。
+ * <p>与 Web 端 P3 同一契约：**存草稿**（draft=true）与**提交送审**（draft=false）
+ * 两个按钮。必填字段（标题 5–50 字 / 价格 / 分类 / 成色 / 校区）两种意图都查——
+ * `item` 表这些列 NOT NULL，草稿同样要落库；草稿豁免图片与描述。
+ * 编辑模式（`?edit={id}`）下草稿商品显示两个按钮，已发布商品只有「保存」。
  *
- * <p>骨架期：图片只走本地临时路径，不上传（MinIO 直传接口未实现）；
- * 提交只给 Toast 反馈，不落库。
+ * <p>骨架期遗留：图片走本地临时路径，不上传（MinIO 直传接口未实现），
+ * 因此新选的图不入提交列表；编辑时已有图片原样带回。
  */
 
 import { computed, ref } from 'vue'
-import { CAMPUSES, CATEGORIES, CONDITION_GRADES, CONDITION_LABELS, type ConditionGrade } from '@campus/shared'
+import { onLoad } from '@dcloudio/uni-app'
+import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
 
 const MAX_SHOTS = 9
 
 const shots = ref<string[]>([])
 const form = ref({
   title: '',
-  categoryIndex: 1,
-  condition: 'B' as ConditionGrade,
+  categoryId: '',
+  grade: 'B',
   price: '',
   originalPrice: '',
-  campusIndex: 0,
-  meetPoint: '',
+  campusId: '',
+  meetPointId: '',
   description: '',
   negotiable: false,
   delivery: false
 })
 
-/** picker 的 range 必须是字符串数组；分类里去掉「首页」 */
-const categoryRange = CATEGORIES.filter((c) => c !== '首页')
-const campusRange = [...CAMPUSES]
+/* ── 字典 ─────────────────────────────────────────────── */
 
-const canSubmit = computed(() => form.value.title.trim().length >= 4 && Number(form.value.price) > 0)
+/** 分类取二级挂在一级下：picker 显示「一级 / 二级」，值是二级 id */
+const categoryLabels = ref<string[]>([])
+const categoryIds = ref<string[]>([])
+const grades = ref<Array<{ code: string; label: string }>>([])
+const campusLabels = ref<string[]>([])
+const campusIds = ref<string[]>([])
+const meetPoints = ref<Array<{ id: string; name: string; campusId: string }>>([])
+
+const meetPointLabels = computed(() =>
+  meetPoints.value.filter((m) => m.campusId === form.value.campusId).map((m) => m.name)
+)
+const meetPointIds = computed(() =>
+  meetPoints.value.filter((m) => m.campusId === form.value.campusId).map((m) => m.id)
+)
+
+onLoad(async (query) => {
+  try {
+    const dict = await userDictApi.all()
+    flattenCategories(dict.categories)
+    grades.value = dict.grades
+    campusLabels.value = dict.campuses.map((c) => c.name)
+    campusIds.value = dict.campuses.map((c) => c.id)
+    meetPoints.value = dict.meetPoints
+    // 默认选中第一项，避免空选导致必填拦不住
+    if (categoryIds.value.length) form.value.categoryId = categoryIds.value[0]
+    if (campusIds.value.length) form.value.campusId = campusIds.value[0]
+  } catch {
+    // request 层已提示
+  }
+  if (typeof query?.edit === 'string' && query.edit) await loadForEdit(query.edit)
+})
+
+/** 二级分类平铺成「一级 / 二级」；一级分类（parentId=0）只做分组头 */
+function flattenCategories(categories: CategoryVO[]): void {
+  const roots = categories.filter((c) => !c.parentId || c.parentId === '0')
+  categoryLabels.value = []
+  categoryIds.value = []
+  for (const root of roots) {
+    const children = categories.filter((c) => c.parentId === root.id)
+    if (children.length === 0) {
+      categoryLabels.value.push(root.name)
+      categoryIds.value.push(root.id)
+      continue
+    }
+    for (const child of children) {
+      categoryLabels.value.push(`${root.name} / ${child.name}`)
+      categoryIds.value.push(child.id)
+    }
+  }
+}
+
+/* ── 编辑模式 ─────────────────────────────────────────── */
+
+const editMode = ref(false)
+const editingId = ref('')
+const editingDraft = ref(true)
+/** 编辑时已有图片（真实 URL，提交原样带回） */
+const existingImages = ref<string[]>([])
+
+async function loadForEdit(id: string): Promise<void> {
+  try {
+    const item = await userItemApi.detail(id)
+    editMode.value = true
+    editingId.value = item.id
+    editingDraft.value = item.status === 'DRAFT'
+    uni.setNavigationBarTitle({ title: editingDraft.value ? '编辑草稿' : '编辑商品' })
+    form.value.title = item.title
+    form.value.categoryId = item.categoryId
+    form.value.grade = item.grade
+    form.value.price = item.price
+    form.value.originalPrice = item.originPrice ?? ''
+    form.value.campusId = item.campusId
+    form.value.meetPointId = item.meetPointId ?? ''
+    form.value.description = item.description ?? ''
+    existingImages.value = (item.images ?? []).map((i) => i.url)
+  } catch {
+    // 详情拉取失败（不存在 / 非本人）时退回新建模式，request 层已提示
+  }
+}
+
+/* ── 选图 ─────────────────────────────────────────────── */
 
 function chooseImage(): void {
   uni.chooseMedia({
@@ -51,22 +131,85 @@ function removeShot(index: number): void {
   shots.value.splice(index, 1)
 }
 
+/* ── 校验与提交 ───────────────────────────────────────── */
+
+/**
+ * 必填校验（草稿与送审同一套），与后端 ItemPublishReq 注解对齐：
+ * 标题 5–50 字、价格 > 0、分类、校区。成色 D 必须写描述（后端 Service 查，这里先拦）。
+ */
+const canSubmit = computed(() => {
+  const title = form.value.title.trim()
+  return (
+    title.length >= 5 &&
+    title.length <= 50 &&
+    Number(form.value.price) > 0 &&
+    !!form.value.categoryId &&
+    !!form.value.campusId
+  )
+})
+
+async function save(draft: boolean): Promise<void> {
+  if (!canSubmit.value) {
+    uni.showToast({ title: '标题 5–50 字，价格、分类、校区都要填', icon: 'none' })
+    return
+  }
+  if (form.value.grade === 'D' && !form.value.description.trim()) {
+    uni.showToast({ title: '成色为 D 时请描述写明具体瑕疵', icon: 'none' })
+    return
+  }
+  const req = {
+    title: form.value.title.trim(),
+    categoryId: form.value.categoryId,
+    grade: form.value.grade,
+    price: Number(form.value.price),
+    originalPrice: form.value.originalPrice ? Number(form.value.originalPrice) : undefined,
+    campusId: form.value.campusId,
+    meetPointId: form.value.meetPointId || undefined,
+    description: form.value.description.trim() || undefined,
+    // 新选的本地图不入列表（上传接口未接）；编辑时已有图片原样带回
+    images: editMode.value ? existingImages.value : [],
+    negotiable: form.value.negotiable ? 1 : 0,
+    deliveryIncluded: form.value.delivery ? 1 : 0,
+    draft
+  }
+  try {
+    if (editMode.value) {
+      await userItemApi.edit(editingId.value, req)
+      uni.showToast({ title: draft ? '已存回草稿' : '已保存', icon: 'success' })
+    } else {
+      await userItemApi.publish(req)
+      uni.showToast({
+        title: draft ? '已存入草稿' : '已提交审核',
+        icon: 'success'
+      })
+    }
+    setTimeout(() => uni.navigateBack(), 800)
+  } catch {
+    // request 层已提示具体原因（1000 参数 / 1108 归属 / 1001 未登录跳登录）
+  }
+}
+
+/** picker change：range 是标签数组，值按下标回查 id 数组 */
 function onCategoryChange(e: { detail: { value: number } }): void {
-  form.value.categoryIndex = e.detail.value
+  form.value.categoryId = categoryIds.value[e.detail.value] ?? ''
 }
 
 function onCampusChange(e: { detail: { value: number } }): void {
-  form.value.campusIndex = e.detail.value
+  form.value.campusId = campusIds.value[e.detail.value] ?? ''
+  // 校区换了面交点作废：面交点挂在校区下，不跨校区选
+  form.value.meetPointId = ''
 }
 
-function submit(): void {
-  if (!canSubmit.value) {
-    uni.showToast({ title: '标题至少 4 字，价格要大于 0', icon: 'none', duration: 1500 })
-    return
-  }
-  // 骨架期不落库：后端 /api/item/publish 未实现
-  uni.showToast({ title: '已提交审核（骨架期未落库）', icon: 'none', duration: 1500 })
-  setTimeout(() => uni.switchTab({ url: '/pages/index/index' }), 1200)
+function onMeetPointChange(e: { detail: { value: number } }): void {
+  form.value.meetPointId = meetPointIds.value[e.detail.value] ?? ''
+}
+
+/**
+ * switch 变更。事件类型在 @dcloudio/types 里是松的 Event，没有 detail，
+ * 这里显式收形参再断言，避免 template 里到处 as any。
+ */
+function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
+  form.value[field] = (e as { detail: { value: boolean } }).detail.value
 }
 </script>
 
@@ -90,13 +233,13 @@ function submit(): void {
     <!-- 表单 -->
     <view class="sec">
       <text class="sec__t">标题</text>
-      <input v-model="form.title" class="input" placeholder="例如：iPad 9 64G WiFi 版 电池 92%" maxlength="40" />
+      <input v-model="form.title" class="input" placeholder="例如：iPad 9 64G WiFi 版 电池 92%" maxlength="50" />
     </view>
 
     <view class="sec">
       <text class="sec__t">分类</text>
-      <picker mode="selector" :range="categoryRange" :value="form.categoryIndex" @change="onCategoryChange">
-        <view class="picker">{{ categoryRange[form.categoryIndex] }} ▾</view>
+      <picker :range="categoryLabels" @change="onCategoryChange">
+        <view class="picker">{{ categoryLabels[categoryIds.indexOf(form.categoryId)] || '选择分类' }} ▾</view>
       </picker>
     </view>
 
@@ -104,13 +247,13 @@ function submit(): void {
       <text class="sec__t">成色</text>
       <view class="grades">
         <text
-          v-for="g in CONDITION_GRADES"
-          :key="g"
+          v-for="g in grades"
+          :key="g.code"
           class="grade"
-          :class="{ 'grade--on': form.condition === g }"
-          @click="form.condition = g"
+          :class="{ 'grade--on': form.grade === g.code }"
+          @click="form.grade = g.code"
         >
-          {{ g }} {{ CONDITION_LABELS[g] }}
+          {{ g.code }} {{ g.label }}
         </text>
       </view>
     </view>
@@ -125,10 +268,14 @@ function submit(): void {
 
     <view class="sec">
       <text class="sec__t">校区 / 面交点</text>
-      <picker mode="selector" :range="campusRange" :value="form.campusIndex" @change="onCampusChange">
-        <view class="picker">{{ campusRange[form.campusIndex] }} ▾</view>
+      <picker :range="campusLabels" @change="onCampusChange">
+        <view class="picker">{{ campusLabels[campusIds.indexOf(form.campusId)] || '选择校区' }} ▾</view>
       </picker>
-      <input v-model="form.meetPoint" class="input" placeholder="面交点，例如：图书馆东门" />
+      <picker :range="meetPointLabels" @change="onMeetPointChange">
+        <view class="picker">
+          {{ meetPointLabels[meetPointIds.indexOf(form.meetPointId)] || (form.campusId ? '选择面交点（选填）' : '先选校区') }} ▾
+        </view>
+      </picker>
     </view>
 
     <view class="sec">
@@ -139,17 +286,30 @@ function submit(): void {
     <view class="sec">
       <view class="switch-row">
         <text>可议价</text>
-        <switch :checked="form.negotiable" color="#FF6A00" @change="form.negotiable = $event.detail.value" />
+        <switch :checked="form.negotiable" color="#FF6A00" @change="onToggle('negotiable', $event)" />
       </view>
       <view class="switch-row">
         <text>包校园配送</text>
-        <switch :checked="form.delivery" color="#FF6A00" @change="form.delivery = $event.detail.value" />
+        <switch :checked="form.delivery" color="#FF6A00" @change="onToggle('delivery', $event)" />
       </view>
     </view>
 
-    <view class="submit" hover-class="submit--active" :class="{ 'submit--off': !canSubmit }" @click="submit">
-      <text class="submit__t">提交送审</text>
-    </view>
+    <!-- 提交：草稿态 / 新建两个按钮；已发布商品只有「保存」 -->
+    <template v-if="editMode && !editingDraft">
+      <view class="submit" hover-class="submit--active" :class="{ 'submit--off': !canSubmit }" @click="save(false)">
+        <text class="submit__t">保存</text>
+      </view>
+    </template>
+    <template v-else>
+      <view class="btns">
+        <view class="btn btn--ghost" hover-class="submit--active" :class="{ 'btn--off': !canSubmit }" @click="save(true)">
+          <text class="btn__t">存草稿</text>
+        </view>
+        <view class="btn" hover-class="submit--active" :class="{ 'submit--off': !canSubmit }" @click="save(false)">
+          <text class="submit__t">提交送审</text>
+        </view>
+      </view>
+    </template>
   </view>
 </template>
 
@@ -329,5 +489,41 @@ function submit(): void {
 
 .submit--active {
   transform: scale(0.97);
+}
+
+/* 双按钮：草稿在左（次要），送审在右（主要） */
+.btns {
+  display: flex;
+  gap: $cm-space-3;
+}
+
+.btn {
+  flex: 1;
+  height: 88rpx;
+  line-height: 88rpx;
+  text-align: center;
+  background: $cm-color-brand;
+  border-radius: $cm-radius-md;
+  transition: transform 120ms ease-out;
+}
+
+.btn--ghost {
+  background: $cm-color-surface;
+  border: 1rpx solid $cm-color-brand;
+}
+
+.btn__t {
+  font-size: $cm-font-size-md;
+  font-weight: 600;
+  color: $cm-color-brand-text;
+}
+
+.btn--off {
+  background: $cm-color-brand-bg;
+  border-color: transparent;
+}
+
+.btn--off .btn__t {
+  color: $cm-color-text-3;
 }
 </style>

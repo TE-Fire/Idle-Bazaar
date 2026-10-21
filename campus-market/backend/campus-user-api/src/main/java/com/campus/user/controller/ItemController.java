@@ -33,7 +33,7 @@ public class ItemController {
 
     private final ItemService itemService;
 
-    @Operation(summary = "发布商品", description = "提交即送审：落 PENDING 并插入 item_audit 进队，不直接上架")
+    @Operation(summary = "发布商品", description = "提交即送审：落 PENDING 并插入 item_audit 进队，不直接上架；draft=true 暂存草稿，不进队、图片与描述可后补")
     @PostMapping("/publish")
     public Result<Long> publish(@Valid @RequestBody ItemPublishReq req) {
         return Result.ok(itemService.publish(UserContext.getUserId(), req));
@@ -51,10 +51,23 @@ public class ItemController {
         return Result.ok(itemService.detail(id));
     }
 
-    @Operation(summary = "编辑商品", description = "改价格或改成色须回待审核重新排队，只改描述免审")
+    @Operation(summary = "编辑商品", description = "草稿可继续编辑，draft=false 时送审；已发布商品改价格或改成色回待审核，只改描述免审")
     @PostMapping("/{id}/edit")
     public Result<Void> edit(@PathVariable Long id, @Valid @RequestBody ItemPublishReq req) {
         itemService.update(UserContext.getUserId(), id, req);
+        return Result.ok();
+    }
+
+    @Operation(summary = "我的商品", description = "卖家视角：含草稿等全部状态，支持状态/关键词/分类/校区筛选，按最近更新倒序")
+    @GetMapping("/mine")
+    public Result<PageResult<ApiItemVO>> mine(ItemListReq req) {
+        return Result.ok(itemService.mine(UserContext.getUserId(), req));
+    }
+
+    @Operation(summary = "删除商品", description = "仅限草稿/已下架/审核未过（软删）；已强制下架需走申诉，在售/待审核/已售出不可删")
+    @PostMapping("/{id}/delete")
+    public Result<Void> delete(@PathVariable Long id) {
+        itemService.delete(UserContext.getUserId(), id);
         return Result.ok();
     }
 

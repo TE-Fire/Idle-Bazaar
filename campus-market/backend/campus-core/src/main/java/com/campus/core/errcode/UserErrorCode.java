@@ -27,6 +27,12 @@ public enum UserErrorCode implements IErrorCode {
     PASSWORD_SAME_AS_OLD(4011, "新密码不能与旧密码相同"),
     CAPTCHA_INVALID(4012, "图形验证码不正确或已过期"),
     ROLE_SUPER_FORBIDDEN(4013, "超级管理员只能由开发者创建，不支持分配"),
+
+    /* ── 学生端登录（2026-10-21 新增，手机号 + 短信验证码）── */
+    USER_PHONE_INVALID(4014, "手机号格式不正确"),
+    USER_NOT_FOUND(4015, "该手机号未注册"),
+    USER_SMS_TOO_FREQUENT(4016, "发送过于频繁，请 60 秒后再试"),
+    USER_SMS_CODE_INVALID(4017, "验证码不正确或已过期"),
     ;
 
     @Override

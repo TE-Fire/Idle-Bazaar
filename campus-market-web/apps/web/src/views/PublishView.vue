@@ -3,29 +3,102 @@
  * P3 发布闲置（桌面独占重头戏，business/01 §三 F-W3）
  *
  * <p>桌面价值就体现在这一页：**拖拽多图 + 图序调整 + 右侧实时预览 + Ctrl+Enter 提交**。
- * 四项缺一项，Web 端就退化成移动端的放大版。
  *
- * <p>骨架期说明：图片只做本地预览（`URL.createObjectURL`），不上传——
- * 上传要走 MinIO 直传（tech/02 §6.5），后端接口未实现。提交也是本地反馈，不落库。
+ * <p>两种提交意图共用一个表单：**存草稿**（`draft=true`）与**提交送审**（`draft=false`）。
+ * 必填字段（标题 5–50 字 / 价格 / 分类 / 成色 / 校区）两种意图都查——`item` 表这些列
+ * NOT NULL，草稿同样要落库；草稿豁免的是图片与描述。编辑模式（`?edit={id}`）下
+ * 草稿商品显示「存草稿 + 提交送审」，已发布商品只有「保存」。
+ *
+ * <p>骨架期遗留：图片只做本地预览（`URL.createObjectURL`），上传走独立接口
+ * （MinIO 尚未接入），因此新拖的图不入提交列表；编辑时已有图片原样带回。
  */
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import {
-  CAMPUSES,
-  CATEGORIES,
-  CONDITION_GRADES,
-  CONDITION_LABELS,
-  ITEM_STATUS,
-  type ConditionGrade,
-  type GoodsItem
-} from '@campus/shared'
 import { ElMessage } from 'element-plus'
+import {
+  ITEM_STATUS,
+  type Category,
+  type ConditionGrade,
+  type GoodsItem,
+  type ItemStatus
+} from '@campus/shared'
+import { userDictApi, userItemApi, type CategoryVO } from '@campus/api'
 import ProductCard from '@/components/ProductCard.vue'
 
 const router = useRouter()
 
-/* ── 图片：拖拽 + 排序 ──────────────────────────────────── */
+/* ── 字典：分类 / 成色 / 校区 / 面交点 ─────────────────── */
+
+const categories = ref<CategoryVO[]>([])
+const grades = ref<Array<{ code: string; label: string }>>([])
+const campuses = ref<Array<{ id: string; name: string }>>([])
+const meetPoints = ref<Array<{ id: string; name: string; campusId: string }>>([])
+
+/** 分类平铺带回 parentId：一级做分组头，二级挂进去；0 是一级 */
+const categoryGroups = computed(() => {
+  const roots = categories.value.filter((c) => !c.parentId || c.parentId === '0')
+  return roots.map((root) => ({
+    root,
+    children: categories.value.filter((c) => c.parentId === root.id)
+  }))
+})
+
+/** 面交点按所选校区过滤：选完校区才出现可选面交点 */
+const meetPointsOfCampus = computed(() =>
+  meetPoints.value.filter((m) => m.campusId === form.value.campusId)
+)
+
+const categoryName = computed(
+  () => categories.value.find((c) => c.id === form.value.categoryId)?.name ?? ''
+)
+
+onMounted(async () => {
+  try {
+    const dict = await userDictApi.all()
+    categories.value = dict.categories
+    grades.value = dict.grades.map((g) => ({ code: g.code, label: g.label }))
+    campuses.value = dict.campuses
+    meetPoints.value = dict.meetPoints
+  } catch {
+    // http 层已提示；字典拉不到时下拉为空，提交会被必填校验拦住
+  }
+})
+
+/* ── 编辑模式：?edit={id} 回填已有商品 ─────────────────── */
+
+const editMode = ref(false)
+const editingId = ref('')
+const editingStatus = ref<ItemStatus>('DRAFT')
+/** 编辑时已有的图片（真实 URL，提交原样带回）；新拖的本地图不上传，不入列表 */
+const existingImages = ref<string[]>([])
+
+onMounted(async () => {
+  const id = router.currentRoute.value.query.edit
+  if (typeof id !== 'string' || !id) return
+  try {
+    const item = await userItemApi.detail(id)
+    editMode.value = true
+    editingId.value = item.id
+    editingStatus.value = item.status
+    form.value.title = item.title
+    form.value.categoryId = item.categoryId
+    form.value.grade = item.grade as ConditionGrade
+    form.value.price = Number(item.price)
+    form.value.originPrice = item.originPrice ? Number(item.originPrice) : null
+    form.value.campusId = item.campusId
+    form.value.meetPointId = item.meetPointId ?? ''
+    form.value.description = item.description ?? ''
+    existingImages.value = (item.images ?? []).map((i) => i.url)
+  } catch {
+    // 详情拉取失败（不存在 / 非本人）时退回新建模式，http 层已提示
+  }
+})
+
+/** 编辑的是草稿：两个按钮都显示；已发布商品只有「保存」 */
+const editingDraft = computed(() => editingStatus.value === 'DRAFT')
+
+/* ── 图片：拖拽 + 排序 ─────────────────────────────────── */
 
 interface Shot {
   id: string
@@ -79,12 +152,12 @@ onBeforeUnmount(() => {
 
 const form = ref({
   title: '',
-  category: CATEGORIES[1],
-  condition: 'B' as ConditionGrade,
+  categoryId: '',
+  grade: 'B' as ConditionGrade,
   price: null as number | null,
-  originalPrice: null as number | null,
-  campus: CAMPUSES[0],
-  meetPoint: '',
+  originPrice: null as number | null,
+  campusId: '',
+  meetPointId: '',
   description: '',
   negotiable: false,
   delivery: false
@@ -94,12 +167,12 @@ const form = ref({
 const preview = computed<GoodsItem>(() => ({
   id: 'preview',
   title: form.value.title || '标题预览（填入标题后显示）',
-  category: form.value.category,
+  category: (categoryName.value || '其他闲置') as Category,
   price: form.value.price ?? 0,
-  originalPrice: form.value.originalPrice ?? undefined,
-  condition: form.value.condition,
-  campus: form.value.campus,
-  meetPoint: form.value.meetPoint || '待填面交点',
+  originalPrice: form.value.originPrice ?? undefined,
+  condition: form.value.grade,
+  campus: (campuses.value.find((c) => c.id === form.value.campusId)?.name ?? '待选校区') as GoodsItem['campus'],
+  meetPoint: meetPoints.value.find((m) => m.id === form.value.meetPointId)?.name ?? '待填面交点',
   negotiable: form.value.negotiable,
   delivery: form.value.delivery,
   status: ITEM_STATUS.DRAFT,
@@ -111,27 +184,73 @@ const preview = computed<GoodsItem>(() => ({
   tints: ['#ECEFF3', '#D3D9E0']
 }))
 
-const canSubmit = computed(() => form.value.title.trim().length >= 4 && (form.value.price ?? 0) > 0)
+/**
+ * 必填校验（草稿与送审同一套）：标题 5–50 字、价格 > 0、分类 / 成色 / 校区。
+ * 与后端 `ItemPublishReq` 的注解逐条对齐——后端是最终判官，前端先拦一遍只为少一次往返。
+ */
+const canSubmit = computed(
+  () =>
+    form.value.title.trim().length >= 5 &&
+    form.value.title.trim().length <= 50 &&
+    (form.value.price ?? 0) > 0 &&
+    !!form.value.categoryId &&
+    !!form.value.campusId
+)
 
 /** Ctrl+Enter 提交（design/01 §七 键盘约定） */
 function onKeydown(e: KeyboardEvent): void {
   if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault()
-    submit()
+    void save(false)
   }
 }
 
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 
-function submit(): void {
+/**
+ * 提交 / 存草稿。draft=true 落草稿不进队；draft=false 送审（草稿商品必进队）。
+ * 成色 D 必须写描述：跨字段规则后端查（Service），这里先拦一遍同样口径。
+ */
+async function save(draft: boolean): Promise<void> {
   if (!canSubmit.value) {
-    ElMessage.warning({ message: '标题至少 4 个字，价格要大于 0', duration: 2000 })
+    ElMessage.warning({ message: '标题 5–50 字，价格、分类、校区都要填', duration: 2000 })
     return
   }
-  // 骨架期：接口未实现，只给反馈。真实实现走 POST /api/item/publish
-  ElMessage.success({ message: '已提交审核（骨架期未落库）', duration: 2000 })
-  void router.push({ name: 'home' })
+  if (form.value.grade === 'D' && !form.value.description.trim()) {
+    ElMessage.warning({ message: '成色为「明显使用痕迹」时，请描述写明具体瑕疵', duration: 2000 })
+    return
+  }
+  const req = {
+    title: form.value.title.trim(),
+    categoryId: form.value.categoryId,
+    grade: form.value.grade,
+    price: form.value.price as number,
+    originPrice: form.value.originPrice ?? undefined,
+    campusId: form.value.campusId,
+    meetPointId: form.value.meetPointId || undefined,
+    description: form.value.description.trim() || undefined,
+    // 新拖的本地图不入列表（上传接口未接）；编辑时已有图片原样带回
+    images: editMode.value ? existingImages.value : [],
+    negotiable: form.value.negotiable ? 1 : 0,
+    deliveryIncluded: form.value.delivery ? 1 : 0,
+    draft
+  }
+  try {
+    if (editMode.value) {
+      await userItemApi.edit(editingId.value, req)
+      ElMessage.success({ message: draft ? '已存回草稿' : '已保存', duration: 2000 })
+    } else {
+      await userItemApi.publish(req)
+      ElMessage.success({
+        message: draft ? '已存入草稿' : '已提交审核，通常 2 小时内完成',
+        duration: 2000
+      })
+    }
+    void router.push({ name: 'my-items' })
+  } catch {
+    // http 层已提示具体原因（1000 参数 / 1108 归属 / 1001 未登录跳转）
+  }
 }
 </script>
 
@@ -146,7 +265,7 @@ function submit(): void {
           class="drop"
           :class="{ 'drop--over': dragging }"
           @dragover.prevent="dragging = true"
-          @dragleave.prevent="dragging = false"
+          @dragleave="dragging = false"
           @drop.prevent="onDrop"
           @click="fileInput?.click()"
         >
@@ -171,19 +290,21 @@ function submit(): void {
 
         <el-form label-width="88px" class="form">
           <el-form-item label="标题">
-            <el-input v-model="form.title" maxlength="40" show-word-limit placeholder="例如：iPad 9 64G WiFi 版 电池 92%" />
+            <el-input v-model="form.title" maxlength="50" show-word-limit placeholder="例如：iPad 9 64G WiFi 版 电池 92%" />
           </el-form-item>
 
           <el-form-item label="分类">
-            <el-select v-model="form.category">
-              <el-option v-for="c in CATEGORIES" :key="c" :label="c" :value="c" />
+            <el-select v-model="form.categoryId" placeholder="选择分类">
+              <el-option-group v-for="g in categoryGroups" :key="g.root.id" :label="g.root.name">
+                <el-option v-for="c in g.children" :key="c.id" :label="c.name" :value="c.id" />
+              </el-option-group>
             </el-select>
           </el-form-item>
 
           <el-form-item label="成色">
-            <el-radio-group v-model="form.condition">
-              <el-radio v-for="g in CONDITION_GRADES" :key="g" :value="g">
-                {{ g }} · {{ CONDITION_LABELS[g] }}
+            <el-radio-group v-model="form.grade">
+              <el-radio v-for="g in grades" :key="g.code" :value="g.code">
+                {{ g.code }} · {{ g.label }}
               </el-radio>
             </el-radio-group>
           </el-form-item>
@@ -192,18 +313,20 @@ function submit(): void {
             <div class="price-row">
               <el-input-number v-model="form.price" :min="0" :step="5" placeholder="现价" />
               <span class="price-row__label">原价（选填）</span>
-              <el-input-number v-model="form.originalPrice" :min="0" :step="5" placeholder="原价" />
+              <el-input-number v-model="form.originPrice" :min="0" :step="5" placeholder="原价" />
             </div>
           </el-form-item>
 
           <el-form-item label="校区">
-            <el-select v-model="form.campus">
-              <el-option v-for="c in CAMPUSES" :key="c" :label="c" :value="c" />
+            <el-select v-model="form.campusId" placeholder="选择校区" @change="form.meetPointId = ''">
+              <el-option v-for="c in campuses" :key="c.id" :label="c.name" :value="c.id" />
             </el-select>
           </el-form-item>
 
           <el-form-item label="面交点">
-            <el-input v-model="form.meetPoint" placeholder="例如：图书馆东门" />
+            <el-select v-model="form.meetPointId" placeholder="选择面交点" :disabled="!form.campusId">
+              <el-option v-for="m in meetPointsOfCampus" :key="m.id" :label="m.name" :value="m.id" />
+            </el-select>
           </el-form-item>
 
           <el-form-item label="描述">
@@ -217,8 +340,17 @@ function submit(): void {
         </el-form>
 
         <div class="submit">
-          <el-button type="primary" size="large" :disabled="!canSubmit" @click="submit">提交送审</el-button>
-          <span class="tip">或按 Ctrl + Enter</span>
+          <template v-if="editMode && !editingDraft">
+            <el-button type="primary" size="large" :disabled="!canSubmit" @click="save(false)">保存</el-button>
+            <span class="tip">或按 Ctrl + Enter</span>
+          </template>
+          <template v-else>
+            <el-button type="primary" size="large" :disabled="!canSubmit" @click="save(false)">
+              {{ editMode ? '提交送审' : '发布，送审核' }}
+            </el-button>
+            <el-button size="large" :disabled="!canSubmit" @click="save(true)">存草稿</el-button>
+            <span class="tip">或按 Ctrl + Enter</span>
+          </template>
         </div>
       </section>
 
@@ -231,10 +363,11 @@ function submit(): void {
         </div>
 
         <ul class="checklist">
-          <li :class="{ ok: form.title.trim().length >= 4 }">标题 ≥ 4 字</li>
+          <li :class="{ ok: form.title.trim().length >= 5 && form.title.trim().length <= 50 }">标题 5–50 字</li>
           <li :class="{ ok: (form.price ?? 0) > 0 }">已填价格</li>
-          <li :class="{ ok: shots.length > 0 }">至少 1 张图</li>
-          <li :class="{ ok: !!form.meetPoint }">已填面交点</li>
+          <li :class="{ ok: !!form.categoryId }">已选分类</li>
+          <li :class="{ ok: !!form.campusId }">已选校区</li>
+          <li :class="{ ok: form.grade !== 'D' || !!form.description.trim() }">成色 D 已写瑕疵</li>
         </ul>
       </aside>
     </div>

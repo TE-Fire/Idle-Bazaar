@@ -4,8 +4,8 @@
  * <p>与 admin 同构：pinia 先于 router 装配；请求层的 UI 副作用在这里注入
  * （`@campus/api` 本身不认识任何 UI 库），两端因此能共用同一份请求层。
  *
- * <p>学生端登录接口后端尚未实现，所以**没有登录页与路由守卫**——
- * `onUnauthorized` 目前只提示，不做跳转。等 `/api/auth/*` 就位后补。
+ * <p>登录失效（1001）跳登录页并带 redirect：写操作（发布 / 编辑 / 我的商品）
+ * 全部要求登录，回跳让用户登录后回到原来的页面。
  */
 
 import { createApp } from 'vue'
@@ -34,6 +34,7 @@ configureApi({
   onUnauthorized: () => {
     clearToken()
     ElMessage.warning({ message: '请先登录', duration: 2000 })
+    void router.push({ name: 'login', query: { redirect: router.currentRoute.value.fullPath } })
   }
 })
 

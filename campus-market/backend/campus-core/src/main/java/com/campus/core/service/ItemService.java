@@ -24,6 +24,7 @@ import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
+import com.campus.core.mapper.ReportMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -69,12 +70,20 @@ public class ItemService {
 
     private final CategoryAvgPriceCache categoryAvgPriceCache;
 
-    /** 发布商品，提交即送审：落 PENDING 并插 `item_audit` 进队（先审后发，business/01 F-W3） */
+    private final ReportMapper reportMapper;
+
+    /**
+     * 发布商品。提交即送审：落 PENDING 并插 `item_audit` 进队（先审后发，business/01 F-W3）；
+     * `draft = true` 暂存草稿：落 DRAFT、不进队、豁免图片与描述（含 D 档描述必填），
+     * 必填字段仍要齐全——`item` 表这些列 NOT NULL，草稿同样要落库。
+     */
     @Transactional(rollbackFor = Exception.class)
     public Long publish(Long sellerId, ItemPublishReq req) {
-        AppUser seller = appUserMapper.selectById(sellerId);
-        BizAssert.notNull(seller, CommonErrorCode.NOT_FOUND);
-        requireGradeFlawDescribed(req);
+        AppUser seller = requireUser(sellerId);
+        boolean draft = Boolean.TRUE.equals(req.getDraft());
+        if (!draft) {
+            requireGradeFlawDescribed(req);
+        }
 
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
         Item item = new Item()
@@ -89,14 +98,16 @@ public class ItemService {
                 .setDescription(req.getDescription())
                 .setNegotiable(nvl(req.getNegotiable()))
                 .setDeliveryIncluded(nvl(req.getDeliveryIncluded()))
-                .setStatus(ItemStatusEnum.PENDING.getCode());
+                .setStatus((draft ? ItemStatusEnum.DRAFT : ItemStatusEnum.PENDING).getCode());
         if (!images.isEmpty()) {
             // 首张即主图，列表页免查图表
             item.setMainImage(images.get(0));
         }
         itemMapper.insert(item);
         saveImages(item.getId(), images);
-        enqueueAudit(item, seller);
+        if (!draft) {
+            enqueueAudit(item, seller);
+        }
         return item.getId();
     }
 
@@ -112,6 +123,67 @@ public class ItemService {
                 .eq(Item::getId, itemId)
                         .eq(Item::getStatus, ItemStatusEnum.ON_SALE.getCode())
                         .set(Item::getStatus, ItemStatusEnum.OFFLINE.getCode()));
+    }
+
+    /**
+     * 卖家视角的「我的商品」：含草稿等全部状态（business/01 第四节：草稿可继续编辑 / 删除），
+     * 支持按状态 / 关键词 / 分类 / 校区筛选。按最近更新倒序——草稿要能最快找到接着改。
+     *
+     * <p>不回填卖家信息（`fillSellers`）：卖家就是当前用户，昵称与信用分前端本地已有。
+     */
+    public PageResult<ApiItemVO> mine(Long sellerId, ItemListReq req) {
+        long pageNum = req.getPageNum() == null || req.getPageNum() < 1 ? 1 : req.getPageNum();
+        long size = req.getPageSize() == null || req.getPageSize() < 1 ? 10 : req.getPageSize();
+        long pageSize = Math.min(size, MAX_PAGE_SIZE);
+
+        LambdaQueryWrapper<Item> q = new LambdaQueryWrapper<Item>()
+                .eq(Item::getSellerId, sellerId)
+                .eq(Item::getDeleted, 0);
+        String keyword = trim(req.getKeyword());
+        if (keyword != null) {
+            q.like(Item::getTitle, keyword);
+        }
+        Integer status = parseStatus(req.getStatus());
+        if (status != null) {
+            q.eq(Item::getStatus, status);
+        }
+        List<Long> categoryIds = expandCategory(req.getCategoryId());
+        if (!categoryIds.isEmpty()) {
+            q.in(Item::getCategoryId, categoryIds);
+        }
+        Long campusId = toId(req.getCampusId());
+        if (campusId != null) {
+            q.eq(Item::getCampusId, campusId);
+        }
+        q.orderByDesc(Item::getUpdateTime).orderByDesc(Item::getId);
+
+        Page<Item> page = itemMapper.selectPage(new Page<>(pageNum, pageSize), q);
+        List<ApiItemVO> list = page.getRecords().stream().map(this::toApiVO).toList();
+        return PageResult.of(list, page.getTotal(), pageNum, pageSize);
+    }
+
+    /**
+     * 卖家删除自己的商品（软删，与管理端同一写法）：仅草稿 / 已下架 / 审核未过。
+     *
+     * <p>不含已强制下架——申诉撤销要把商品恢复在售（notes/09 R5），商品没了恢复就失去落点，
+     * 那条路只能走申诉等平台处置；也不含在售 / 待审核 / 已售出（有订单引用或正在交易）。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void delete(Long sellerId, Long itemId) {
+        Item item = requireOwned(sellerId, itemId);
+        ItemStatusEnum status = ItemStatusEnum.fromCode(item.getStatus());
+        BizAssert.isTrue(status == ItemStatusEnum.DRAFT || status == ItemStatusEnum.OFFLINE
+                || status == ItemStatusEnum.REJECTED, ItemErrorCode.ITEM_CANNOT_DELETE);
+
+        long ts = System.currentTimeMillis();
+        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
+                .eq(Item::getId, itemId)
+                .eq(Item::getDeleted, 0)
+                .set(Item::getDeleted, ts));
+        itemImageMapper.update(null, new LambdaUpdateWrapper<ItemImage>()
+                .eq(ItemImage::getItemId, itemId)
+                .eq(ItemImage::getDeleted, 0)
+                .set(ItemImage::getDeleted, ts));
     }
 
     /* ══ 二、浏览 ═════════════════════════════════════════════ */
@@ -182,21 +254,28 @@ public class ItemService {
     /* ══ 三、编辑 ═════════════════════════════════════════════ */
 
     /**
-     * 编辑商品：改价格或改成色回待审核重新进队（审核认定的正是这两项，notes/13 第七节），
-     * 只改描述免审。图片按入参整体替换，不传差量——差量能从库里算出来。
+     * 编辑商品。草稿态商品也可编辑（继续编辑 / 送审）；已发布商品改价格或改成色回待审核
+     * 重新进队（审核认定的正是这两项，notes/13 第七节），只改描述免审。
+     * 图片按入参整体替换，不传差量——差量能从库里算出来。
      */
     @Transactional(rollbackFor = Exception.class)
     public void update(Long sellerId, Long itemId, ItemPublishReq req) {
         Item item = requireOwned(sellerId, itemId);
         ItemStatusEnum status = ItemStatusEnum.fromCode(item.getStatus());
-        BizAssert.isTrue(status == ItemStatusEnum.ON_SALE || status == ItemStatusEnum.OFFLINE,
-                ItemErrorCode.ITEM_CANNOT_EDIT);
+        BizAssert.isTrue(status == ItemStatusEnum.DRAFT || status == ItemStatusEnum.ON_SALE
+                || status == ItemStatusEnum.OFFLINE, ItemErrorCode.ITEM_CANNOT_EDIT);
 
-        // 与 publish 同一规则：编辑同样可能把商品改成「D 档 + 空描述」，见 requireGradeFlawDescribed
-        requireGradeFlawDescribed(req);
+        // 纯草稿暂存豁免 D 档描述必填（允许「先存着，回头再补」）；送审与已发布编辑都要查
+        boolean draftSave = status == ItemStatusEnum.DRAFT && Boolean.TRUE.equals(req.getDraft());
+        if (!draftSave) {
+            requireGradeFlawDescribed(req);
+        }
 
+        // 草稿首次送审必进队（此前从没进过）；已发布商品仍只看价格 / 成色是否变化
+        boolean submitDraft = status == ItemStatusEnum.DRAFT && !draftSave;
         boolean coreChanged = !Objects.equals(item.getPrice(), req.getPrice())
                 || !item.getGrade().equalsIgnoreCase(req.getGrade());
+        boolean reaudit = submitDraft || (status != ItemStatusEnum.DRAFT && coreChanged);
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
 
         LambdaUpdateWrapper<Item> u = new LambdaUpdateWrapper<Item>()
@@ -213,13 +292,13 @@ public class ItemService {
                 .set(Item::getNegotiable, nvl(req.getNegotiable()))
                 .set(Item::getDeliveryIncluded, nvl(req.getDeliveryIncluded()))
                 .set(Item::getMainImage, images.isEmpty() ? null : images.get(0));
-        if (coreChanged) {
+        if (reaudit) {
             u.set(Item::getStatus, ItemStatusEnum.PENDING.getCode());
         }
         itemMapper.update(null, u);
         replaceImages(itemId, images);
 
-        if (coreChanged) {
+        if (reaudit) {
             enqueueAudit(itemMapper.selectById(itemId), requireUser(sellerId));
         }
     }
@@ -238,10 +317,11 @@ public class ItemService {
      * 数据变化跳位置；等待补偿是时间函数，由 ReviewAdminService 查询时实算。
      */
     private void enqueueAudit(Item item, AppUser seller) {
+        // 预留分量：本期没有图片检测源，恒 0（db/01 §5.6 同口径：一期占位，二期接识别服务）
         int imageRisk = 0;
         int priceAbnormal = isPriceAbnormal(item) ? 1 : 0;
         int creditDeduct = (100 - nvl(seller.getCreditScore(), 100)) / 10;
-        int reportCount = 0;
+        int reportCount = currentReportCount(item.getId());
 
         itemAuditMapper.insert(new ItemAudit()
                 .setItemId(item.getId())
@@ -253,6 +333,12 @@ public class ItemService {
                 .setPriceAbnormal(priceAbnormal)
                 .setPriorityScore(reportCount * 3 + Math.round(imageRisk / 10.0f)
                         + creditDeduct + priceAbnormal * 5));
+    }
+
+    /** 进队时的实时举报数（notes/13 O1 规则 3.1）；没被举报的商品查不到行，按 0 计 */
+    private int currentReportCount(Long itemId) {
+        List<ReportMapper.ItemReportCountRow> rows = reportMapper.countByItem(List.of(itemId));
+        return rows.isEmpty() ? 0 : Math.toIntExact(rows.get(0).getCnt());
     }
 
     /**
@@ -275,6 +361,19 @@ public class ItemService {
         BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
         BizAssert.isTrue(sellerId.equals(item.getSellerId()), ItemErrorCode.ITEM_NOT_OWNER);
         return item;
+    }
+
+    /** 状态筛选用枚举名接（与对外输出的形态一致）；空 = 全部，非法名 1000 */
+    private Integer parseStatus(String name) {
+        if (name == null || name.isBlank()) {
+            return null;
+        }
+        try {
+            return ItemStatusEnum.valueOf(name.trim().toUpperCase(Locale.ROOT)).getCode();
+        } catch (IllegalArgumentException e) {
+            BizAssert.isTrue(false, CommonErrorCode.PARAM_ERROR, "未知商品状态：" + name);
+            return null;
+        }
     }
 
     private AppUser requireUser(Long userId) {

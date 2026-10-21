@@ -21,6 +21,18 @@
       }
     },
     {
+      "path": "pages/my-items/index",
+      "style": {
+        "navigationBarTitleText": "我的商品"
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录"
+      }
+    },
+    {
       "path": "pages/category/index",
       "style": {
         "navigationBarTitleText": "全部分类"

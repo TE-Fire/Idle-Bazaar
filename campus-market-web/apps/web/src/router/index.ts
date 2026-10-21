@@ -2,7 +2,7 @@
  * 用户 Web 端路由（design/01 §五 页面清单）
  *
  * <p>骨架期只落地 P0 三页 + P4 对比页（对比是桌面独占卖点，且数据已在 store 里）。
- * 其余 P5–P9 等接口与页面设计确认后再加。
+ * 发布与我的商品已接真实接口（学生端登录就绪后补上路由守卫：未登录访问写页跳登录）。
  */
 
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
@@ -29,8 +29,10 @@ const routes: RouteRecordRaw[] = [
       },
       { path: 'list', name: 'list', component: () => import('@/views/HomeView.vue'), meta: { title: '商品列表' } },
       { path: 'item/:id', name: 'item', component: () => import('@/views/ItemDetailView.vue'), meta: { title: '商品详情' } },
-      // P3 发布：桌面独占重头戏，拖拽多图 + 实时预览 + Ctrl+Enter
+      // P3 发布：桌面独占重头戏，拖拽多图 + 实时预览 + Ctrl+Enter；?edit={id} 编辑模式
       { path: 'publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { title: '发布闲置' } },
+      // 我的商品：卖家视角全状态（含草稿），操作按状态给出
+      { path: 'my-items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我的商品' } },
       // P4 对比：桌面独占，2–4 件参数横评
       { path: 'compare', name: 'compare', component: () => import('@/views/CompareView.vue'), meta: { title: '对比' } }
     ]

@@ -12,7 +12,9 @@ import java.util.List;
 /**
  * 学生端发布/编辑商品。字段范围与 `item` 表一致（标题 5–50 字、价格 > 0）。
  *
- * <p>成色 D 必须写瑕疵说明，但该校验在 Service（跨字段，@Valid 的单字段注解表达不了），
+ * <p>必填字段（标题/分类/成色/价格/校区）草稿与送审都查——`item` 表这些列 NOT NULL，
+ * 草稿同样要落库；草稿豁免的是图片与描述（business/02「稍后补齐」）。
+ * 成色 D 必须写瑕疵说明，但该校验在 Service（跨字段，@Valid 的单字段注解表达不了），
  * 见 {@code ItemService#requireGradeFlawDescribed}。{@code images} 是已上传的 URL 列表
  * （上传走独立接口，MinIO 未接入），入参顺序即图序。
  */
@@ -52,4 +54,11 @@ public class ItemPublishReq {
     private Integer negotiable;
 
     private Integer deliveryIncluded;
+
+    /**
+     * 暂存草稿标志：true = 落草稿(1)、不进审核队列、豁免图片与描述；空/false = 提交送审。
+     *
+     * <p>只对草稿态商品有意义：已发布（在售/已下架）商品编辑时忽略它，按普通编辑处理。
+     */
+    private Boolean draft;
 }

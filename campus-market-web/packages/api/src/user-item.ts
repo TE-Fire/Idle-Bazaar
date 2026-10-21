@@ -1,0 +1,100 @@
+/**
+ * 学生端商品（/api/item）：发布（含草稿）、编辑、我的商品、删除、下架
+ *
+ * <p>与管理端 `item.ts` 的分工：那边是处置视角（列表 / 详情 / 强制下架 / 删除，
+ * 没有编辑——business/03「不做替用户改价改描述」）；这边是卖家视角，
+ * 一切操作以 `seller_id = 当前登录用户` 为前提，后端从令牌取用户，不接受客户端传 id。
+ *
+ * <p>发布与编辑共用 `ItemPublishReq`：
+ *   ① `draft=true` 暂存草稿——落草稿(1)、不进审核队列、豁免图片与描述；
+ *   ② 已发布商品编辑时改价格或改成色回待审核重新进队，只改描述免审。
+ * 价格入参用 number（JSON 数字），后端按 BigDecimal 收；出参一律是字符串。
+ */
+
+import { request, type PageResult } from './http'
+import type { ItemStatus } from './item'
+
+/** 与后端 `ApiItemVO` 对齐；可空字段为可选（Jackson non_null，null 不出现在 JSON） */
+export interface ApiItemVO {
+  id: string
+  title: string
+  mainImage?: string | null
+  categoryId: string
+  categoryName?: string | null
+  /** 2 位小数字符串 */
+  price: string
+  originPrice?: string | null
+  /** 成色 A–D */
+  grade: string
+  campusId: string
+  campusName?: string | null
+  meetPointId?: string | null
+  meetPointName?: string | null
+  sellerId: string
+  sellerNick?: string | null
+  sellerCredit?: number | null
+  /** 1 可议价；议价在聊天里进行，不进订单 */
+  negotiable?: number | null
+  deliveryIncluded?: number | null
+  description?: string | null
+  status: ItemStatus
+  /** 发布时间（草稿是创建时间） */
+  publishAt: string
+  viewCount: number
+  /** 仅详情有 */
+  images?: Array<{ id: string; url: string; sort: number }> | null
+}
+
+/** 发布 / 编辑入参。images 是已上传的 URL 列表（≤9，第一张为主图），上传走独立接口 */
+export interface ItemPublishReq {
+  title: string
+  categoryId: string
+  grade: string
+  price: number
+  originPrice?: number
+  campusId: string
+  meetPointId?: string
+  description?: string
+  images?: string[]
+  negotiable?: number
+  deliveryIncluded?: number
+  /** true = 暂存草稿（不进队、豁免图片与描述）；已发布商品编辑时忽略 */
+  draft?: boolean
+}
+
+/** 我的商品 / 搜索共用的查询条件 */
+export interface MyItemParams {
+  keyword?: string
+  /** 传一级分类 id 命中其下所有二级 */
+  categoryId?: string
+  status?: ItemStatus
+  campusId?: string
+  pageNum?: number
+  pageSize?: number
+}
+
+export const userItemApi = {
+  /** 发布；draft=true 存草稿。返回新商品 id */
+  publish: (req: ItemPublishReq) =>
+    request<string>({ url: '/api/item/publish', method: 'POST', data: req }),
+
+  /** 在售商品列表（免登录）。待审核 / 已下架 / 被处置的一律不出 */
+  list: (params: MyItemParams = {}) =>
+    request<PageResult<ApiItemVO>>({ url: '/api/item/list', params: { ...params } }),
+
+  detail: (id: string) => request<ApiItemVO>({ url: `/api/item/${id}` }),
+
+  /** 编辑。草稿续存传 draft=true；草稿送审传 draft=false（必进队） */
+  edit: (id: string, req: ItemPublishReq) =>
+    request<void>({ url: `/api/item/${id}/edit`, method: 'POST', data: req }),
+
+  /** 我的商品：全状态（含草稿），按最近更新倒序 */
+  mine: (params: MyItemParams = {}) =>
+    request<PageResult<ApiItemVO>>({ url: '/api/item/mine', params: { ...params } }),
+
+  /** 删除（软删）。仅草稿 / 已下架 / 审核未过可删；在售 / 已售出返回 1107 */
+  remove: (id: string) => request<void>({ url: `/api/item/${id}/delete`, method: 'POST' }),
+
+  /** 卖家主动下架 → 已下架(4)，可重新编辑上架 */
+  offline: (id: string) => request<void>({ url: `/api/item/${id}/offline`, method: 'POST' })
+}
