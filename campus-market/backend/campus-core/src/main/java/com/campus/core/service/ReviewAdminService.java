@@ -104,6 +104,7 @@ public class ReviewAdminService {
     private final ItemAdminService itemAdminService;
     private final OrderService orderService;
     private final DictService dictService;
+    private final CategoryAvgPriceCache categoryAvgPriceCache;
 
     /* ══ 一、队列 ═══════════════════════════════════════════ */
 
@@ -511,10 +512,8 @@ public class ReviewAdminService {
         rawImages.forEach((itemId, list) ->
                 fill.images.put(itemId, list.stream().map(this::toImageVO).toList()));
 
-        // 分类均价（全量，绕过单商品回填）
-        fill.avgPrices = itemMapper.avgPriceByCategory().stream()
-                .collect(Collectors.toMap(ItemMapper.CategoryAvgRow::getCategoryId,
-                        ItemMapper.CategoryAvgRow::getAvgPrice, (a, b) -> a));
+        // 分类均价走共享缓存：全量 GROUP BY 不随队列规模变化，与商品列表同一口径（TTL 5 分钟）
+        fill.avgPrices = categoryAvgPriceCache.categoryAvgPrices();
 
         // 分类名（全量小表）
         fill.categoryNames = dictService.categories().stream()

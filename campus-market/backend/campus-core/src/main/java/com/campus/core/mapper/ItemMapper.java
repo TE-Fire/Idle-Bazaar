@@ -37,7 +37,7 @@ public interface ItemMapper extends BaseMapper<Item> {
      * <p>全量 GROUP BY 而不按当前页的 categoryId 过滤：分类只有几十个，
      * 结果形状稳定，算一次就能给整页复用。
      *
-     * <p>**调用方必须走缓存**（`ItemAdminService#categoryAvgPrices()`）：这条是全表聚合，
+     * <p>**调用方必须走缓存**（`CategoryAvgPriceCache#categoryAvgPrices()`）：这条是全表聚合，
      * 成本随订单历史增长、不随分页下降，实测 5 万订单要 380–1000ms。加索引也救不了——
      * 瓶颈在按 `item_id` 回表取 `category_id`，加候选索引反而让优化器换错 JOIN 驱动方向。
      *

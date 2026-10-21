@@ -71,6 +71,8 @@ public class ItemService {
 
     private final DictService dictService;
 
+    private final CategoryAvgPriceCache categoryAvgPriceCache;
+
     /**
      * 发布商品，提交即送审。
      *
@@ -286,17 +288,17 @@ public class ItemService {
     /**
      * 价格异常：标价高于同类目成交均价 3 倍。
      *
+     * <p>均价走 {@link CategoryAvgPriceCache} 共享缓存：这条查询是全量 GROUP BY，
+     * 5 万订单量级冷启动要 380–1000ms，而发布是用户在线等的一次请求。均价是整段历史的
+     * 分组平均，缓存最多滞后 5 分钟，不改变判定结果。
+     *
      * <p>新品尚无成交时没有均价可比，判为不异常；冒把这个前提写成「异常」会让每个新品都 +5 分。
      */
     private boolean isPriceAbnormal(Item item) {
         if (item.getCategoryId() == null || item.getPrice() == null) {
             return false;
         }
-        BigDecimal avg = itemMapper.avgPriceByCategory().stream()
-                .filter(r -> item.getCategoryId().equals(r.getCategoryId()))
-                .map(ItemMapper.CategoryAvgRow::getAvgPrice)
-                .findFirst()
-                .orElse(null);
+        BigDecimal avg = categoryAvgPriceCache.categoryAvgPrices().get(item.getCategoryId());
         if (avg == null || avg.signum() <= 0) {
             return false;
         }

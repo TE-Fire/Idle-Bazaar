@@ -27,16 +27,12 @@ import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
-import com.campus.core.redis.ItemRedisKeys;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -65,12 +61,12 @@ import java.util.stream.Collectors;
  * 不用一条大联表 SQL：LEFT JOIN + GROUP BY 会让 MP 分页的 count 查询把总数算错，
  * 而一页最多几十条，两次查询的开销可以忽略。**这个模式订单 / 用户 / 审核列表都会复用。**
  *
- * <p><b>唯一的缓存</b>是分类成交均价（见 {@link #categoryAvgPrices()}）。其余 5 条 SQL
- * 都带分页条件、结果不重复，缓存没有收益；而均价是全量 GROUP BY、不随筛选变化，
- * 每个请求算一次的代价会随订单历史增长。加了 `idx_admin_list` 索引后，列表的耗时
- * 已经回到亚毫秒级，那条 SQL 成了剩下的大头。
+ * <p><b>均价查询不在本类里</b>：分类成交均价是全量 GROUP BY、实测 380–1000ms，
+ * 由 {@link CategoryAvgPriceCache} 统一缓存，本类与 `ItemService`（进队的
+ * `price_abnormal` 快照）、`ReviewAdminService`（队列回填）三方共用。
+ * 本类其余 SQL 都带分页条件、结果不重复，缓存没有收益。加了 `idx_admin_list`
+ * 索引后，列表耗时已回到亚毫秒级。
  */
-@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ItemAdminService {
@@ -84,25 +80,13 @@ public class ItemAdminService {
     /** 上限：不限制的话 pageSize=100000 一次就能把表拖出来 */
     private static final int MAX_PAGE_SIZE = 100;
 
-    /**
-     * 分类均价缓存有效期。
-     *
-     * <p>一期没有订单写侧，也就没有主动失效的触发点，**TTL 是唯一的刷新手段**，
-     * 所以不能像字典那样把它当成「del 失败时的兜底」。订单模块落地后，
-     * 完成订单（status → 4）时要一并 DEL 这个 key。
-     *
-     * <p>取值 5 分钟的依据：均价是整段历史的分组平均，单笔订单对它的影响可以忽略，
-     * 而这个值只用于列表上的「价格异常」提示，不参与任何写判断。
-     */
-    private static final Duration AVG_PRICE_TTL = Duration.ofMinutes(5);
-
     private final ItemMapper itemMapper;
     private final ItemImageMapper itemImageMapper;
     private final ItemAuditMapper itemAuditMapper;
     private final AppUserMapper appUserMapper;
     private final ReportMapper reportMapper;
     private final DictService dictService;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final CategoryAvgPriceCache categoryAvgPriceCache;
 
     /* ══ 一、列表 ═══════════════════════════════════════════ */
 
@@ -354,7 +338,7 @@ public class ItemAdminService {
                         (a, b) -> a.getCreateTime().compareTo(b.getCreateTime()) >= 0 ? a : b));
 
         // 分类均价与字典名称是全量小表，一次查完比按 id 过滤更简单，结果形状也稳定
-        fill.avgPrices = categoryAvgPrices();
+        fill.avgPrices = categoryAvgPriceCache.categoryAvgPrices();
 
         fill.categoryNames = nameMap(dictService.categories(), DictCategoryVO::getId, DictCategoryVO::getName);
         fill.campusNames = nameMap(dictService.campuses(), DictCampusVO::getId, DictCampusVO::getName);
@@ -367,70 +351,6 @@ public class ItemAdminService {
                                           Function<T, String> nameFn) {
         return rows.stream().collect(Collectors.toMap(idFn, nameFn, (a, b) -> a));
     }
-
-    /* ══ 六·一、分类均价缓存 ═════════════════════════════════ */
-
-    /**
-     * 各分类已成交均价，走 Redis 缓存。
-     *
-     * <p>为什么只给这一条加缓存：{@link ItemMapper#avgPriceByCategory()} 是全量 GROUP BY，
-     * 不随分页与筛选变化，每个列表请求都要跑一次；而结果只有几十行、几乎不变。
-     * 实测（5 万条已完成订单）单次要 380–1000ms，是列表 6 条 SQL 里最贵的一条。
-     *
-     * <p>Redis 读写异常时不抛错，改为直接查库返回——与 {@link DictService#all()} 同一口径。
-     * 均价只是列表上的一个提示，不该因为它让整页 500。
-     */
-    private Map<Long, BigDecimal> categoryAvgPrices() {
-        List<ItemMapper.CategoryAvgRow> rows = readAvgPriceCache();
-        if (rows == null) {
-            rows = itemMapper.avgPriceByCategory();
-            writeAvgPriceCache(rows);
-        }
-        return rows.stream().collect(Collectors.toMap(ItemMapper.CategoryAvgRow::getCategoryId,
-                ItemMapper.CategoryAvgRow::getAvgPrice, (a, b) -> a));
-    }
-
-    /**
-     * 读缓存；未命中或读失败都返回 `null`，调用方统一走查库。
-     *
-     * <p><b>缓存的是 `List` 而不是 `Map`</b>：JSON 的对象 key 只能是字符串，
-     * 存 `Map&lt;Long, ?&gt;` 取回来 key 会变成 `String`，调用方拿 `Long` 去 `get`
-     * 不会抛错、只会静默返回 `null`（表现为均价全都不显示）。缓存 List 则没有这个问题。
-     */
-    private List<ItemMapper.CategoryAvgRow> readAvgPriceCache() {
-        Object cached;
-        try {
-            cached = redisTemplate.opsForValue().get(ItemRedisKeys.CATEGORY_AVG);
-        } catch (Exception e) {
-            // 反序列化失败（改过类结构、旧格式对不上）也走这里，一并降级
-            log.warn("[item] 读均价缓存失败，降级直查库", e);
-            return null;
-        }
-        if (!(cached instanceof List<?> list)) {
-            return null;
-        }
-        // 空列表是合法结果（没有任何已成交订单），要当成命中，否则每次都白查一次库
-        if (list.isEmpty()) {
-            return List.of();
-        }
-        if (!(list.get(0) instanceof ItemMapper.CategoryAvgRow)) {
-            return null;
-        }
-        @SuppressWarnings("unchecked")
-        List<ItemMapper.CategoryAvgRow> rows = (List<ItemMapper.CategoryAvgRow>) list;
-        return rows;
-    }
-
-    /** 写缓存失败不影响本次返回：查库的结果已经拿到了 */
-    private void writeAvgPriceCache(List<ItemMapper.CategoryAvgRow> rows) {
-        try {
-            redisTemplate.opsForValue().set(ItemRedisKeys.CATEGORY_AVG, rows, AVG_PRICE_TTL);
-        } catch (Exception e) {
-            log.warn("[item] 写均价缓存失败，本次直查结果仍然可用", e);
-        }
-    }
-
-    /* ══ 七、Entity → VO ════════════════════════════════════ */
 
     private ItemListVO toListVO(Item row, Fill fill) {
         ItemListVO vo = new ItemListVO();
