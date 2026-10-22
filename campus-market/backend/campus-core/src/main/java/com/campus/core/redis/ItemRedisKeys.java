@@ -26,7 +26,7 @@ public final class ItemRedisKeys {
      */
     public static final String HOLDER = MODULE + "holder";
 
-    /** 前置拦截的健康值：只有「在售」才允许被抢占（`tech/01` §9.1 的 Lua 脚本） */
+    /** 前置拦截的健康值：只有「在售」才允许被抢占（`lua/occupy.lua`，口径见 tech/01 §9.1） */
     public static final String STATE_ON_SALE = "ON_SALE";
 
     public static final String STATE_LOCKED = "LOCKED";

@@ -20,6 +20,7 @@ import com.campus.core.mapper.AppealMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.TradeOrderMapper;
 import com.campus.core.redis.ItemRedisKeys;
+import com.campus.core.redis.LuaScripts;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -83,29 +84,12 @@ public class OrderService {
     private static final int OCCUPY_MISS = -1;
 
     /**
-     * 抢占商品占位标记（`tech/01` §9.1 的脚本，holder hash 改为由 KEYS[2] 传入以遵守 key 常量规范）。
+     * 抢占商品占位标记（{@code lua/occupy.lua}，`tech/01` §9.1；holder hash 由 KEYS[2] 传入以遵守 key 常量规范）。
      *
      * <p>返回 -1 表示缓存缺失，**必须放行**：缓存未预热或已被淘汰时 Lua 无从判定，
      * 若按「缺失即拒绝」设计，缓存一失效商品就永远卖不掉。放行是安全的，DB 会拦住。
      */
-    private static final RedisScript<Long> OCCUPY_SCRIPT = RedisScript.of("""
-            local cur = redis.call('GET', KEYS[1])
-            if cur == false then
-              return -1
-            end
-            if cur == ARGV[2] then
-              if redis.call('HGET', KEYS[2], KEYS[1]) == ARGV[4] then
-                return 2
-              end
-              return 0
-            end
-            if cur ~= ARGV[1] then
-              return 0
-            end
-            redis.call('SET', KEYS[1], ARGV[2], 'EX', ARGV[3])
-            redis.call('HSET', KEYS[2], KEYS[1], ARGV[4])
-            return 1
-            """, Long.class);
+    private static final RedisScript<Long> OCCUPY_SCRIPT = LuaScripts.load("lua/occupy.lua", Long.class);
 
     /**
      * 回滚占位标记，**必须先校验 holder 是自己的订单号**。
