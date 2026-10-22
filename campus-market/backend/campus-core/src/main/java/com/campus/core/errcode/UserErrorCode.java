@@ -33,6 +33,10 @@ public enum UserErrorCode implements IErrorCode {
     USER_NOT_FOUND(4015, "该手机号未注册"),
     USER_SMS_TOO_FREQUENT(4016, "发送过于频繁，请 60 秒后再试"),
     USER_SMS_CODE_INVALID(4017, "验证码不正确或已过期"),
+
+    /* ── 询单留言（2026-10-22 新增，business/01/02 同步留言决策）── */
+    CHAT_ITEM_NOT_FOUND(4018, "商品不存在"),
+    CHAT_PEER_INVALID(4019, "只能与商品卖家询单"),
     ;
 
     @Override

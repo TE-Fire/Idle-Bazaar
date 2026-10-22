@@ -468,6 +468,54 @@ public class DictService {
         return vo;
     }
 
+    /**
+     * 商品发布 / 编辑的字典引用校验（business/01 O1 规则 4）。
+     *
+     * <p>两级口径：发布（requireEnabled=true）要求存在且启用，走启用缓存 {@link #all()}；
+     * 编辑（false）只查存在——历史商品可引用已停用项，一刀切查启用会让这些商品永远改不了。
+     * `meetPointId` 选填，传了才查；成色按 code 匹配（成色表 code 唯一）。
+     */
+    public void validateItemRefs(Long categoryId, String grade, Long campusId, Long meetPointId,
+                                 boolean requireEnabled) {
+        if (requireEnabled) {
+            DictAllVO all = all();
+            BizAssert.isTrue(all.getCategories().stream().anyMatch(c -> categoryId.equals(c.getId()))
+                            && all.getCampuses().stream().anyMatch(c -> campusId.equals(c.getId()))
+                            && all.getGrades().stream().anyMatch(g -> grade.equalsIgnoreCase(g.getCode()))
+                            && (meetPointId == null
+                            || all.getMeetPoints().stream().anyMatch(m -> meetPointId.equals(m.getId()))),
+                    DictErrorCode.DICT_REF_INVALID, "分类、成色、校区或面交点不存在或已停用");
+            return;
+        }
+        BizAssert.isTrue(existsCategory(categoryId) && existsGradeCode(grade) && existsCampus(campusId)
+                        && (meetPointId == null || existsMeetPoint(meetPointId)),
+                DictErrorCode.DICT_REF_INVALID, "分类、成色、校区或面交点不存在");
+    }
+
+    private boolean existsCategory(Long id) {
+        return categoryMapper.selectCount(new LambdaQueryWrapper<DictCategory>()
+                .eq(DictCategory::getId, id)
+                .eq(DictCategory::getDeleted, 0)) > 0;
+    }
+
+    private boolean existsGradeCode(String code) {
+        return gradeMapper.selectCount(new LambdaQueryWrapper<DictGrade>()
+                .eq(DictGrade::getCode, code.trim().toUpperCase(Locale.ROOT))
+                .eq(DictGrade::getDeleted, 0)) > 0;
+    }
+
+    private boolean existsCampus(Long id) {
+        return campusMapper.selectCount(new LambdaQueryWrapper<DictCampus>()
+                .eq(DictCampus::getId, id)
+                .eq(DictCampus::getDeleted, 0)) > 0;
+    }
+
+    private boolean existsMeetPoint(Long id) {
+        return meetPointMapper.selectCount(new LambdaQueryWrapper<DictMeetPoint>()
+                .eq(DictMeetPoint::getId, id)
+                .eq(DictMeetPoint::getDeleted, 0)) > 0;
+    }
+
     /* ══ 七、缓存失效与事务 ══════════════════════════════════ */
 
     /**

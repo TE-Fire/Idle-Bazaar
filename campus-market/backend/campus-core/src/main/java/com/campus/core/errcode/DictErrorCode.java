@@ -20,6 +20,8 @@ public enum DictErrorCode implements IErrorCode {
     DICT_PARENT_INVALID(6003, "上级分类本身不是一级分类"),
     DICT_PARENT_DISABLED(6004, "上级分类已停用，不能挂到它下面"),
     DICT_CAMPUS_INVALID(6005, "所属校区不存在或已停用"),
+    /** 商品发布/编辑引用校验：发布时四项须启用；编辑时只查存在（历史商品可引用停用项） */
+    DICT_REF_INVALID(6006, "商品引用的字典项不存在或已停用"),
     ;
 
     @Override

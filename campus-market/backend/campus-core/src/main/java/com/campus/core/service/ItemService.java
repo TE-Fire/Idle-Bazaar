@@ -72,6 +72,8 @@ public class ItemService {
 
     private final ReportMapper reportMapper;
 
+    private final ItemImageJanitor itemImageJanitor;
+
     /**
      * 发布商品。提交即送审：落 PENDING 并插 `item_audit` 进队（先审后发，business/01 F-W3）；
      * `draft = true` 暂存草稿：落 DRAFT、不进队、豁免图片与描述（含 D 档描述必填），
@@ -80,6 +82,9 @@ public class ItemService {
     @Transactional(rollbackFor = Exception.class)
     public Long publish(Long sellerId, ItemPublishReq req) {
         AppUser seller = requireUser(sellerId);
+        // 发布：字典项必须存在且启用（草稿同样落库，引用也必须有效）
+        dictService.validateItemRefs(req.getCategoryId(), req.getGrade(), req.getCampusId(),
+                req.getMeetPointId(), true);
         boolean draft = Boolean.TRUE.equals(req.getDraft());
         if (!draft) {
             requireGradeFlawDescribed(req);
@@ -184,6 +189,8 @@ public class ItemService {
                 .eq(ItemImage::getItemId, itemId)
                 .eq(ItemImage::getDeleted, 0)
                 .set(ItemImage::getDeleted, ts));
+        // MinIO 对象在提交后清理（回滚则图必须还在）
+        itemImageJanitor.cleanupAfterCommit(itemId);
     }
 
     /* ══ 二、浏览 ═════════════════════════════════════════════ */
@@ -265,6 +272,9 @@ public class ItemService {
         BizAssert.isTrue(status == ItemStatusEnum.DRAFT || status == ItemStatusEnum.ON_SALE
                 || status == ItemStatusEnum.OFFLINE || status == ItemStatusEnum.REJECTED,
                 ItemErrorCode.ITEM_CANNOT_EDIT);
+        // 编辑：只查存在不查启用——历史商品可引用已停用项，查启用会把它们锁死
+        dictService.validateItemRefs(req.getCategoryId(), req.getGrade(), req.getCampusId(),
+                req.getMeetPointId(), false);
 
         // 草稿暂存：草稿态 + 勾选「存草稿」——先存着回头再补，不进队、豁免 D 档描述必填
         boolean draftSave = status == ItemStatusEnum.DRAFT && Boolean.TRUE.equals(req.getDraft());
