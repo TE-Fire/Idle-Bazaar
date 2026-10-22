@@ -28,7 +28,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -99,6 +102,9 @@ public class OrderService {
      */
     private static final RedisScript<Long> RELEASE_SCRIPT = LuaScripts.load("lua/release.lua", Long.class);
 
+    /** 超时扫描每轮处理上限：积压时分多轮消化，单轮耗时与连接持有时间有上界 */
+    private static final int EXPIRE_SCAN_BATCH = 200;
+
     private final TradeOrderMapper orderMapper;
 
     private final ItemMapper itemMapper;
@@ -106,6 +112,9 @@ public class OrderService {
     private final AppealMapper appealMapper;
 
     private final CategoryAvgPriceCache categoryAvgPriceCache;
+
+    /** 批量逐笔取消用：单笔独立事务，失败不牵连同批已提交的（见 cancelOne） */
+    private final PlatformTransactionManager txManager;
 
     /** 占位标记是纯字符串状态机，用 StringRedisTemplate 即可，不必绕一层 JSON 序列化 */
     private final StringRedisTemplate stringRedisTemplate;
@@ -239,19 +248,30 @@ public class OrderService {
     /**
      * 超时未付款订单的补偿扫描（`tech/01` §9.2 的兜底环节，决策 1 选定本期就用它承担超时取消）。
      *
-     * <p>每 10 分钟一次，取消 `expire_time` 已过、仍是待付款的订单。
-     * 取消本身带条件更新：并发真实付款成功时状态已不是待付款，这里的更新自然落空，
+     * <p>每 10 分钟一次，取消 `expire_time` 已过、仍是待付款的订单。取消本身带条件更新：
+     * 并发真实付款成功时状态已不是待付款，这里的更新自然落空，
      * 不会出现「付款成功后被超时任务取消」。
+     *
+     * <p><b>方法本身不开事务</b>：整批一个大事务，任何一笔失败都全批回滚，且行锁从第一笔
+     * 握到最后一笔，阻塞的恰是这批订单的真实付款。逐笔独立事务由 {@link #cancelOne} 负责，
+     * 失败的订单状态未变，下一轮扫描会再次捞到——重试由幂等性免费提供，无需补偿机制。
+     * 每轮限量并按过期时间排序：积压时分多轮消化，fixedDelay 保证轮次不重叠。
      */
     @Scheduled(fixedDelay = 10 * 60 * 1000L)
-    @Transactional(rollbackFor = Exception.class)
     public void cancelExpired() {
         List<TradeOrder> expired = orderMapper.selectList(new LambdaQueryWrapper<TradeOrder>()
                 .eq(TradeOrder::getStatus, OrderStatusEnum.WAIT_PAY.getCode())
-                .le(TradeOrder::getExpireTime, LocalDateTime.now()));
+                .le(TradeOrder::getExpireTime, LocalDateTime.now())
+                .orderByAsc(TradeOrder::getExpireTime)
+                .last("LIMIT " + EXPIRE_SCAN_BATCH));
         int count = 0;
         for (TradeOrder order : expired) {
-            count += cancelOne(order, CancelTypeEnum.SYSTEM_TIMEOUT, "30 分钟未付款，系统自动取消");
+            try {
+                count += cancelOne(order, CancelTypeEnum.SYSTEM_TIMEOUT, "30 分钟未付款，系统自动取消");
+            } catch (Exception e) {
+                // 单笔失败只丢这一笔：状态未变，下轮扫描自动重试，不能让它拖垮已成功的
+                log.error("[order] 单笔超时取消失败，留待下次扫描重试：orderId={}", order.getId(), e);
+            }
         }
         if (count > 0) {
             log.info("[order] 超时取消待付款订单 {} 笔", count);
@@ -262,14 +282,20 @@ public class OrderService {
      * 单笔取消。**状态校验写在 WHERE 里而不是先查后判**：
      * 两个入口同时操作同一笔订单时，先查后判的两个请求都会通过，后一个会覆盖前一个的结果。
      * 影响行数 0 即表示状态已被别人改走，本次作废。
+     *
+     * <p>单笔一个独立事务（REQUIRES_NEW）：批量调用方（{@link #cancelExpired}）失败只回滚
+     * 这一笔，不影响同批已提交的。异常照实抛给调用方，由它决定吞掉重试还是让外层回滚——
+     * 「取消失败该怎么办」两个入口语义不同，不能在这里统一处理。
      */
     private int cancelOne(TradeOrder order, CancelTypeEnum type, String reason) {
-        return orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+        TransactionTemplate template = new TransactionTemplate(txManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template.execute(status -> orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                 .eq(TradeOrder::getId, order.getId())
                 .eq(TradeOrder::getStatus, order.getStatus())
                 .set(TradeOrder::getStatus, OrderStatusEnum.CANCELED.getCode())
                 .set(TradeOrder::getCancelBy, type.getCode())
-                .set(TradeOrder::getCancelReason, reason));
+                .set(TradeOrder::getCancelReason, reason)));
     }
 
     /* ══ 四、履约：核销与确认收货 ══════════════════════════════ */
