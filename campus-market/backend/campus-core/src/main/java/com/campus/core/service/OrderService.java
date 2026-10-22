@@ -92,19 +92,12 @@ public class OrderService {
     private static final RedisScript<Long> OCCUPY_SCRIPT = LuaScripts.load("lua/occupy.lua", Long.class);
 
     /**
-     * 回滚占位标记，**必须先校验 holder 是自己的订单号**。
+     * 回滚占位标记，**必须先校验 holder 是自己的订单号**（{@code lua/release.lua}）。
      *
      * <p>少了这层校验，DB 走得慢的那个请求会在自己的更新失败后，把别人刚抢到的锁释放掉，
      * 于是出现两个赢家。这是本方案里最隐蔽的一处正确性依赖。
      */
-    private static final RedisScript<Long> RELEASE_SCRIPT = RedisScript.of("""
-            if redis.call('HGET', KEYS[2], KEYS[1]) == ARGV[1] then
-              redis.call('DEL', KEYS[1])
-              redis.call('HDEL', KEYS[2], KEYS[1])
-              return 1
-            end
-            return 0
-            """, Long.class);
+    private static final RedisScript<Long> RELEASE_SCRIPT = LuaScripts.load("lua/release.lua", Long.class);
 
     private final TradeOrderMapper orderMapper;
 
