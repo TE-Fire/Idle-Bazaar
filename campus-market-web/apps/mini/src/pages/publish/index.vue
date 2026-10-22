@@ -7,17 +7,20 @@
  * `item` 表这些列 NOT NULL，草稿同样要落库；草稿豁免图片与描述。
  * 编辑模式（`?edit={id}`）下草稿商品显示两个按钮，已发布商品只有「保存」。
  *
- * <p>骨架期遗留：图片走本地临时路径，不上传（MinIO 直传接口未实现），
- * 因此新选的图不入提交列表；编辑时已有图片原样带回。
+ * <p>图片两步票据制上传（utils/upload，固定 PROXY：uni.uploadFile 只能发 multipart，
+ * 发不了 Web 端 DIRECT 的 PUT 直传——平台限制）。先占位「上传中」，成功后换 accessUrl；
+ * 提交时 images = 已有图片 + 新上传 URL 整体替换。
  */
 
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
+import { uploadImage } from '@/utils/upload'
 
 const MAX_SHOTS = 9
 
-const shots = ref<string[]>([])
+/** 选图：先以临时路径占位（uploading），成功后换成 MinIO 公开读 URL */
+const shots = ref<Array<{ path: string; uploading: boolean }>>([])
 const form = ref({
   title: '',
   categoryId: '',
@@ -120,9 +123,28 @@ function chooseImage(): void {
     count: MAX_SHOTS - shots.value.length,
     mediaType: ['image'],
     success: (res) => {
-      // res.tempFiles 的类型在 @dcloudio/types 里较松，这里显式取路径
-      const files = (res as unknown as { tempFiles: { tempFilePath: string }[] }).tempFiles
-      shots.value.push(...files.map((f) => f.tempFilePath).slice(0, MAX_SHOTS - shots.value.length))
+      // res.tempFiles 的类型在 @dcloudio/types 里较松，这里显式取路径与大小
+      const files = (res as unknown as { tempFiles: { tempFilePath: string; size: number }[] }).tempFiles
+      for (const f of files) {
+        if (shots.value.length >= MAX_SHOTS) {
+          uni.showToast({ title: `最多 ${MAX_SHOTS} 张图`, icon: 'none' })
+          break
+        }
+        const path = f.tempFilePath
+        shots.value.push({ path, uploading: true })
+        void uploadImage(path, f.size)
+          .then((url) => {
+            const shot = shots.value.find((s) => s.path === path)
+            if (shot) {
+              shot.path = url
+              shot.uploading = false
+            }
+          })
+          .catch(() => {
+            // 失败即移除占位；request 层已 toast 具体原因
+            shots.value = shots.value.filter((s) => s.path !== path)
+          })
+      }
     }
   })
 }
@@ -157,6 +179,11 @@ async function save(draft: boolean): Promise<void> {
     uni.showToast({ title: '成色为 D 时请描述写明具体瑕疵', icon: 'none' })
     return
   }
+  // 图片未传完不提交：images 是「已上传 URL」列表
+  if (shots.value.some((s) => s.uploading)) {
+    uni.showToast({ title: '图片正在上传，稍候再提交', icon: 'none' })
+    return
+  }
   const req = {
     title: form.value.title.trim(),
     categoryId: form.value.categoryId,
@@ -166,8 +193,8 @@ async function save(draft: boolean): Promise<void> {
     campusId: form.value.campusId,
     meetPointId: form.value.meetPointId || undefined,
     description: form.value.description.trim() || undefined,
-    // 新选的本地图不入列表（上传接口未接）；编辑时已有图片原样带回
-    images: editMode.value ? existingImages.value : [],
+    // 编辑时已有图片原样带回 + 新上传的 accessUrl，整体替换（后端不传差量）
+    images: [...existingImages.value, ...shots.value.map((s) => s.path)],
     negotiable: form.value.negotiable ? 1 : 0,
     deliveryIncluded: form.value.delivery ? 1 : 0,
     draft
@@ -219,8 +246,9 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
     <view class="sec">
       <text class="sec__t">图片（{{ shots.length }}/{{ MAX_SHOTS }}，第一张为封面）</text>
       <view class="shots">
-        <view v-for="(s, i) in shots" :key="s" class="shot">
-          <image class="shot__img" :src="s" mode="aspectFill" />
+        <view v-for="(s, i) in shots" :key="s.path" class="shot">
+          <image v-if="!s.uploading" class="shot__img" :src="s.path" mode="aspectFill" />
+          <view v-else class="shot__loading">上传中</view>
           <text v-if="i === 0" class="shot__cover">封面</text>
           <text class="shot__x" @click="removeShot(i)">×</text>
         </view>
@@ -352,6 +380,18 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 .shot__img {
   width: 100%;
   height: 100%;
+}
+
+/* 上传占位：票据已签、文件在传 */
+.shot__loading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+  background: $cm-color-bg;
 }
 
 .shot--add {

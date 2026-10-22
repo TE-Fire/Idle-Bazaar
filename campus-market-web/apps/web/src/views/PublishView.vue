@@ -9,8 +9,8 @@
  * NOT NULL，草稿同样要落库；草稿豁免的是图片与描述。编辑模式（`?edit={id}`）下
  * 草稿商品显示「存草稿 + 提交送审」，已发布商品只有「保存」。
  *
- * <p>骨架期遗留：图片只做本地预览（`URL.createObjectURL`），上传走独立接口
- * （MinIO 尚未接入），因此新拖的图不入提交列表；编辑时已有图片原样带回。
+ * <p>图片两步票据制上传（`uploadImage`，tech/01 4.4 策略模式）：先占位「上传中」，
+ * 成功后换成 MinIO 公开读 URL；提交时 images = 已有图片 + 新上传 URL 整体替换。
  */
 
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
@@ -23,7 +23,7 @@ import {
   type GoodsItem,
   type ItemStatus
 } from '@campus/shared'
-import { userDictApi, userItemApi, type CategoryVO } from '@campus/api'
+import { userDictApi, userItemApi, uploadImage, type CategoryVO } from '@campus/api'
 import ProductCard from '@/components/ProductCard.vue'
 
 const router = useRouter()
@@ -70,7 +70,7 @@ onMounted(async () => {
 const editMode = ref(false)
 const editingId = ref('')
 const editingStatus = ref<ItemStatus>('DRAFT')
-/** 编辑时已有的图片（真实 URL，提交原样带回）；新拖的本地图不上传，不入列表 */
+/** 编辑时已有的图片（真实 URL，提交时与新上传的一并整体替换） */
 const existingImages = ref<string[]>([])
 
 onMounted(async () => {
@@ -103,6 +103,8 @@ const editingDraft = computed(() => editingStatus.value === 'DRAFT')
 interface Shot {
   id: string
   url: string
+  /** 上传中：占位期间不允许提交，成功后落真实 accessUrl */
+  uploading: boolean
 }
 
 const shots = ref<Shot[]>([])
@@ -114,12 +116,26 @@ function addFiles(files: FileList | null): void {
   if (!files?.length) return
   for (const f of Array.from(files)) {
     if (!f.type.startsWith('image/')) continue
-    shots.value.push({ id: `s${seed++}`, url: URL.createObjectURL(f) })
-  }
-  if (shots.value.length > 9) {
-    // design/01：发布最多 9 张（预览卡片是 9 宫格）
-    shots.value = shots.value.slice(0, 9)
-    ElMessage.warning({ message: '最多 9 张图', duration: 2000 })
+    // 逐张查上限：上传是异步的，批量超出时先到先得
+    if (shots.value.length >= 9) {
+      ElMessage.warning({ message: '最多 9 张图', duration: 2000 })
+      break
+    }
+    const id = `s${seed++}`
+    // 先占位再上传：失败即移除，成功把 blob 占位换成真实 accessUrl
+    shots.value.push({ id, url: '', uploading: true })
+    void uploadImage(f)
+      .then((url) => {
+        const shot = shots.value.find((s) => s.id === id)
+        if (shot) {
+          shot.url = url
+          shot.uploading = false
+        }
+      })
+      .catch((e: unknown) => {
+        shots.value = shots.value.filter((s) => s.id !== id)
+        ElMessage.warning({ message: e instanceof Error ? e.message : '图片上传失败', duration: 2000 })
+      })
   }
 }
 
@@ -130,7 +146,8 @@ function onDrop(e: DragEvent): void {
 
 function removeShot(id: string): void {
   const target = shots.value.find((s) => s.id === id)
-  if (target) URL.revokeObjectURL(target.url)
+  // 只回收 blob: 预览地址；真实 URL 由 MinIO 管，revoke 它无意义
+  if (target?.url.startsWith('blob:')) URL.revokeObjectURL(target.url)
   shots.value = shots.value.filter((s) => s.id !== id)
 }
 
@@ -143,9 +160,11 @@ function moveShot(index: number, delta: number): void {
   shots.value = arr
 }
 
-/** 组件卸载时回收 objectURL，否则刷新前的内存白占着 */
+/** 组件卸载时回收未拆穿的 blob 预览，否则刷新前的内存白占着 */
 onBeforeUnmount(() => {
-  for (const s of shots.value) URL.revokeObjectURL(s.url)
+  for (const s of shots.value) {
+    if (s.url.startsWith('blob:')) URL.revokeObjectURL(s.url)
+  }
 })
 
 /* ── 表单 ───────────────────────────────────────────────── */
@@ -221,6 +240,11 @@ async function save(draft: boolean): Promise<void> {
     ElMessage.warning({ message: '成色为「明显使用痕迹」时，请描述写明具体瑕疵', duration: 2000 })
     return
   }
+  // 图片未传完不提交：images 是「已上传 URL」列表，半张图进去后端也落不了库
+  if (shots.value.some((s) => s.uploading)) {
+    ElMessage.warning({ message: '图片正在上传，稍候再提交', duration: 2000 })
+    return
+  }
   const req = {
     title: form.value.title.trim(),
     categoryId: form.value.categoryId,
@@ -230,8 +254,8 @@ async function save(draft: boolean): Promise<void> {
     campusId: form.value.campusId,
     meetPointId: form.value.meetPointId || undefined,
     description: form.value.description.trim() || undefined,
-    // 新拖的本地图不入列表（上传接口未接）；编辑时已有图片原样带回
-    images: editMode.value ? existingImages.value : [],
+    // 编辑时已有图片原样带回 + 新上传的 accessUrl，整体替换（后端不传差量）
+    images: [...existingImages.value, ...shots.value.map((s) => s.url)],
     negotiable: form.value.negotiable ? 1 : 0,
     deliveryIncluded: form.value.delivery ? 1 : 0,
     draft
@@ -276,7 +300,8 @@ async function save(draft: boolean): Promise<void> {
 
         <div v-if="shots.length" class="shots">
           <div v-for="(s, i) in shots" :key="s.id" class="shot">
-            <img :src="s.url" alt="" />
+            <img v-if="s.url" :src="s.url" alt="" />
+            <div v-else class="shot__uploading">上传中…</div>
             <div class="shot__bar">
               <button type="button" aria-label="前移" @click.stop="moveShot(i, -1)">←</button>
               <button type="button" aria-label="后移" @click.stop="moveShot(i, 1)">→</button>
@@ -359,7 +384,7 @@ async function save(draft: boolean): Promise<void> {
         <h2 class="pane__title">实时预览</h2>
         <p class="pane__hint">这是商品在列表页里的真实样子</p>
         <div class="preview-card">
-          <ProductCard :item="preview" :preview-src="shots[0]?.url" />
+          <ProductCard :item="preview" :preview-src="shots[0]?.url || undefined" />
         </div>
 
         <ul class="checklist">
@@ -466,6 +491,18 @@ async function save(draft: boolean): Promise<void> {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* 上传占位：票据已签、文件在传，图未就位 */
+.shot__uploading {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--cm-font-size-xs, 12px);
+  color: var(--cm-color-text-3);
+  background: var(--cm-color-bg);
 }
 
 .shot__bar {

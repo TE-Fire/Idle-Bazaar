@@ -66,12 +66,19 @@ export interface ApiItemVO {
   /** 2 位小数字符串 */
   price: string
   originPrice?: string
+  /** 成色 A–D */
   grade: string
   campusId: string
   campusName?: string
   meetPointId?: string
   meetPointName?: string
   description?: string
+  sellerId: string
+  sellerNick?: string
+  sellerCredit?: number
+  /** 1 可议价；议价在聊天里进行，不进订单 */
+  negotiable?: number
+  deliveryIncluded?: number
   status: 'DRAFT' | 'PENDING' | 'ON_SALE' | 'SOLD' | 'OFFLINE' | 'REJECTED' | 'FORCED_OFFLINE'
   publishAt: string
   viewCount: number
@@ -93,6 +100,52 @@ export interface ItemPublishReq {
   /** true = 暂存草稿（不进队、豁免图片与描述） */
   draft?: boolean
 }
+
+/* ── 询单留言（同步模式：进会话轮询 + 拉取即已读）──────────── */
+
+export interface ChatConversationVO {
+  itemId: string
+  itemTitle?: string
+  itemMainImage?: string
+  peerUserId: string
+  peerNick?: string
+  lastContent?: string
+  lastAt?: string
+  unread: number
+}
+
+export interface ChatMessageVO {
+  id: string
+  senderId: string
+  content: string
+  createdAt: string
+  /** 服务端比较发送人与当前登录用户给出，前端不自己判断左右 */
+  mine: boolean
+}
+
+export const userChatApi = {
+  send: (itemId: string, toUserId: string, content: string) =>
+    request<string>({
+      url: '/api/chat/send',
+      method: 'POST',
+      data: { itemId, toUserId, content }
+    }),
+
+  conversations: () => request<ChatConversationVO[]>({ url: '/api/chat/conversations' }),
+
+  /** 倒序分页；beforeId 传列表最后一条的 id 向上翻历史 */
+  messages: (itemId: string, withUserId: string, beforeId?: string) =>
+    request<ChatMessageVO[]>({
+      url: '/api/chat/messages',
+      data: { itemId, withUserId, beforeId }
+    }),
+
+  /** 标已读：进会话时调 */
+  read: (itemId: string, withUserId: string) =>
+    request<void>({ url: '/api/chat/read', method: 'POST', data: { itemId, withUserId } })
+}
+
+/* ── 商品 ─────────────────────────────────────────────── */
 
 export const userItemApi = {
   publish: (req: ItemPublishReq) =>

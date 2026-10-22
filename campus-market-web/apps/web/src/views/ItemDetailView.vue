@@ -4,39 +4,95 @@
  *
  * <p>校园字段是一等公民（design/01 原则 5）：成色 / 校区 / 面交点 / 学号认证
  * 必须在**卡片、筛选、详情**三处同时可见，所以这里把四项放进参数表而不是折叠起来。
+ *
+ * <p>数据接 `/api/item/{id}`（免登录）：详情同时是交易入口——「聊一聊」进询单会话，
+ * 自己的商品显示编辑入口。无主图时保留渐变占位（骨架期视觉方案）。
  */
 
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
-import { findItem } from '@campus/mock'
+import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
+import { userItemApi, type ApiItemVO } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
+import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
 const compare = useCompareStore()
+const userStore = useUserStore()
 
-const item = computed(() => findItem(String(route.params.id ?? '')))
+const item = ref<ApiItemVO | null>(null)
+const loading = ref(true)
 
-/** 图集：骨架期用占位渐变切换，「图」就是换一组渐变 */
+onMounted(async () => {
+  try {
+    item.value = await userItemApi.detail(String(route.params.id ?? ''))
+  } catch {
+    // 不存在 / 已下架：http 层已提示，这里落空态
+  } finally {
+    loading.value = false
+  }
+})
+
+/** 图集：有真实图片用图片，否则一张渐变占位（切换「图」就是换一组渐变） */
+const shots = computed(() => {
+  const imgs = item.value?.images ?? []
+  return imgs.length ? imgs.map((i) => i.url) : [null]
+})
 const active = ref(0)
-const shots = computed(() => [0, 1, 2, 3])
-const bg = (tints: [string, string], flip: boolean): string => {
-  const [a, b] = flip ? [tints[1], tints[0]] : tints
-  return `linear-gradient(135deg, ${a}, ${b})`
+const bg = (flip: boolean): string => {
+  const tints: [string, string] = ['#ECEFF3', '#D3D9E0']
+  return `linear-gradient(135deg, ${flip ? tints[1] : tints[0]}, ${flip ? tints[0] : tints[1]})`
 }
 
 const selected = computed(() => (item.value ? compare.has(item.value.id) : false))
+const isMine = computed(() => !!item.value && userStore.userId === item.value.sellerId)
 
 function onCompare(): void {
   if (!item.value) return
-  if (!compare.toggle(item.value)) ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
+  // 对比 store 是 mock 时代的联合类型；真实分类名/校区名不在枚举里，按字符串收
+  const goods: GoodsItem = {
+    id: item.value.id,
+    title: item.value.title,
+    category: (item.value.categoryName ?? '其他') as GoodsItem['category'],
+    price: Number(item.value.price),
+    originalPrice: item.value.originPrice ? Number(item.value.originPrice) : undefined,
+    condition: item.value.grade as GoodsItem['condition'],
+    campus: (item.value.campusName ?? '') as GoodsItem['campus'],
+    meetPoint: item.value.meetPointName ?? '待定',
+    negotiable: !!item.value.negotiable,
+    delivery: !!item.value.deliveryIncluded,
+    status: item.value.status,
+    wantCount: 0,
+    description: item.value.description ?? '',
+    seller: {
+      id: item.value.sellerId,
+      nick: item.value.sellerNick ?? '卖家',
+      verified: true,
+      credit: '良好',
+      tints: ['#BFD4EA', '#8FA9C4']
+    },
+    images: [],
+    tints: ['#ECEFF3', '#D3D9E0'],
+    publishedAt: item.value.publishAt
+  }
+  if (!compare.toggle(goods)) ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
 }
 
-function onWant(): void {
-  // 下单 / 议价都依赖后端订单与会话接口，骨架期只做反馈
-  ElMessage.success({ message: '已通知卖家，可在「消息」里继续沟通', duration: 2000 })
+/** 聊一聊：未登录先跳登录（带回跳）；自己的商品不进会话 */
+function onChat(): void {
+  if (!item.value) return
+  if (!userStore.userId) {
+    void router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  void router.push({ name: 'chat', query: { itemId: item.value.id, peerId: item.value.sellerId } })
+}
+
+function onEdit(): void {
+  if (!item.value) return
+  void router.push({ path: '/publish', query: { edit: item.value.id } })
 }
 </script>
 
@@ -45,18 +101,22 @@ function onWant(): void {
     <div class="top">
       <!-- 图集 -->
       <div class="gallery">
-        <div class="stage" :style="{ background: bg(item.tints, active % 2 === 1) }" />
+        <div class="stage" :style="{ background: shots[active] ? undefined : bg(active % 2 === 1) }">
+          <img v-if="shots[active]" :src="shots[active]!" alt="" class="stage__img" />
+        </div>
         <div class="thumbs">
           <button
-            v-for="i in shots"
+            v-for="(s, i) in shots"
             :key="i"
             type="button"
             class="thumb"
-            :class="{ on: active === i - 1 }"
-            :style="{ background: bg(item.tints, (i - 1) % 2 === 1) }"
-            :aria-label="`第 ${i} 张图`"
-            @click="active = i - 1"
-          />
+            :class="{ on: active === i }"
+            :style="{ background: s ? undefined : bg(i % 2 === 1) }"
+            :aria-label="`第 ${i + 1} 张图`"
+            @click="active = i"
+          >
+            <img v-if="s" :src="s" alt="" class="thumb__img" />
+          </button>
         </div>
       </div>
 
@@ -65,46 +125,47 @@ function onWant(): void {
         <h1 class="title">{{ item.title }}</h1>
 
         <div class="tags">
-          <span v-if="item.delivery" class="cm-tag cm-tag--red">包邮</span>
+          <span v-if="item.deliveryIncluded" class="cm-tag cm-tag--red">包邮</span>
           <span v-if="item.negotiable" class="cm-tag cm-tag--yellow">可议价</span>
-          <span class="cm-tag cm-tag--blue">学号{{ item.seller.verified ? '已' : '未' }}认证</span>
+          <span class="cm-tag cm-tag--blue">信用 {{ item.sellerCredit ?? 100 }} 分</span>
         </div>
 
         <div class="price">
-          <strong>{{ formatPrice(item.price) }}</strong>
-          <s v-if="item.originalPrice">{{ formatPrice(item.originalPrice) }}</s>
-          <span class="want">{{ item.wantCount }} 人想要</span>
+          <strong>{{ formatPrice(Number(item.price)) }}</strong>
+          <s v-if="item.originPrice">{{ formatPrice(Number(item.originPrice)) }}</s>
+          <span class="want">浏览 {{ item.viewCount }} 次</span>
         </div>
 
         <dl class="params">
           <dt>成色</dt>
-          <dd>{{ item.condition }} 级 · {{ CONDITION_LABELS[item.condition] }}</dd>
+          <dd>{{ item.grade }} 级 · {{ CONDITION_LABELS[item.grade as 'A'] }}</dd>
           <dt>校区</dt>
-          <dd>{{ item.campus }}</dd>
+          <dd>{{ item.campusName }}</dd>
           <dt>面交点</dt>
-          <dd>{{ item.meetPoint }}</dd>
+          <dd>{{ item.meetPointName ?? '待定' }}</dd>
           <dt>发布</dt>
-          <dd>{{ formatRelativeTime(item.publishedAt) }}</dd>
+          <dd>{{ formatRelativeTime(item.publishAt) }}</dd>
         </dl>
 
         <div class="acts">
-          <el-button type="primary" size="large" @click="onWant">我想要</el-button>
-          <el-button size="large" :type="selected ? 'warning' : 'default'" @click="onCompare">
-            {{ selected ? '已加入对比' : '加入对比' }}
-          </el-button>
+          <template v-if="isMine">
+            <el-button type="primary" size="large" @click="onEdit">编辑商品</el-button>
+          </template>
+          <template v-else>
+            <el-button type="primary" size="large" @click="onChat">聊一聊</el-button>
+            <el-button size="large" :type="selected ? 'warning' : 'default'" @click="onCompare">
+              {{ selected ? '已加入对比' : '加入对比' }}
+            </el-button>
+          </template>
         </div>
 
         <!-- 卖家卡 -->
         <div class="seller">
-          <span class="avatar" :style="{ background: bg(item.seller.tints, false) }" />
+          <span class="avatar" :style="{ background: bg(false) }" />
           <div class="seller__meta">
-            <span class="nick">{{ item.seller.nick }}</span>
-            <span class="sub">
-              信用{{ item.seller.credit }}
-              <em v-if="item.seller.verified">· 学号已认证</em>
-            </span>
+            <span class="nick">{{ item.sellerNick ?? '卖家' }}</span>
+            <span class="sub">信用 {{ item.sellerCredit ?? 100 }} 分</span>
           </div>
-          <el-button size="small" plain>查看主页</el-button>
         </div>
 
         <p class="notice">
@@ -116,12 +177,12 @@ function onWant(): void {
 
     <section class="desc">
       <h2>商品描述</h2>
-      <p class="desc__text">{{ item.description }}</p>
+      <p class="desc__text">{{ item.description || '卖家没有填写描述。' }}</p>
     </section>
   </div>
 
   <!-- 找不到（id 被改过 / 已下架）：给回列表的出口，不留白屏 -->
-  <div v-else class="cm-shell">
+  <div v-else-if="!loading" class="cm-shell">
     <el-empty description="商品不存在或已下架">
       <el-button type="primary" @click="router.push({ name: 'home' })">回首页逛逛</el-button>
     </el-empty>
@@ -153,6 +214,14 @@ function onWant(): void {
   aspect-ratio: 4 / 3;
   border-radius: var(--cm-radius-2xl);
   box-shadow: var(--cm-shadow-1);
+  overflow: hidden;
+}
+
+.stage__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .thumbs {
@@ -168,10 +237,18 @@ function onWant(): void {
   border-radius: var(--cm-radius-lg);
   cursor: pointer;
   padding: 0;
+  overflow: hidden;
 }
 
 .thumb.on {
   border-color: var(--cm-color-brand);
+}
+
+.thumb__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 /* ── 价格盒 ─────────────────────────────────────────────── */

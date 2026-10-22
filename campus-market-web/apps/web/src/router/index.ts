@@ -34,7 +34,9 @@ const routes: RouteRecordRaw[] = [
       // 我的商品：卖家视角全状态（含草稿），操作按状态给出
       { path: 'my-items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我的商品' } },
       // P4 对比：桌面独占，2–4 件参数横评
-      { path: 'compare', name: 'compare', component: () => import('@/views/CompareView.vue'), meta: { title: '对比' } }
+      { path: 'compare', name: 'compare', component: () => import('@/views/CompareView.vue'), meta: { title: '对比' } },
+      // P6 消息：询单会话（同步留言，无实时推送）；?itemId=&peerId= 从详情页带入选中会话
+      { path: 'chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { title: '消息' } }
     ]
   },
   // 登录：独立全屏页（闲鱼口径），不走 MainLayout，因此没有顶栏与悬浮工具栏

@@ -5,93 +5,97 @@
  * <p>「半熟人信任可见」（原则 4）：学号认证、同校、面交点三项必须一眼看到——
  * 所以这三样放在参数区的最前面，不折叠。
  *
- * <p>页面栈最多 10 层（design/02 §二）：详情页 → 卖家主页 → 商品详情 这类链路
- * 要用 `redirectTo` 而不是 `navigateTo` 截断，否则来回点几次就跳不动了。
+ * <p>数据接 `/api/item/{id}`（免登录）。底部「聊一聊」进询单会话（同步留言）；
+ * 下单链路（M8）未接前，「我想要」同样落进询单——先聊后买是校园二手的主路径。
  */
 
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
-import { findItem } from '@campus/mock'
+import { userItemApi, type ApiItemVO } from '@/api/user'
 import ConditionTag from '@/components/ConditionTag.vue'
 
 const id = ref('')
-const item = computed(() => findItem(id.value))
+const item = ref<ApiItemVO | null>(null)
 
 onLoad((query) => {
   id.value = (query as { id?: string })?.id ?? ''
+  void userItemApi
+    .detail(id.value)
+    .then((vo) => {
+      item.value = vo
+    })
+    .catch(() => {
+      // 不存在 / 已下架：request 层已提示，落空态
+    })
 })
 
-const gradient = computed(() =>
-  item.value ? `linear-gradient(135deg, ${item.value.tints[0]}, ${item.value.tints[1]})` : ''
-)
+/** 图集：有真实图片用图片，否则一张渐变占位 */
+const shots = computed(() => {
+  const imgs = item.value?.images ?? []
+  return imgs.length ? imgs.map((i) => i.url) : [null]
+})
 
-/** 骨架期图集：4 张占位，第二张反向渐变（与 Web 端 hover 换图同源思路） */
-const shots = computed(() => (item.value ? [0, 1, 2, 3] : []))
-
-function shotGradient(i: number): string {
-  if (!item.value) return ''
-  const [a, b] = i % 2 === 1 ? [item.value.tints[1], item.value.tints[0]] : item.value.tints
-  return `linear-gradient(135deg, ${a}, ${b})`
-}
-
-function onWant(): void {
-  uni.showToast({ title: '已通知卖家', icon: 'none', duration: 1500 })
+function shotGradient(): string {
+  return 'linear-gradient(135deg, #ECEFF3, #D3D9E0)'
 }
 
 function onChat(): void {
-  // 会话页还没建，骨架期只给反馈；将来用 redirectTo 截断页面栈
-  uni.showToast({ title: '会话页待建（M5）', icon: 'none' })
+  if (!item.value) return
+  void uni.navigateTo({
+    url: `/pages/chat/detail?itemId=${item.value.id}&peerId=${item.value.sellerId}&nick=${encodeURIComponent(item.value.sellerNick ?? '')}`
+  })
 }
 </script>
 
 <template>
   <view v-if="item" class="page">
     <swiper class="swiper" indicator-dots circular>
-      <swiper-item v-for="i in shots" :key="i">
-        <view class="shot" :style="{ backgroundImage: shotGradient(i) }" />
+      <swiper-item v-for="(s, i) in shots" :key="i">
+        <image v-if="s" :src="s" mode="aspectFill" class="shot__img" />
+        <view v-else class="shot" :style="{ backgroundImage: shotGradient() }" />
       </swiper-item>
     </swiper>
 
     <view class="box">
-      <text class="price">{{ formatPrice(item.price) }}</text>
-      <text v-if="item.originalPrice" class="origin">原价 {{ formatPrice(item.originalPrice) }}</text>
+      <text class="price">{{ formatPrice(Number(item.price)) }}</text>
+      <text v-if="item.originPrice" class="origin">原价 {{ formatPrice(Number(item.originPrice)) }}</text>
       <text class="title">{{ item.title }}</text>
-      <text class="want">{{ item.wantCount }} 人想要 · {{ formatRelativeTime(item.publishedAt) }}</text>
+      <text class="want">浏览 {{ item.viewCount }} 次 · {{ formatRelativeTime(item.publishAt) }}</text>
     </view>
 
     <!-- 校园四项：成色 / 校区 / 面交点 / 认证，前三项必须一眼可见 -->
     <view class="box">
       <view class="row">
         <text class="row__k">成色</text>
-        <ConditionTag :grade="item.condition" />
-        <text class="row__v">{{ CONDITION_LABELS[item.condition] }}</text>
+        <ConditionTag :grade="item.grade as 'A'" />
+        <text class="row__v">{{ CONDITION_LABELS[item.grade as 'A'] }}</text>
       </view>
-      <view class="row"><text class="row__k">校区</text><text class="row__v">{{ item.campus }}</text></view>
-      <view class="row"><text class="row__k">面交点</text><text class="row__v">{{ item.meetPoint }}</text></view>
+      <view class="row"><text class="row__k">校区</text><text class="row__v">{{ item.campusName }}</text></view>
+      <view class="row"><text class="row__k">面交点</text><text class="row__v">{{ item.meetPointName ?? '待定' }}</text></view>
       <view class="row">
         <text class="row__k">交易</text>
-        <text class="row__v">{{ item.negotiable ? '可议价' : '一口价' }} · {{ item.delivery ? '包配送' : '自提' }}</text>
+        <text class="row__v">{{ item.negotiable ? '可议价' : '一口价' }} · {{ item.deliveryIncluded ? '包配送' : '自提' }}</text>
       </view>
     </view>
 
     <view class="box seller">
-      <view class="avatar" :style="{ backgroundImage: gradient }" />
+      <view class="avatar" :style="{ backgroundImage: shotGradient() }" />
       <view class="seller__meta">
-        <text class="seller__nick">{{ item.seller.nick }}</text>
-        <text class="seller__sub">信用{{ item.seller.credit }}<text v-if="item.seller.verified" class="ok"> · 学号已认证</text></text>
+        <text class="seller__nick">{{ item.sellerNick ?? '卖家' }}</text>
+        <text class="seller__sub">信用 {{ item.sellerCredit ?? 100 }} 分</text>
       </view>
     </view>
 
     <view class="box">
       <text class="desc__t">商品描述</text>
-      <text class="desc">{{ item.description }}</text>
+      <text class="desc">{{ item.description || '卖家没有填写描述。' }}</text>
     </view>
 
     <!-- 底部固定操作条：50pt + 安全区，主行动占 60% -->
     <view class="actionbar">
       <view class="actionbar__minor" @click="onChat">聊一聊</view>
-      <view class="actionbar__main" hover-class="actionbar__main--active" @click="onWant">我想要</view>
+      <view class="actionbar__main" hover-class="actionbar__main--active" @click="onChat">我想要</view>
     </view>
   </view>
 
@@ -113,6 +117,11 @@ function onChat(): void {
   width: 100%;
   height: 100%;
   background-size: cover;
+}
+
+.shot__img {
+  width: 100%;
+  height: 100%;
 }
 
 .box {
@@ -193,10 +202,6 @@ function onChat(): void {
 .seller__sub {
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
-}
-
-.ok {
-  color: $cm-color-ok;
 }
 
 .desc__t {

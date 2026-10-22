@@ -84,7 +84,7 @@ async function logout(): Promise<void> {
           <RouterLink :to="{ name: 'publish' }" class="nav__publish">
             <el-icon :size="14"><Position /></el-icon>发布闲置
           </RouterLink>
-          <a class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</a>
+          <RouterLink :to="{ name: 'chat' }" class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</RouterLink>
           <a class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</a>
           <!-- 登录态：未登录显示入口，已登录显示昵称 + 我的商品 + 退出 -->
           <RouterLink v-if="!session.isLogin" :to="{ name: 'login' }" class="lnk">登录</RouterLink>
@@ -106,10 +106,10 @@ async function logout(): Promise<void> {
         <span class="rail__ico"><el-icon :size="18"><Position /></el-icon></span>
         <span>发布</span>
       </RouterLink>
-      <a class="rail__item">
+      <RouterLink :to="{ name: 'chat' }" class="rail__item">
         <span class="rail__ico"><el-icon :size="18"><ChatDotRound /></el-icon></span>
         <span>消息</span>
-      </a>
+      </RouterLink>
       <button type="button" class="rail__item" @click="router.push({ name: 'compare' })">
         <span class="rail__ico">
           <el-icon :size="18"><CopyDocument /></el-icon>

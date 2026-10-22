@@ -1,50 +1,67 @@
 <script setup lang="ts">
 /**
- * M5 消息 · 会话列表（design/02 §六，P0）
+ * M5 消息 · 会话列表（business/02 M-B4，2026-10-22 同步留言口径）
  *
- * <p>骨架期只铺列表壳子：会话数据依赖 WebSocket（tech/02 §6.6：原生 WS + Sa-Token 握手），
- * 后端未实现，所以这里是静态占位。消息三分区（PRIVATE / SYSTEM / TRADE）由
- * 前端按 `zone` 字段分流渲染——接口就位后按 zone 分组，而不是按时间混排。
+ * <p>真实会话来自 /api/chat/conversations：按「商品 + 对方」一行，买家与卖家共用。
+ * 无实时推送——进详情轮询拉取；未读红点来自服务端统计，进会话即清零。
+ * 系统通知与交易通知合并为后续站内通知能力，本期不做（见 M-B10）。
  */
 
-interface Session {
-  id: string
-  nick: string
-  last: string
-  time: string
-  unread: number
-  zone: 'PRIVATE' | 'SYSTEM' | 'TRADE'
+import { onPullDownRefresh, onShow } from '@dcloudio/uni-app'
+import { ref } from 'vue'
+import { userChatApi, type ChatConversationVO } from '@/api/user'
+
+const conversations = ref<ChatConversationVO[]>([])
+const loading = ref(true)
+
+async function load(): Promise<void> {
+  try {
+    conversations.value = await userChatApi.conversations()
+  } catch {
+    // request 层已提示
+  } finally {
+    loading.value = false
+  }
 }
 
-const sessions: Session[] = [
-  { id: '1', nick: '小林同学', last: '这本书还在的，图书馆东门见？', time: '刚刚', unread: 2, zone: 'PRIVATE' },
-  { id: '2', nick: '系统通知', last: '你发布的「iPad 9 64G」已通过审核', time: '2 小时前', unread: 0, zone: 'SYSTEM' },
-  { id: '3', nick: '橘子汽水', last: '订单已确认，明天下午面交', time: '昨天', unread: 0, zone: 'TRADE' }
-]
-
-const ZONE_LABEL: Record<Session['zone'], string> = {
-  PRIVATE: '私信',
-  SYSTEM: '系统',
-  TRADE: '交易'
+function open(c: ChatConversationVO): void {
+  void uni.navigateTo({
+    url: `/pages/chat/detail?itemId=${c.itemId}&peerId=${c.peerUserId}`
+  })
 }
 
-function open(s: Session): void {
-  uni.showToast({ title: `聊天页待建（${ZONE_LABEL[s.zone]}）`, icon: 'none' })
-}
+// 列表页 onShow 刷新：从详情返回后未读数要是新的
+onShow(() => {
+  void load()
+})
+
+onPullDownRefresh(() => {
+  void load().then(() => uni.stopPullDownRefresh())
+})
 </script>
 
 <template>
   <view class="page">
-    <view v-for="s in sessions" :key="s.id" class="item" hover-class="item--active" @click="open(s)">
-      <view class="avatar"><text class="avatar__t">{{ s.nick[0] }}</text></view>
+    <view v-if="loading" class="tip">加载中…</view>
+    <view v-else-if="!conversations.length" class="tip">
+      还没有会话。去商品详情页点「聊一聊」开始询价。
+    </view>
+    <view
+      v-for="c in conversations"
+      :key="`${c.itemId}-${c.peerUserId}`"
+      class="item"
+      hover-class="item--active"
+      @click="open(c)"
+    >
+      <view class="avatar"><text class="avatar__t">{{ (c.peerNick || '方')[0] }}</text></view>
       <view class="mid">
         <view class="mid__top">
-          <text class="nick">{{ s.nick }}</text>
-          <text class="time">{{ s.time }}</text>
+          <text class="nick">{{ c.peerNick || '对方' }}</text>
+          <text v-if="c.unread" class="dot">{{ c.unread }}</text>
         </view>
-        <text class="last">{{ s.last }}</text>
+        <text class="last">{{ c.lastContent || '（暂无消息）' }}</text>
+        <text class="item-of">问：{{ c.itemTitle || '商品' }}</text>
       </view>
-      <view v-if="s.unread" class="dot">{{ s.unread }}</view>
     </view>
   </view>
 </template>
@@ -52,6 +69,15 @@ function open(s: Session): void {
 <style scoped lang="scss">
 .page {
   background: $cm-color-surface;
+  min-height: 100vh;
+}
+
+.tip {
+  padding: $cm-space-8 $cm-space-4;
+  text-align: center;
+  font-size: $cm-font-size-sm;
+  color: $cm-color-text-3;
+  line-height: 1.6;
 }
 
 .item {
@@ -91,8 +117,8 @@ function open(s: Session): void {
 
 .mid__top {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
+  gap: $cm-space-2;
 }
 
 .nick {
@@ -101,30 +127,35 @@ function open(s: Session): void {
   color: $cm-color-text-1;
 }
 
-.time {
+.dot {
+  min-width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  text-align: center;
   font-size: $cm-font-size-xs;
-  color: $cm-color-text-3;
+  color: #fff;
+  background: $cm-color-err;
+  border-radius: 16rpx;
+  padding: 0 8rpx;
 }
 
 .last {
   display: block;
   margin-top: 4rpx;
   font-size: $cm-font-size-sm;
-  color: $cm-color-text-3;
+  color: $cm-color-text-2;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.dot {
-  min-width: 36rpx;
-  height: 36rpx;
-  line-height: 36rpx;
-  text-align: center;
+.item-of {
+  display: block;
+  margin-top: 2rpx;
   font-size: $cm-font-size-xs;
-  color: #fff;
-  background: $cm-color-err;
-  border-radius: 18rpx;
-  padding: 0 8rpx;
+  color: $cm-color-text-3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
