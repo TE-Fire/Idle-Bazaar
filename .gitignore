@@ -111,10 +111,13 @@ application-prod.yml
 !application-demo.yml
 
 # ── 项目本地产物与运行时数据 ───────────────────────────────
-uploads/
-storage/
+# 锚定到仓库根：无锚定的 storage/ 会匹配到任何层级的 storage 目录，
+# 曾把 backend/campus-support/src/main/java/com/campus/support/storage/
+# 整个 Java 包吞掉导致模块从未入过库，根目录以外真有运行时数据再按需加规则
+/uploads/
+/storage/
 **/logs/
-logs/
+/logs/
 *.sql.bak
 dump-*.sql
 *.dump
