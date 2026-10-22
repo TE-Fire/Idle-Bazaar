@@ -87,6 +87,7 @@ public class ItemAdminService {
     private final ReportMapper reportMapper;
     private final DictService dictService;
     private final CategoryAvgPriceCache categoryAvgPriceCache;
+    private final ItemImageJanitor itemImageJanitor;
 
     /* ══ 一、列表 ═══════════════════════════════════════════ */
 
@@ -238,6 +239,8 @@ public class ItemAdminService {
                 .eq(ItemImage::getItemId, id)
                 .eq(ItemImage::getDeleted, 0)
                 .set(ItemImage::getDeleted, ts));
+        // MinIO 对象在提交后清理（回滚则图必须还在）
+        itemImageJanitor.cleanupAfterCommit(id);
     }
 
     /* ══ 五、查询条件 ═══════════════════════════════════════ */

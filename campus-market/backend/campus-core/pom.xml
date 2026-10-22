@@ -18,6 +18,12 @@
       <groupId>com.campus</groupId>
       <artifactId>campus-common</artifactId>
     </dependency>
+    <!-- 对象存储能力：业务代码只依赖 StorageService 接口（support 不引任何 MinIO API 之外的耦合）。
+         demo 关 MinIO 时无 StorageService Bean，消费方用 ObjectProvider 容错 -->
+    <dependency>
+      <groupId>com.campus</groupId>
+      <artifactId>campus-support</artifactId>
+    </dependency>
 
     <dependency>
       <groupId>com.baomidou</groupId>

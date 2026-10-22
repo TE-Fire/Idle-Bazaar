@@ -40,6 +40,8 @@ minio:
   bucket: item-image
 
 campus:
+  upload:
+    mode: proxy           # 演示关存储时仅 PROXY 票据可签，真正上传才提示未启用
   captcha:
     enabled: false        # 演示关闭验证码，登录只需账号密码（要演示防刷就改 true）
   mail:
