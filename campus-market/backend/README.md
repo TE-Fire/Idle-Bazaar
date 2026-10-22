@@ -129,4 +129,4 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 
 中间件（非业务，独立推进）：
 - [ ] RocketMQ 生产者/消费者（5 个 topic 已定义在 `tech/01` 4.3；`OP_LOG` 已明确不启用）
-- [ ] MinIO 真正接入（实现类已就绪，改 `minio.enabled=true`）
+- [x] MinIO 接入（2026-10-22：dev 已 `minio.enabled=true`；图片上传两步票据制 + 策略模式，PROXY/DIRECT 由 `campus.upload.mode` 切换；删除商品提交后清对象）
