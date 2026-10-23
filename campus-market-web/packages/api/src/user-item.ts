@@ -33,6 +33,8 @@ export interface ApiItemVO {
   sellerId: string
   sellerNick?: string | null
   sellerCredit?: number | null
+  /** 卖家认证态（app_user.auth_status：0未认证 1审核中 2已认证 3未通过）；旧后端不返回时为 undefined */
+  sellerAuthStatus?: number | null
   /** 1 可议价；议价在聊天里进行，不进订单 */
   negotiable?: number | null
   deliveryIncluded?: number | null

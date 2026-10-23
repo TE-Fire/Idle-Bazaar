@@ -452,6 +452,7 @@ public class ItemService {
             if (u != null) {
                 vo.setSellerNick(u.getNickname());
                 vo.setSellerCredit(u.getCreditScore());
+                vo.setSellerAuthStatus(u.getAuthStatus());
             }
         });
     }

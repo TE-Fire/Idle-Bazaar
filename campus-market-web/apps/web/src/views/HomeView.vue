@@ -7,8 +7,11 @@
  *
  * <p>结果为空时给「放宽条件的建议」，不能只显示"暂无数据"（F-W1 判据）。
  *
- * <p>数据来自 `@campus/mock`（与小程序同一批）：学生端接口未实现，
- * 等 `/api/item/list` 就位后只换数据源。
+ * <p>数据来自 `/api/item/list`（`userItemApi.list`）：后端只返在售商品，发布时间倒序。
+ * 一次拉满一页（pageSize=50，后端上限）后**筛选 / 排序 / 分页全在客户端做**——
+ * 后端列表接口暂只支持 keyword/categoryId/campusId 三个服务端条件，
+ * 价格、成色、卖家、时间范围与排序尚未参数化（见 utils/item-map.ts 的边界说明）。
+ * 在售量超过 50 后必须回头补服务端筛选参数，否则第 50 名之后的商品永不可见。
  *
  * <p>2026-09-30 按闲鱼 Web 版改版：
  * - 顶部分类条取消，分类收进左侧「全部分类」卡（闲鱼的分类入口在首页左上）；
@@ -18,7 +21,7 @@
  * - 排序从下拉换成闲鱼式的**排序胶囊组**（综合/最新/最热/价格）。
  */
 
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CAMPUSES,
@@ -27,11 +30,13 @@ import {
   CONDITION_LABELS,
   formatPrice,
   type Campus,
-  type ConditionGrade
+  type ConditionGrade,
+  type GoodsItem
 } from '@campus/shared'
-import { mockItems } from '@campus/mock'
+import { userItemApi } from '@campus/api'
 import ProductCard from '@/components/ProductCard.vue'
 import FilterGroup from '@/components/FilterGroup.vue'
+import { toGoodsItem } from '@/utils/item-map'
 
 type SortKey = 'default' | 'price-asc' | 'price-desc' | 'time' | 'hot'
 type ViewMode = 'grid' | 'list'
@@ -64,6 +69,28 @@ const sort = ref<SortKey>('default')
 const view = ref<ViewMode>('grid')
 const page = ref(1)
 const pageSize = 12
+
+/* ── 数据源（/api/item/list）────────────────────────────── */
+
+const items = ref<GoodsItem[]>([])
+const loading = ref(false)
+const loadError = ref(false)
+
+async function fetchItems(): Promise<void> {
+  loading.value = true
+  loadError.value = false
+  try {
+    // 服务端只返在售、按发布时间倒序；50 是后端 pageSize 上限
+    const res = await userItemApi.list({ pageSize: 50 })
+    items.value = res.list.map(toGoodsItem)
+  } catch {
+    loadError.value = true
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(fetchItems)
 
 /** 顶栏搜索与分类条是 URL 驱动的，换 URL 要同步进筛选状态 */
 watch(
@@ -131,7 +158,7 @@ const filtered = computed(() => {
   const kw = keyword.value.trim()
   const now = Date.now()
 
-  return mockItems.filter((it) => {
+  return items.value.filter((it) => {
     if (category.value && it.category !== category.value) return false
     if (kw && !`${it.title}${it.description}`.includes(kw)) return false
     if (priceMin.value !== null && it.price < priceMin.value) return false
@@ -375,8 +402,19 @@ watch([filtered], () => {
           </div>
         </div>
 
+        <!-- 加载态：骨架卡占位，避免刷新时「暂无数据」闪烁 -->
+        <div v-if="loading" class="grid grid--grid">
+          <el-skeleton v-for="n in 8" :key="n" class="card-skeleton" :rows="4" animated />
+        </div>
+
+        <!-- 失败态：给重试，不放一句「暂无数据」让用户以为真没货 -->
+        <div v-else-if="loadError" class="load-error cm-card">
+          <p>商品列表加载失败</p>
+          <el-button type="primary" @click="fetchItems">重新加载</el-button>
+        </div>
+
         <!-- 空态：给可执行的放宽建议，不放一句「暂无数据」就完事 -->
-        <el-empty v-if="!paged.length" description="没有符合条件的商品">
+        <el-empty v-else-if="!paged.length" description="没有符合条件的商品">
           <el-button type="primary" @click="relax">放宽条件（去掉校区与价格限制）</el-button>
         </el-empty>
 
@@ -718,6 +756,18 @@ watch([filtered], () => {
 .grid {
   display: grid;
   gap: var(--cm-space-4);
+}
+
+.card-skeleton {
+  background: var(--cm-color-surface);
+  border-radius: var(--cm-radius-xl);
+  padding: var(--cm-space-4);
+}
+
+.load-error {
+  padding: var(--cm-space-8);
+  text-align: center;
+  color: var(--cm-color-text-2);
 }
 
 .grid--grid {

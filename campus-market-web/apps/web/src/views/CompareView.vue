@@ -7,21 +7,47 @@
  * 同一维度上的差异，转置成「行是商品」就退化成列表了。
  *
  * <p>数据来源优先级：URL 的 `ids` > 对比篮。这样链接可分享，且刷新不丢。
+ * URL 带 ids 时按 id 逐个拉 `/api/item/{id}`（免登录）回显——真实雪花 id 在 mock 里查不到，
+ * 这条路径早已随首页接真数据改为拉接口。
  */
 
-import { computed } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
-import { findItem } from '@campus/mock'
+import { userItemApi } from '@campus/api'
+import { toGoodsItem } from '@/utils/item-map'
 import { useCompareStore } from '@/stores/compare'
 
 const route = useRoute()
 const compare = useCompareStore()
 
-const items = computed<GoodsItem[]>(() => {
-  const ids = (route.query.ids as string | undefined)?.split(',').filter(Boolean)
-  if (ids?.length) return ids.map(findItem).filter((it): it is GoodsItem => !!it)
-  return compare.items
+/** URL ids 回显是异步的（逐个拉详情）；无 ids 时直接用对比篮快照 */
+const items = ref<GoodsItem[]>(compare.items)
+
+async function loadFromUrl(ids: string[]): Promise<void> {
+  const loaded = await Promise.all(
+    ids.map((id) =>
+      userItemApi
+        .detail(id)
+        .then(toGoodsItem)
+        .catch(() => null)
+    )
+  )
+  items.value = loaded.filter((it): it is GoodsItem => !!it)
+}
+
+watch(
+  () => route.query.ids,
+  (raw) => {
+    const ids = (raw as string | undefined)?.split(',').filter(Boolean)
+    if (ids?.length) void loadFromUrl(ids)
+    else items.value = compare.items
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (!route.query.ids) items.value = compare.items
 })
 
 interface Row {

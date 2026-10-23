@@ -37,6 +37,13 @@ const props = withDefaults(
 const router = useRouter()
 const compare = useCompareStore()
 
+/**
+ * 主图优先用真实 URL（item.images[0]），发布页实时预览（previewSrc）次之，都没有才落 tints 占位。
+ * 第二张图给 hover 交叉淡入用；只有一张图时仍显示反转占位，保持骨架期的悬浮结构。
+ */
+const mainImg = computed(() => props.previewSrc || props.item.images?.[0] || '')
+const secondImg = computed(() => props.item.images?.[1] || '')
+
 /** 占位图渐变：第二张把两色反过来并压暗一档，hover 切换时才看得出变化 */
 const bg = (tints: [string, string], flip = false): string => {
   const [a, b] = flip ? [tints[1], tints[0]] : tints
@@ -76,9 +83,9 @@ function onCompare(e: MouseEvent): void {
     <div class="card__pic">
       <div
         class="pic pic--a"
-        :style="previewSrc ? { backgroundImage: `url(${previewSrc})` } : { background: bg(item.tints) }"
+        :style="mainImg ? { backgroundImage: `url(${mainImg})` } : { background: bg(item.tints) }"
       />
-      <div v-if="!previewSrc" class="pic pic--b" :style="{ background: bg(item.tints, true) }" />
+      <div v-if="!previewSrc" class="pic pic--b" :style="secondImg ? { backgroundImage: `url(${secondImg})` } : { background: bg(item.tints, true) }" />
 
       <!-- 角标：急出用价格色底，其余半透黑底（design/01 §4.1） -->
       <span v-if="item.badge === '急出'" class="card__badge card__badge--hot">急出</span>
@@ -106,7 +113,8 @@ function onCompare(e: MouseEvent): void {
         <strong>{{ priceInt }}</strong>
         <span v-if="priceDec" class="dec">.{{ priceDec }}</span>
         <s v-if="item.originalPrice">{{ item.originalPrice }}元</s>
-        <span class="want">{{ item.wantCount }}人想要</span>
+        <!-- wantCount 为 0 时隐藏（真实数据不下发收藏数），不显示「0 人想要」 -->
+        <span v-if="item.wantCount > 0" class="want">{{ item.wantCount }}人想要</span>
       </div>
 
       <div class="card__meta">

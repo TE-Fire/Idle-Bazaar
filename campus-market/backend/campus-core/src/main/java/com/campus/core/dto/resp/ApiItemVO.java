@@ -49,6 +49,9 @@ public class ApiItemVO {
 
     private Integer sellerCredit;
 
+    /** 卖家认证态（app_user.auth_status：0未认证 1审核中 2已认证 3未通过），首页「仅看已认证」筛选用 */
+    private Integer sellerAuthStatus;
+
     /** 1 可议价；议价在聊天里进行，不进订单 */
     private Integer negotiable;
 
