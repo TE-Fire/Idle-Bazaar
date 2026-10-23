@@ -453,29 +453,56 @@ public class OrderService {
      * <p>起算时间取 `update_time`：表里没有专门的退款申请时间列，而订单停留在退款中期间不会有别处改动它，
      * 此刻 `update_time` 就等于那次状态迁移的时刻。这是借用的语义，将来若这条分支上再长出别的写操作，
      * 应当补一列而不是继续借用它。
+     *
+     * <p><b>方法本身不开事务</b>：整批一个大事务，任何一笔失败都全批回滚，且行锁从第一笔握到
+     * 最后一笔，阻塞的恰是这批订单的真实受理。逐笔独立事务由 {@link #autoRefundOne} 负责，
+     * 失败的订单状态未变，下一轮扫描会再次捞到——重试由幂等性免费提供，无需补偿机制
+     * （与 {@link #cancelExpired} 同一模式，notes/18 问题一）。
+     * 每轮限量并按进入退款中的时刻排序：先被冷处理的更早解决，积压时分多轮消化。
      */
     @Scheduled(fixedDelay = 30 * 60 * 1000L)
-    @Transactional(rollbackFor = Exception.class)
     public void autoRefund() {
         LocalDateTime deadline = LocalDateTime.now().minusHours(AUTO_REFUND_HOURS);
         List<TradeOrder> pending = orderMapper.selectList(new LambdaQueryWrapper<TradeOrder>()
                 .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
-                .le(TradeOrder::getUpdateTime, deadline));
+                .le(TradeOrder::getUpdateTime, deadline)
+                .orderByAsc(TradeOrder::getUpdateTime)
+                .last("LIMIT " + EXPIRE_SCAN_BATCH));
         int count = 0;
         for (TradeOrder order : pending) {
+            try {
+                count += autoRefundOne(order);
+            } catch (Exception e) {
+                // 单笔失败只丢这一笔：状态未变，下轮扫描自动重试，不能让它拖垮已成功的
+                log.error("[order] 单笔自动同意退款失败，留待下次扫描重试：orderId={}", order.getId(), e);
+            }
+        }
+        if (count > 0) {
+            log.info("[order] 卖家超时未处理，系统自动同意退款 {} 笔", count);
+        }
+    }
+
+    /**
+     * 单笔自动同意：转已退款并恢复商品。**状态校验写在 WHERE 里而不是先查后判**：
+     * 并发下卖家可能刚好自己点了同意，行数 0 即表示订单已被改走，本次作废。
+     *
+     * <p>单笔一个独立事务（REQUIRES_NEW）：批量调用方（{@link #autoRefund}）失败只回滚
+     * 这一笔，不影响同批已提交的。
+     */
+    private int autoRefundOne(TradeOrder order) {
+        TransactionTemplate template = new TransactionTemplate(txManager);
+        template.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        return template.execute(status -> {
             int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                     .eq(TradeOrder::getId, order.getId())
                     .eq(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode())
                     .set(TradeOrder::getStatus, OrderStatusEnum.REFUNDED.getCode())
                     .set(TradeOrder::getCancelReason, AUTO_REFUND_REASON));
             if (rows == 1) {
-                count++;
                 restoreItemOnRefund(order);
             }
-        }
-        if (count > 0) {
-            log.info("[order] 卖家超时未处理，系统自动同意退款 {} 笔", count);
-        }
+            return rows;
+        });
     }
 
     /**
