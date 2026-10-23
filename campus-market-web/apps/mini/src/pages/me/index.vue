@@ -22,8 +22,8 @@ interface Entry {
 
 const entries: Entry[] = [
   { key: 'published', label: '我发布的', hint: '草稿 / 在售 / 审核中' },
-  { key: 'sold', label: '我卖出的', hint: '已完成交易' },
-  { key: 'bought', label: '我买到的', hint: '待面交 / 已完成' },
+  { key: 'bought', label: '我买到的', hint: '待付款 / 待面交 / 退款' },
+  { key: 'sold', label: '我卖出的', hint: '待面交 / 核销 / 仲裁' },
   { key: 'fav', label: '我的收藏', hint: '降价提醒' },
   { key: 'verify', label: '学号认证', hint: '认证后可提升信任' }
 ]
@@ -36,6 +36,11 @@ onShow(() => {
 function open(e: Entry): void {
   if (e.key === 'published') {
     void uni.navigateTo({ url: '/pages/my-items/index' })
+    return
+  }
+  if (e.key === 'bought' || e.key === 'sold') {
+    const role = e.key === 'bought' ? 'buyer' : 'seller'
+    void uni.navigateTo({ url: `/pages/order/list?role=${role}` })
     return
   }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })
@@ -87,13 +92,13 @@ async function logout(): Promise<void> {
   display: flex;
   align-items: center;
   gap: $cm-space-4;
-  padding: $cm-space-6 $cm-space-4;
+  padding: $cm-space-8 $cm-space-5 $cm-space-6;
   background: $cm-color-surface;
 }
 
 .head__avatar {
-  width: 120rpx;
-  height: 120rpx;
+  width: 144rpx;
+  height: 144rpx;
   border-radius: 50%;
   background: $cm-color-brand-bg;
   display: flex;
@@ -102,7 +107,7 @@ async function logout(): Promise<void> {
 }
 
 .head__t {
-  font-size: 44rpx;
+  font-size: 56rpx;
   font-weight: 600;
   color: $cm-color-brand-text;
 }
@@ -111,38 +116,45 @@ async function logout(): Promise<void> {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
+  gap: 8rpx;
 }
 
 .head__nick {
-  font-size: $cm-font-size-md;
-  font-weight: 600;
+  font-size: $cm-font-size-lg;
+  font-weight: 700;
   color: $cm-color-text-1;
 }
 
 .head__sub {
-  font-size: $cm-font-size-xs;
+  font-size: $cm-font-size-sm;
   color: $cm-color-text-3;
 }
 
 .head__logout {
   font-size: $cm-font-size-sm;
   color: $cm-color-text-3;
+  padding: $cm-space-2 $cm-space-3;
 }
 
 .list {
-  margin-top: $cm-space-3;
+  margin: $cm-space-4 $cm-space-4 0;
+  border-radius: $cm-radius-xl;
   background: $cm-color-surface;
+  overflow: hidden;
 }
 
 .entry {
   display: flex;
   align-items: center;
   gap: $cm-space-3;
-  height: 112rpx;
-  padding: 0 $cm-space-4;
+  height: 120rpx;
+  padding: 0 $cm-space-5;
   border-bottom: 1rpx solid $cm-color-border;
   transition: transform 120ms ease-out;
+}
+
+.entry:last-child {
+  border-bottom: none;
 }
 
 .entry--active {
@@ -161,7 +173,7 @@ async function logout(): Promise<void> {
 }
 
 .entry__arrow {
-  font-size: $cm-font-size-md;
+  font-size: $cm-font-size-lg;
   color: $cm-color-text-3;
 }
 </style>

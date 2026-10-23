@@ -6,13 +6,14 @@
  * 所以这三样放在参数区的最前面，不折叠。
  *
  * <p>数据接 `/api/item/{id}`（免登录）。底部「聊一聊」进询单会话（同步留言）；
- * 下单链路（M8）未接前，「我想要」同样落进询单——先聊后买是校园二手的主路径。
+ * 「我想要」下单（未登录先跳登录）：只插待付款订单，商品不锁定，金额按标价。
  */
 
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
-import { userItemApi, type ApiItemVO } from '@/api/user'
+import { userItemApi, userOrderApi, type ApiItemVO } from '@/api/user'
+import { getSession } from '@/utils/session'
 import ConditionTag from '@/components/ConditionTag.vue'
 
 const id = ref('')
@@ -45,6 +46,29 @@ function onChat(): void {
   void uni.navigateTo({
     url: `/pages/chat/detail?itemId=${item.value.id}&peerId=${item.value.sellerId}&nick=${encodeURIComponent(item.value.sellerNick ?? '')}`
   })
+}
+
+/** 我想要：未登录先跳登录（下单要令牌），已登录直接创建待付款订单进详情 */
+function onBuy(): void {
+  if (!item.value) return
+  if (!getSession().tokenValue) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    void uni.navigateTo({ url: '/pages/login/index' })
+    return
+  }
+  if (item.value.sellerId === getSession().userId) {
+    uni.showToast({ title: '不能购买自己发布的商品', icon: 'none' })
+    return
+  }
+  uni.showLoading({ title: '下单中…', mask: true })
+  userOrderApi
+    .create({ itemId: item.value.id, meetPointId: item.value.meetPointId ?? undefined })
+    .then((orderId) => {
+      uni.hideLoading()
+      uni.showToast({ title: '已创建订单', icon: 'success' })
+      void uni.redirectTo({ url: `/pages/order/detail?id=${orderId}&role=buyer` })
+    })
+    .catch(() => uni.hideLoading())
 }
 </script>
 
@@ -95,7 +119,7 @@ function onChat(): void {
     <!-- 底部固定操作条：50pt + 安全区，主行动占 60% -->
     <view class="actionbar">
       <view class="actionbar__minor" @click="onChat">聊一聊</view>
-      <view class="actionbar__main" hover-class="actionbar__main--active" @click="onChat">我想要</view>
+      <view class="actionbar__main" hover-class="actionbar__main--active" @click="onBuy">我想要</view>
     </view>
   </view>
 
@@ -106,17 +130,19 @@ function onChat(): void {
 
 <style scoped lang="scss">
 .page {
-  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
 }
 
+/* 图集通铺到屏幕边（闲鱼口径）：卡片从图下面才开始 */
 .swiper {
-  height: 560rpx;
+  height: 640rpx;
 }
 
 .shot {
   width: 100%;
   height: 100%;
   background-size: cover;
+  background-position: center;
 }
 
 .shot__img {
@@ -125,19 +151,19 @@ function onChat(): void {
 }
 
 .box {
-  margin: $cm-space-2 $cm-space-3;
-  padding: $cm-space-4;
+  margin: $cm-space-3 $cm-space-4;
+  padding: $cm-space-5;
   background: $cm-color-surface;
-  border-radius: $cm-radius-lg;
+  border-radius: $cm-radius-xl;
   display: flex;
   flex-direction: column;
-  gap: $cm-space-2;
+  gap: $cm-space-3;
 }
 
 .price {
-  font-size: 44rpx;
+  font-size: 56rpx;
   font-weight: 700;
-  line-height: 1.1;
+  line-height: 1;
   color: $cm-color-price;
 }
 
@@ -148,8 +174,8 @@ function onChat(): void {
 }
 
 .title {
-  font-size: $cm-font-size-md;
-  font-weight: 600;
+  font-size: $cm-font-size-lg;
+  font-weight: 700;
   line-height: 1.4;
   color: $cm-color-text-1;
 }
@@ -162,13 +188,15 @@ function onChat(): void {
 .row {
   display: flex;
   align-items: center;
-  gap: $cm-space-3;
+  gap: $cm-space-4;
   font-size: $cm-font-size-sm;
+  min-height: 56rpx;
 }
 
 .row__k {
-  width: 96rpx;
+  width: 112rpx;
   color: $cm-color-text-3;
+  flex: none;
 }
 
 .row__v {
@@ -181,8 +209,8 @@ function onChat(): void {
 }
 
 .avatar {
-  width: 72rpx;
-  height: 72rpx;
+  width: 88rpx;
+  height: 88rpx;
   border-radius: 50%;
   background-size: cover;
 }
@@ -190,8 +218,8 @@ function onChat(): void {
 .seller__meta {
   display: flex;
   flex-direction: column;
-  gap: 4rpx;
-  margin-left: $cm-space-3;
+  gap: 6rpx;
+  margin-left: $cm-space-4;
 }
 
 .seller__nick {
@@ -205,14 +233,14 @@ function onChat(): void {
 }
 
 .desc__t {
-  font-size: $cm-font-size-sm;
-  font-weight: 600;
+  font-size: $cm-font-size-base;
+  font-weight: 700;
   color: $cm-color-text-1;
 }
 
 .desc {
   font-size: $cm-font-size-sm;
-  line-height: 1.6;
+  line-height: 1.7;
   color: $cm-color-text-2;
 }
 

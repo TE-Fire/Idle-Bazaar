@@ -42,7 +42,8 @@ export const userAuthApi = {
 export interface CategoryVO {
   id: string
   name: string
-  parentId: string
+  /** 一级分类后端置 null（Jackson non_null 后键消失）；二级为其父 id */
+  parentId?: string
 }
 
 export const userDictApi = {
@@ -147,12 +148,33 @@ export const userChatApi = {
 
 /* ── 商品 ─────────────────────────────────────────────── */
 
+/** 在售列表查询条件（后端只支持这三个服务端条件 + 分页；价格/成色排序在后端参数化之前不做） */
+export interface ItemListParams {
+  keyword?: string
+  /** 一级分类 id，命中其下所有二级 */
+  categoryId?: string
+  campusId?: string
+  pageNum?: number
+  pageSize?: number
+}
+
+export interface ItemPage {
+  list: ApiItemVO[]
+  total: number
+  pageNum: number
+  pageSize: number
+}
+
 export const userItemApi = {
   publish: (req: ItemPublishReq) =>
     request<string>({ url: '/api/item/publish', method: 'POST', data: { ...req } }),
 
   edit: (id: string, req: ItemPublishReq) =>
     request<void>({ url: `/api/item/${id}/edit`, method: 'POST', data: { ...req } }),
+
+  /** 在售商品列表（免登录），发布时间倒序 */
+  list: (params: ItemListParams = {}) =>
+    request<ItemPage>({ url: '/api/item/list', data: { ...params } }),
 
   mine: (status?: string, pageNum = 1, pageSize = 10) =>
     request<{ list: ApiItemVO[]; total: number }>({
@@ -165,4 +187,79 @@ export const userItemApi = {
   remove: (id: string) => request<void>({ url: `/api/item/${id}/delete`, method: 'POST' }),
 
   offline: (id: string) => request<void>({ url: `/api/item/${id}/offline`, method: 'POST' })
+}
+
+/* ── 订单（状态机见 notes/13 第二节）────────────────────── */
+
+/** 与后端 OrderStatusEnum 枚举名逐字一致 */
+export type OrderStatus =
+  | 'WAIT_PAY'
+  | 'WAIT_MEET'
+  | 'VERIFIED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+  | 'REFUNDING'
+  | 'REFUNDED'
+  | 'DISPUTING'
+
+export interface OrderVO {
+  id: string
+  orderNo: string
+  itemId: string
+  buyerId: string
+  sellerId: string
+  /** 2 位小数字符串 */
+  amount: string
+  status: OrderStatus
+  meetPointId?: string
+  /** 约定面交时间 */
+  meetTime?: string
+  /** 核销码（付款后生成，面交时出示/扫描） */
+  verifyCode?: string
+  expireTime?: string
+  payTime?: string
+  cancelBy?: number
+  cancelReason?: string
+  itemTitle?: string
+  itemPrice?: string
+  itemGrade?: string
+  itemMainImage?: string
+  createTime: string
+}
+
+export const userOrderApi = {
+  /** 下单：只插待付款订单，商品不锁定；金额一律按标价 */
+  create: (req: { itemId: string; meetPointId?: string; meetTime?: string }) =>
+    request<string>({ url: '/api/order/create', method: 'POST', data: { ...req } }),
+
+  /** 模拟支付 → 待面交 */
+  pay: (id: string) => request<void>({ url: `/api/order/${id}/pay`, method: 'POST' }),
+
+  /** 待付款直接作废；已付款的取消 = 发起退款申请 */
+  cancel: (id: string, reason?: string) =>
+    request<void>({ url: `/api/order/${id}/cancel`, method: 'POST', data: reason ? { reason } : {} }),
+
+  /** 卖家处理退款：agree=true 已退款；false 拒绝 → 纠纷中 */
+  refund: (id: string, agree: boolean, note?: string) =>
+    request<void>({ url: `/api/order/${id}/refund`, method: 'POST', data: { agree, note } }),
+
+  /** 发起纠纷（待面交/已验货/退款中可发起） */
+  dispute: (id: string, reason: string) =>
+    request<void>({ url: `/api/order/${id}/dispute`, method: 'POST', data: { reason } }),
+
+  /** 扫码核销：待面交 → 已验货 */
+  verify: (id: string, code: string) =>
+    request<void>({ url: `/api/order/${id}/verify`, method: 'POST', data: { code } }),
+
+  /** 确认收货：已验货 → 已完成 */
+  receive: (id: string) => request<void>({ url: `/api/order/${id}/receive`, method: 'POST' }),
+
+  /** role：buyer 我买到的（默认）/ seller 我卖出的 */
+  list: (role: 'buyer' | 'seller' = 'buyer', pageNum = 1, pageSize = 10) =>
+    request<{ list: OrderVO[]; total: number; pageNum: number; pageSize: number }>({
+      url: '/api/order/list',
+      data: { role, pageNum, pageSize }
+    }),
+
+  detail: (id: string) => request<OrderVO>({ url: `/api/order/${id}` })
 }

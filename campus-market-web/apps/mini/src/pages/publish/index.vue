@@ -343,21 +343,21 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 
 <style scoped lang="scss">
 .page {
-  padding: $cm-space-3 $cm-space-3 160rpx;
+  padding: $cm-space-4 $cm-space-4 180rpx;
 }
 
 .sec {
-  margin-bottom: $cm-space-3;
-  padding: $cm-space-4;
+  margin-bottom: $cm-space-4;
+  padding: $cm-space-5;
   background: $cm-color-surface;
-  border-radius: $cm-radius-lg;
+  border-radius: $cm-radius-xl;
 }
 
 .sec__t {
   display: block;
-  margin-bottom: $cm-space-3;
-  font-size: $cm-font-size-sm;
-  font-weight: 600;
+  margin-bottom: $cm-space-4;
+  font-size: $cm-font-size-base;
+  font-weight: 700;
   color: $cm-color-text-1;
 }
 
@@ -366,14 +366,14 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 .shots {
   display: flex;
   flex-wrap: wrap;
-  gap: $cm-space-2;
+  gap: $cm-space-3;
 }
 
 .shot {
   position: relative;
-  width: 160rpx;
-  height: 160rpx;
-  border-radius: $cm-radius-md;
+  width: 168rpx;
+  height: 168rpx;
+  border-radius: $cm-radius-lg;
   overflow: hidden;
 }
 
