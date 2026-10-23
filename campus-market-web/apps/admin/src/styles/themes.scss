@@ -1,0 +1,36 @@
+/**
+ * 换肤的 CSS 变量侧（JS 侧见 stores/theme.ts 与 App.vue 的 ConfigProvider）
+ *
+ * <p>结构：`:root[data-theme=...]` 覆盖品牌相关变量。只覆盖「品牌系」——
+ * 中性色（文本/背景/边框）四套主题共用，换品牌色不动中性层，
+ * 这样每套主题的对比度都经过同一套检验，不会出现某套主题文字发灰。
+ *
+ * <p>default（apple）不写：admin.css 的 :root 原值就是 apple，缺省即默认。
+ */
+
+:root[data-theme='violet'] {
+  --cm-color-brand: #7c4dff;
+  --cm-color-brand-hover: #8f66ff;
+  --cm-color-brand-bg: #f1ebff;
+  --cm-color-brand-border: #c9b6ff;
+  --cm-color-brand-text: #5b2ee0;
+  --cm-color-price: #7c4dff;
+}
+
+:root[data-theme='forest'] {
+  --cm-color-brand: #0fa968;
+  --cm-color-brand-hover: #16b974;
+  --cm-color-brand-bg: #e6f7ef;
+  --cm-color-brand-border: #a3e0c4;
+  --cm-color-brand-text: #0a7a4a;
+  --cm-color-price: #0fa968;
+}
+
+:root[data-theme='sunset'] {
+  --cm-color-brand: #ff6a00;
+  --cm-color-brand-hover: #ff7d26;
+  --cm-color-brand-bg: #fff1e6;
+  --cm-color-brand-border: #ffc299;
+  --cm-color-brand-text: #c25a00;
+  --cm-color-price: #ff5000;
+}

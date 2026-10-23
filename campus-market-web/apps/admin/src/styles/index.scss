@@ -28,8 +28,10 @@ body {
 /*
  * 表格表头：antd 4.2.6 的 Table 组件令牌没对外暴露（ComponentToken 是空接口），
  * theme.components 里写不进去，只能在这里覆盖。做成 Apple 表头那种「浅灰底、无竖线」。
+ * 行高统一按 space-4/space-5 走：比 antd 默认略松，长表格翻读不累眼。
  */
 .ant-table-thead > tr > th {
+  padding: var(--cm-space-4) var(--cm-space-5);
   background: var(--cm-color-surface-muted) !important;
   color: var(--cm-color-text-2);
   font-weight: 500;
@@ -40,7 +42,13 @@ body {
 }
 
 .ant-table-tbody > tr > td {
+  padding: var(--cm-space-4) var(--cm-space-5);
   border-color: var(--cm-color-border);
+}
+
+/* 分页与表格之间留一拍，避免贴住卡片底边 */
+.ant-pagination {
+  margin-top: var(--cm-space-4);
 }
 
 /* 内容区卡片：白底 + hairline 边框 + 14px 圆角 + Apple 那种极淡的大范围阴影 */
@@ -51,15 +59,16 @@ body {
   box-shadow: var(--cm-shadow-1);
 }
 
+/* 卡片内边距按 space-6 走：20px 偏挤，24px 才撑得起「一张卡一件事」的呼吸感 */
 .cm-card__title {
-  padding: var(--cm-space-5);
+  padding: var(--cm-space-6);
   border-bottom: 1px solid var(--cm-color-border);
   font-size: var(--cm-font-size-md);
   font-weight: 600;
 }
 
 .cm-card__body {
-  padding: var(--cm-space-5);
+  padding: var(--cm-space-6);
 }
 
 /* ── 页面骨架：Apple 官网那套「大留白 + 大标题」 ─────────────── */
@@ -70,7 +79,7 @@ body {
 }
 
 .cm-page__head {
-  margin-bottom: var(--cm-space-7);
+  margin-bottom: var(--cm-space-8);
 }
 
 .cm-page__title {
@@ -82,7 +91,7 @@ body {
 }
 
 .cm-page__sub {
-  margin: var(--cm-space-2) 0 0;
+  margin: var(--cm-space-3) 0 0;
   font-size: var(--cm-font-size-md);
   color: var(--cm-color-text-2);
 }

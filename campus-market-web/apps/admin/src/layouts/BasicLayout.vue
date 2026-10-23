@@ -13,6 +13,7 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   BarChartOutlined,
+  BgColorsOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
@@ -27,10 +28,12 @@ import {
 import { Modal } from 'ant-design-vue'
 import { ROLE_META, type PermCode, type RoleCode } from '@campus/shared'
 import { useUserStore } from '@/stores/user'
+import { useThemeStore, THEMES } from '@/stores/theme'
 
 const route = useRoute()
 const router = useRouter()
 const user = useUserStore()
+const themeStore = useThemeStore()
 
 const collapsed = ref(false)
 
@@ -137,6 +140,31 @@ const onLogout = (): void => {
         </a-space>
 
         <a-space :size="12">
+          <!-- 一键换肤：色板 Popover。图标用 BgColorsOutlined（调色盘语义），
+               当前主题的色板加勾选态；选中即切 antd token 与 CSS 变量两侧（stores/theme.ts） -->
+          <a-popover placement="bottomRight" trigger="click" overlay-class-name="theme-pop">
+            <template #content>
+              <div class="theme-panel">
+                <p class="theme-panel__t">界面主题</p>
+                <button
+                  v-for="t in THEMES"
+                  :key="t.key"
+                  type="button"
+                  class="theme-swatch"
+                  :class="{ 'theme-swatch--on': themeStore.current === t.key }"
+                  @click="themeStore.setTheme(t.key)"
+                >
+                  <span class="theme-swatch__dot" :style="{ background: t.swatch }" />
+                  <span class="theme-swatch__label">{{ t.label }}</span>
+                </button>
+              </div>
+            </template>
+            <a-tooltip title="一键换肤">
+              <button type="button" class="layout__iconbtn">
+                <BgColorsOutlined />
+              </button>
+            </a-tooltip>
+          </a-popover>
           <!-- 角色不再单独展示标签：演示账号的 realName 就是角色名，两个「超级管理员」纯冗余。
                角色信息收进头像的 tooltip，实名非角色名的账号也能看到 -->
           <span class="layout__user">{{ user.realName || user.adminId }}</span>
@@ -234,6 +262,72 @@ const onLogout = (): void => {
 
 .layout__user {
   color: var(--cm-color-text-2);
+}
+
+/* 顶栏图标按钮（换肤入口）：与头像同一高度手感，无边框 */
+.layout__iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--cm-radius-md);
+  background: transparent;
+  color: var(--cm-color-text-2);
+  cursor: pointer;
+  transition:
+    background 160ms ease-out,
+    color 160ms ease-out;
+}
+
+.layout__iconbtn:hover {
+  background: var(--cm-color-surface-muted);
+  color: var(--cm-color-text-1);
+}
+
+/* 换肤面板：色板列表。Popover 内容在 teleport 里，scoped 选不中，用全局类名 */
+.theme-panel {
+  width: 168px;
+}
+
+.theme-panel__t {
+  margin: 0 0 var(--cm-space-2);
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-2);
+  width: 100%;
+  padding: var(--cm-space-2);
+  border: none;
+  border-radius: var(--cm-radius-md);
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-1);
+  transition: background 160ms ease-out;
+}
+
+.theme-swatch:hover {
+  background: var(--cm-color-surface-muted);
+}
+
+.theme-swatch__dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: none;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 6%) inset;
+}
+
+.theme-swatch--on {
+  background: var(--cm-color-brand-bg);
+  color: var(--cm-color-brand-text);
+  font-weight: 600;
 }
 
 /* 头像即退出入口：品牌浅底圆 + 首字，hover 加柔光圈提示可点 */

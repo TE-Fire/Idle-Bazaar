@@ -12,6 +12,7 @@ import 'ant-design-vue/dist/reset.css'
 
 // 令牌由 @campus/tokens 生成：pnpm tokens
 import '@campus/tokens/admin.css'
+import './styles/themes.scss'
 import './styles/index.scss'
 
 import App from './App.vue'
