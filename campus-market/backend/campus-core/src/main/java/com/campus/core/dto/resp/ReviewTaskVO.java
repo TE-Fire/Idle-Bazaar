@@ -19,7 +19,7 @@ import java.util.List;
  * <p><b>`id` 跨来源不唯一</b>：`item_audit` / `report` / `appeal` 是三张表的主键，
  * 可能出现相同的数字。前端做列表 key 要用 `kind + id`，处置时也要带 `kind`。
  *
- * <p><b>两个「举报数」</b>：`reportCount` 是 `report` 表的实时计数（运营要看「又被举报了」），
+ * <p><b>两个「举报数」</b>：`reportCount` 是 `report` 表的实时**未结**计数（运营要看「又被举报了」），
  * `parts.report` 用的是 `item_audit` 的进队快照（权重不跳变）。见 {@link WeightPartsVO}。
  *
  * <p>`itemTints`（前端骨架期的占位渐变）这里**不返回**：已有真图 `mainImage` 与 `images`。
@@ -62,7 +62,7 @@ public class ReviewTaskVO {
 
     private Integer sellerCredit;
 
-    /** 实时举报数（report 表） */
+    /** 实时未结举报数（report 表，已处理不计） */
     private Integer reportCount;
 
     /** 图片风险分 0–100，取该商品最新一条审核记录的快照；无记录为 0 */

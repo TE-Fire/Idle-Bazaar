@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
  *
  * <p>比 `AdminItem` 少一个 `tints`——那是骨架期没有真图时的占位渐变，接了真接口后由前端删掉。
  *
- * <p><b>两个「举报数」不要混</b>：`reportCount` 是 `report` 表的**实时**计数（运营要看「又被举报了」）；
+ * <p><b>两个「举报数」不要混</b>：`reportCount` 是 `report` 表的**实时未结**计数（运营要看「又被举报了」）；
  * 审核权重里用的是 `item_audit.report_count`，那是**进队快照**，不随后续举报变化。
  *
  * <p><b>可空字段注意</b>：全局 Jackson 配了 `non_null`，null 字段不出现在 JSON 里，

@@ -487,7 +487,7 @@ public class ReviewAdminService {
                 .stream()
                 .collect(Collectors.toMap(AppUser::getId, Function.identity(), (a, b) -> a));
 
-        // 商品累计举报数（实时）
+        // 商品未结举报数（实时；已处理不计，口径见 ReportMapper#countByItem）
         fill.reportCounts = reportMapper.countByItem(ids).stream()
                 .collect(Collectors.toMap(ReportMapper.ItemReportCountRow::getItemId,
                         ReportMapper.ItemReportCountRow::getCnt, (a, b) -> a));

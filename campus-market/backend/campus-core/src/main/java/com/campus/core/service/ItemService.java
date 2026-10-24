@@ -350,7 +350,7 @@ public class ItemService {
                         + creditDeduct + priceAbnormal * 5));
     }
 
-    /** 进队时的实时举报数（notes/13 O1 规则 3.1）；没被举报的商品查不到行，按 0 计 */
+    /** 进队时的实时未结举报数（notes/13 O1 规则 3.1）；没被举报的商品查不到行，按 0 计 */
     private int currentReportCount(Long itemId) {
         List<ReportMapper.ItemReportCountRow> rows = reportMapper.countByItem(List.of(itemId));
         return rows.isEmpty() ? 0 : Math.toIntExact(rows.get(0).getCnt());
