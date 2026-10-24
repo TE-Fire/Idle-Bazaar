@@ -11,6 +11,7 @@ import com.campus.core.dto.resp.OrderVO;
 import com.campus.core.entity.Appeal;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.TradeOrder;
+import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.CancelTypeEnum;
 import com.campus.core.enums.ItemStatusEnum;
@@ -67,9 +68,6 @@ public class OrderService {
 
     /** 裁决留痕统一文案：让 `cancel_reason` 在同为终态的订单里能区分出「被裁决」这一来源 */
     private static final String DISPUTE_SETTLED_REASON = "管理端裁决结案";
-
-    /** `appeal.biz_type = 订单纠纷(3)`，与 ReportService 申诉分流同口径 */
-    private static final int APPEAL_BIZ_ORDER = 3;
 
     /** 纠纷默认理由：前端允许只发起不填理由，申诉单 reason 不能空着进队列 */
     private static final String DISPUTE_DEFAULT_REASON = "订单纠纷，申请平台裁决";
@@ -441,7 +439,7 @@ public class OrderService {
 
         appealMapper.insert(new Appeal()
                 .setApplicantId(applicantId)
-                .setBizType(APPEAL_BIZ_ORDER)
+                .setBizType(AppealBizTypeEnum.ORDER.getCode())
                 .setBizId(order.getId())
                 .setReason(text == null ? DISPUTE_DEFAULT_REASON : text)
                 .setStatus(AppealStatusEnum.WAITING.getCode()));

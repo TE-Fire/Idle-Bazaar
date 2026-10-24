@@ -12,9 +12,11 @@ import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.Report;
 import com.campus.core.entity.TradeOrder;
+import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.enums.ReportStatusEnum;
+import com.campus.core.enums.ReportTargetTypeEnum;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.errcode.OrderErrorCode;
 import com.campus.core.errcode.ReviewErrorCode;
@@ -69,10 +71,10 @@ public class ReportService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long report(Long userId, ReportCreateReq req) {
-        Integer type = req.getTargetType();
-        BizAssert.isTrue(type != null && (type == 1 || type == 2), CommonErrorCode.PARAM_ERROR);
+        ReportTargetTypeEnum targetType = ReportTargetTypeEnum.fromCodeOrNull(req.getTargetType());
+        BizAssert.notNull(targetType, CommonErrorCode.PARAM_ERROR, "举报对象类型只能是 1 商品 / 2 用户");
 
-        if (type == 1) {
+        if (targetType == ReportTargetTypeEnum.ITEM) {
             Item item = itemMapper.selectById(req.getTargetId());
             BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
             BizAssert.isTrue(!userId.equals(item.getSellerId()),
@@ -84,7 +86,7 @@ public class ReportService {
 
         Long dup = reportMapper.selectCount(new LambdaQueryWrapper<Report>()
                 .eq(Report::getReporterId, userId)
-                .eq(Report::getTargetType, type)
+                .eq(Report::getTargetType, targetType.getCode())
                 .eq(Report::getTargetId, req.getTargetId())
                 .in(Report::getStatus,
                         List.of(ReportStatusEnum.WAITING.getCode(), ReportStatusEnum.PROCESSING.getCode())));
@@ -92,7 +94,7 @@ public class ReportService {
 
         Report report = new Report()
                 .setReporterId(userId)
-                .setTargetType(type)
+                .setTargetType(targetType.getCode())
                 .setTargetId(req.getTargetId())
                 .setReason(req.getReason())
                 .setEvidence(toJson(req.getEvidence()))
@@ -112,29 +114,32 @@ public class ReportService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long appeal(Long userId, AppealCreateReq req) {
+        AppealBizTypeEnum bizType = AppealBizTypeEnum.fromCodeOrNull(req.getBizType());
+        BizAssert.notNull(bizType, CommonErrorCode.PARAM_ERROR,
+                "申诉对象类型只能是 1 商品审核 / 2 举报 / 3 订单纠纷");
+
         Long dup = appealMapper.selectCount(new LambdaQueryWrapper<Appeal>()
                 .eq(Appeal::getApplicantId, userId)
-                .eq(Appeal::getBizType, req.getBizType())
+                .eq(Appeal::getBizType, bizType.getCode())
                 .eq(Appeal::getBizId, req.getBizId()));
         BizAssert.isTrue(dup == null || dup == 0, ReviewErrorCode.APPEAL_NOT_ALLOWED);
 
-        int bizType = req.getBizType();
         // 显式初始化：default 分支会抛异常走不到使用点，但这里不依赖 Java 的确定性赋值分析
         boolean owned = false;
         switch (bizType) {
-            case 1 -> {
+            case ITEM -> {
                 ItemAudit audit = itemAuditMapper.selectById(req.getBizId());
                 BizAssert.notNull(audit, ReviewErrorCode.REVIEW_TASK_NOT_FOUND);
                 Item item = itemMapper.selectById(audit.getItemId());
                 BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
                 owned = userId.equals(item.getSellerId());
             }
-            case 2 -> {
+            case REPORT -> {
                 Report target = reportMapper.selectById(req.getBizId());
                 BizAssert.notNull(target, CommonErrorCode.NOT_FOUND);
                 owned = isReportTarget(target, userId);
             }
-            case 3 -> {
+            case ORDER -> {
                 TradeOrder order = orderMapper.selectById(req.getBizId());
                 BizAssert.notNull(order, OrderErrorCode.ORDER_NOT_FOUND);
                 // 订单纠纷只能从 /api/order/{id}/dispute 进入状态机：这里只收纠纷中订单的
@@ -142,7 +147,7 @@ public class ReportService {
                 BizAssert.isTrue(OrderStatusEnum.fromCode(order.getStatus()) == OrderStatusEnum.DISPUTING,
                         OrderErrorCode.ORDER_STATUS_INVALID, "订单纠纷须通过纠纷入口发起");
                 Long exists = appealMapper.selectCount(new LambdaQueryWrapper<Appeal>()
-                        .eq(Appeal::getBizType, bizType)
+                        .eq(Appeal::getBizType, bizType.getCode())
                         .eq(Appeal::getBizId, req.getBizId()));
                 BizAssert.isTrue(exists == null || exists == 0, ReviewErrorCode.APPEAL_NOT_ALLOWED,
                         "该订单已有纠纷申诉");
@@ -154,7 +159,7 @@ public class ReportService {
 
         Appeal appeal = new Appeal()
                 .setApplicantId(userId)
-                .setBizType(bizType)
+                .setBizType(bizType.getCode())
                 .setBizId(req.getBizId())
                 .setReason(req.getReason())
                 .setEvidence(toJson(req.getEvidence()))
@@ -170,7 +175,7 @@ public class ReportService {
      * 只比 `target_id` 会把「举报人」误判成「被举报人」。
      */
     private boolean isReportTarget(Report target, Long userId) {
-        if (Integer.valueOf(1).equals(target.getTargetType())) {
+        if (ReportTargetTypeEnum.ITEM.getCode().equals(target.getTargetType())) {
             Item item = itemMapper.selectById(target.getTargetId());
             return item != null && userId.equals(item.getSellerId());
         }

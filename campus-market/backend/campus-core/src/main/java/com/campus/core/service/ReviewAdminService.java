@@ -24,12 +24,14 @@ import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.ItemImage;
 import com.campus.core.entity.Report;
 import com.campus.core.entity.TradeOrder;
+import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.AuditStatusEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.enums.QueueKindEnum;
 import com.campus.core.enums.ReportStatusEnum;
+import com.campus.core.enums.ReportTargetTypeEnum;
 import com.campus.core.errcode.ReviewErrorCode;
 import com.campus.core.mapper.AdminUserMapper;
 import com.campus.core.mapper.AppUserMapper;
@@ -84,11 +86,6 @@ public class ReviewAdminService {
     /** 等待每满 12 小时 +1 */
     private static final int WAIT_COMPENSATE_HOURS = 12;
 
-    /** 申诉 `biz_type`：1 商品审核 2 举报 3 订单纠纷 */
-    private static final int BIZ_ITEM = 1;
-    private static final int BIZ_REPORT = 2;
-    private static final int BIZ_ORDER = 3;
-
     /** 申诉裁决结论：`appeal.status` 直接复用这两个值 */
     private static final int APPEAL_UPHOLD = 2;
     private static final int APPEAL_REVOKE = 3;
@@ -130,9 +127,9 @@ public class ReviewAdminService {
 
         List<Report> reports = (filter == null || filter == QueueKindEnum.REPORT)
                 ? reportMapper.selectList(new LambdaQueryWrapper<Report>()
-                .in(Report::getStatus, List.of(ReportStatusEnum.WAITING.getCode(),
-                        ReportStatusEnum.PROCESSING.getCode()))
-                .eq(Report::getTargetType, 1)
+                        .in(Report::getStatus, List.of(ReportStatusEnum.WAITING.getCode(),
+                                ReportStatusEnum.PROCESSING.getCode()))
+                        .eq(Report::getTargetType, ReportTargetTypeEnum.ITEM.getCode())
                 .eq(Report::getDeleted, 0))
                 : List.of();
 
@@ -541,7 +538,7 @@ public class ReviewAdminService {
 
         for (Appeal a : appeals) {
             Origin o = new Origin();
-            if (a.getBizType() != null && a.getBizType() == BIZ_ITEM) {
+            if (AppealBizTypeEnum.ITEM.getCode().equals(a.getBizType())) {
                 ItemAudit disposed = all.stream()
                         .filter(x -> a.getBizId().equals(x.getItemId())
                                 && (AuditStatusEnum.REJECTED.getCode().equals(x.getStatus())
@@ -552,7 +549,7 @@ public class ReviewAdminService {
                     o.handlerId = disposed.getHandlerId();
                     o.resultText = AuditStatusEnum.fromCode(disposed.getStatus()).getDesc();
                 }
-            } else if (a.getBizType() != null && a.getBizType() == BIZ_REPORT) {
+            } else if (AppealBizTypeEnum.REPORT.getCode().equals(a.getBizType())) {
                 Report r = appealReports.get(a.getBizId());
                 if (r != null) {
                     o.handlerId = r.getHandlerId();
@@ -582,7 +579,7 @@ public class ReviewAdminService {
     /** 申诉引用的举报（biz_type = 2 时 biz_id 是 report.id），一次查齐避免逐条回库 */
     private Map<Long, Report> reportsById(List<Appeal> appeals) {
         List<Long> ids = appeals.stream()
-                .filter(a -> a.getBizType() != null && a.getBizType() == BIZ_REPORT)
+                .filter(a -> AppealBizTypeEnum.REPORT.getCode().equals(a.getBizType()))
                 .map(Appeal::getBizId)
                 .distinct()
                 .toList();
@@ -599,7 +596,7 @@ public class ReviewAdminService {
     /** 申诉引用的订单（biz_type = 3 时 biz_id 是 trade_order.id），一次查齐避免逐条回库 */
     private Map<Long, TradeOrder> ordersById(List<Appeal> appeals) {
         List<Long> ids = appeals.stream()
-                .filter(a -> a.getBizType() != null && a.getBizType() == BIZ_ORDER)
+                .filter(a -> AppealBizTypeEnum.ORDER.getCode().equals(a.getBizType()))
                 .map(Appeal::getBizId)
                 .distinct()
                 .toList();
@@ -621,17 +618,14 @@ public class ReviewAdminService {
      * 纠纷单据得以与管理端其余两类申诉共用同一条处置队列（notes/13 第五节）。
      */
     private Long appealItemId(Appeal appeal, Map<Long, Report> appealReports, Map<Long, TradeOrder> appealOrders) {
-        if (appeal.getBizType() == null) {
-            return null;
-        }
-        if (appeal.getBizType() == BIZ_ITEM) {
+        if (AppealBizTypeEnum.ITEM.getCode().equals(appeal.getBizType())) {
             return appeal.getBizId();
         }
-        if (appeal.getBizType() == BIZ_REPORT) {
+        if (AppealBizTypeEnum.REPORT.getCode().equals(appeal.getBizType())) {
             Report r = appealReports.get(appeal.getBizId());
             return r == null ? null : r.getTargetId();
         }
-        if (appeal.getBizType() == BIZ_ORDER) {
+        if (AppealBizTypeEnum.ORDER.getCode().equals(appeal.getBizType())) {
             TradeOrder o = appealOrders.get(appeal.getBizId());
             return o == null ? null : o.getItemId();
         }
@@ -639,7 +633,7 @@ public class ReviewAdminService {
     }
 
     private Long originHandlerOf(Appeal appeal) {
-        if (appeal.getBizType() != null && appeal.getBizType() == BIZ_ITEM) {
+        if (AppealBizTypeEnum.ITEM.getCode().equals(appeal.getBizType())) {
             ItemAudit disposed = itemAuditMapper.selectList(new LambdaQueryWrapper<ItemAudit>()
                             .eq(ItemAudit::getItemId, appeal.getBizId())
                             .in(ItemAudit::getStatus, List.of(AuditStatusEnum.REJECTED.getCode(),
@@ -650,7 +644,7 @@ public class ReviewAdminService {
                     .orElse(null);
             return disposed == null ? null : disposed.getHandlerId();
         }
-        if (appeal.getBizType() != null && appeal.getBizType() == BIZ_REPORT) {
+        if (AppealBizTypeEnum.REPORT.getCode().equals(appeal.getBizType())) {
             Report r = reportMapper.selectOne(new LambdaQueryWrapper<Report>()
                     .eq(Report::getId, appeal.getBizId())
                     .eq(Report::getDeleted, 0));
@@ -755,7 +749,7 @@ public class ReviewAdminService {
     }
 
     private boolean isOrderAppeal(Appeal appeal) {
-        return appeal.getBizType() != null && appeal.getBizType() == BIZ_ORDER;
+        return AppealBizTypeEnum.ORDER.getCode().equals(appeal.getBizType());
     }
 
     private long waitHours(LocalDateTime since) {

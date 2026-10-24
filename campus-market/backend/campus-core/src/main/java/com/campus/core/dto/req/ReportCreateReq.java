@@ -10,14 +10,15 @@ import java.util.List;
 /**
  * 学生端提交举报。
  *
- * <p>`targetType` 决定 `targetId` 指谁：1 商品、2 用户，与 `report` 表一致。
+ * <p>`targetType` 决定 `targetId` 指谁：1 商品、2 用户，取值以
+ * {@link com.campus.core.enums.ReportTargetTypeEnum} 为准。
  * `evidence` 是已上传的凭证地址，≤3 张；后端只存 JSON 不做结构解析——
  * 解析了就要跟着前端表单一起改，而审核员只需要看图。
  */
 @Data
 public class ReportCreateReq {
 
-    /** 1 商品 2 用户 */
+    /** 1 商品 2 用户，见 `ReportTargetTypeEnum` */
     @NotNull
     private Integer targetType;
 
