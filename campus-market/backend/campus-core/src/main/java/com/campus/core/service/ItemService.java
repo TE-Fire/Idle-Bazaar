@@ -13,6 +13,7 @@ import com.campus.core.dto.resp.DictCampusVO;
 import com.campus.core.dto.resp.DictCategoryVO;
 import com.campus.core.dto.resp.DictMeetPointVO;
 import com.campus.core.dto.resp.ItemImageVO;
+import com.campus.core.dto.resp.UserPubVO;
 import com.campus.core.entity.AppUser;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -69,6 +69,8 @@ public class ItemService {
     private final DictService dictService;
 
     private final CategoryAvgPriceCache categoryAvgPriceCache;
+
+    private final UserPubCache userPubCache;
 
     private final ReportMapper reportMapper;
 
@@ -437,18 +439,18 @@ public class ItemService {
     }
 
     /** 卖家昵称与信用分批量回填；人均一行，避免列表逐条查库 */
+    /**
+     * 回填卖家公开信息（昵称 / 信用分 / 认证态）。走 {@link UserPubCache} 读穿：
+     * 同一卖家在列表多页重复出现，公开资料却极少变；查不到（已软删）就不回填。
+     */
     private void fillSellers(List<ApiItemVO> list) {
         List<Long> ids = list.stream().map(ApiItemVO::getSellerId).filter(Objects::nonNull).distinct().toList();
         if (ids.isEmpty()) {
             return;
         }
-        Map<Long, AppUser> users = appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
-                        .in(AppUser::getId, ids)
-                        .eq(AppUser::getDeleted, 0))
-                .stream()
-                .collect(Collectors.toMap(AppUser::getId, Function.identity(), (a, b) -> a));
+        Map<Long, UserPubVO> users = userPubCache.getOrLoad(ids);
         list.forEach(vo -> {
-            AppUser u = users.get(vo.getSellerId());
+            UserPubVO u = users.get(vo.getSellerId());
             if (u != null) {
                 vo.setSellerNick(u.getNickname());
                 vo.setSellerCredit(u.getCreditScore());
