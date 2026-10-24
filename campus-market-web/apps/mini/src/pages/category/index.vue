@@ -7,9 +7,11 @@
  */
 
 import { computed, onMounted, ref } from 'vue'
+import { onShow } from '@dcloudio/uni-app'
 import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
 import { toGoodsItem } from '@/utils/item-map'
 import GoodsCard from '@/components/GoodsCard.vue'
+import { pendingCategoryId } from '@/utils/nav-intent'
 
 const roots = ref<CategoryVO[]>([])
 const children = ref<Record<string, CategoryVO[]>>({})
@@ -20,7 +22,11 @@ const loading = ref(false)
 
 const subs = computed(() => children.value[activeId.value] ?? [])
 
+/** 字典只拉一次：onShow 早于 onMounted（首帧从金刚区带意图进入时），两边都要能安全触发 */
+let rootsLoaded = false
+
 async function fetchRoots(): Promise<void> {
+  if (rootsLoaded) return
   try {
     const dict = await userDictApi.all()
     // 后端契约：一级分类 parentId 置 null（库里是 0，Jackson non_null 后键消失），
@@ -33,6 +39,7 @@ async function fetchRoots(): Promise<void> {
       }
     }
     children.value = map
+    rootsLoaded = true
     if (roots.value.length) {
       activeId.value = roots.value[0].id
       activeSub.value = ''
@@ -73,6 +80,19 @@ async function pickSub(name: string): Promise<void> {
   activeSub.value = activeSub.value === name ? '' : name
   await fetchList()
 }
+
+/** 首页金刚区带意图进入：消费后立即清空，意图分类不存在（被停用）时忽略 */
+onShow(async () => {
+  const id = pendingCategoryId.value
+  if (!id) return
+  pendingCategoryId.value = ''
+  await fetchRoots()
+  if (id !== activeId.value && roots.value.some((r) => r.id === id)) {
+    activeId.value = id
+    activeSub.value = ''
+    await fetchList()
+  }
+})
 
 onMounted(fetchRoots)
 </script>
