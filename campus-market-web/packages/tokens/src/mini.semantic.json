@@ -32,7 +32,8 @@
   },
   "radius": {
     "lg": "10px",
-    "xl": "14px"
+    "xl": "14px",
+    "pill": "999px"
   },
   "layout": {
     "nav-h": "44px",
