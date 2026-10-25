@@ -3,6 +3,7 @@ package com.campus.core.dto.resp;
 import com.campus.core.enums.ItemStatusEnum;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**

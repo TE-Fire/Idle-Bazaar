@@ -10,6 +10,7 @@ import com.campus.core.entity.AppUser;
 import com.campus.core.entity.ChatSession;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.MsgMessage;
+import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.ChatSessionMapper;
@@ -147,7 +148,7 @@ public class ChatService {
             vo.setItemTitle(item == null ? null : item.getTitle());
             vo.setItemMainImage(item == null ? null : item.getMainImage());
             vo.setPrice(item == null ? null : item.getPrice());
-            vo.setStatus(item == null ? null : item.getStatus());
+            vo.setStatus(item == null ? null : ItemStatusEnum.fromCode(item.getStatus()));
             vo.setPeerUserId(peerId);
             vo.setPeerNick(peer == null ? null : peer.getNickname());
             vo.setLastContent(last == null ? null : last.getContent());
