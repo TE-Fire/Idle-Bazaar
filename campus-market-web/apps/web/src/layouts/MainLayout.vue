@@ -17,6 +17,8 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { CAMPUSES } from '@campus/shared'
 import { ChatDotRound, CopyDocument, Position, Top } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { uploadImage } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import CompareBar from '@/components/CompareBar.vue'
@@ -32,6 +34,66 @@ const campus = ref<string>(CAMPUSES[0])
 
 /** 热搜词：闲鱼把一批高频词铺在搜索框下面。这里写死一组校园高频词，点击即搜 */
 const HOT_WORDS = ['笔记本电脑', '考研资料', '自行车', 'iPad', '电动车', '台灯', '吉他', '篮球'] as const
+
+/* ── 资料编辑（notes/20 D3：昵称 + 头像，顶栏弹层）────────────── */
+
+const editOpen = ref(false)
+const editNick = ref('')
+const editAvatar = ref('')
+const uploading = ref(false)
+const saving = ref(false)
+const fileInput = ref<HTMLInputElement | null>(null)
+
+/** 打开编辑弹层：以当前会话为初值，取消不改任何东西 */
+function openEdit(): void {
+  editNick.value = session.nickname
+  editAvatar.value = session.avatarUrl
+  editOpen.value = true
+}
+
+function pickAvatar(): void {
+  fileInput.value?.click()
+}
+
+/** 选完图即上传（两步票据制）：成功换预览；失败由 http 层统一提示，这里只收尾状态 */
+function onFile(e: Event): void {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  uploading.value = true
+  void uploadImage(file)
+    .then((url) => {
+      editAvatar.value = url
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      uploading.value = false
+      input.value = ''
+    })
+}
+
+async function saveProfile(): Promise<void> {
+  const nick = editNick.value.trim()
+  if (!nick) {
+    ElMessage.warning({ message: '昵称不能为空', duration: 2000 })
+    return
+  }
+  if (uploading.value) {
+    ElMessage.warning({ message: '头像上传中，稍候', duration: 2000 })
+    return
+  }
+  saving.value = true
+  try {
+    // 局部更新：没换过头像就不传 avatarUrl——传空串会被服务端判非法（4021）
+    await session.updateProfile(
+      editAvatar.value ? { nickname: nick, avatarUrl: editAvatar.value } : { nickname: nick }
+    )
+    editOpen.value = false
+    ElMessage.success({ message: '已保存', duration: 2000 })
+  } finally {
+    saving.value = false
+  }
+}
 
 function onSearch(): void {
   void router.push({ name: 'list', query: { q: keyword.value || undefined } })
@@ -86,10 +148,15 @@ async function logout(): Promise<void> {
           </RouterLink>
           <RouterLink :to="{ name: 'chat' }" class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</RouterLink>
           <a class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</a>
-          <!-- 登录态：未登录显示入口，已登录显示昵称 + 我的商品 + 退出 -->
+          <!-- 登录态：未登录显示入口，已登录显示头像 + 昵称 + 我的商品 + 退出 -->
           <RouterLink v-if="!session.isLogin" :to="{ name: 'login' }" class="lnk">登录</RouterLink>
           <template v-else>
+            <button type="button" class="nav__avatar" title="编辑资料" @click="openEdit">
+              <img v-if="session.avatarUrl" :src="session.avatarUrl" class="nav__avatar-img" alt="" />
+              <span v-else class="nav__avatar-t">{{ (session.nickname || '我').slice(0, 1) }}</span>
+            </button>
             <RouterLink :to="{ name: 'my-items' }" class="lnk">{{ session.nickname || '我的' }}</RouterLink>
+            <a class="lnk" @click="openEdit">编辑</a>
             <a class="lnk" @click="logout">退出</a>
           </template>
         </nav>
@@ -124,6 +191,26 @@ async function logout(): Promise<void> {
     </aside>
 
     <CompareBar />
+
+    <!-- 资料编辑弹层：Web 端没有独立「我的」页，编辑入口收在顶栏（notes/20 §五） -->
+    <el-dialog v-model="editOpen" title="编辑资料" width="400px" append-to-body>
+      <div class="pf">
+        <button type="button" class="pf__avatar" @click="pickAvatar">
+          <img v-if="editAvatar" :src="editAvatar" class="pf__img" alt="" />
+          <span v-else class="pf__t">{{ (session.nickname || '我').slice(0, 1) }}</span>
+          <span class="pf__mask">更换头像</span>
+          <span v-if="uploading" class="pf__loading">上传中</span>
+        </button>
+        <input ref="fileInput" class="pf__file" type="file" accept="image/jpeg,image/png,image/webp" @change="onFile" />
+        <label class="pf__label">昵称</label>
+        <el-input v-model="editNick" maxlength="64" show-word-limit placeholder="请输入昵称" />
+        <p class="pf__hint">昵称展示在商品列表、详情与留言中；头像支持 jpg / png / webp，不超过 5MB。</p>
+      </div>
+      <template #footer>
+        <el-button @click="editOpen = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="saveProfile">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -286,6 +373,37 @@ async function logout(): Promise<void> {
   }
 }
 
+/* 顶栏头像：黄底上的白环小圆，点击进资料编辑（notes/20 D4） */
+.nav__avatar {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  background: var(--cm-color-brand-dark);
+  cursor: pointer;
+  overflow: hidden;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+.nav__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nav__avatar-t {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--cm-color-brand);
+}
+
 /* ── 内容区 ─────────────────────────────────────────────── */
 
 .main {
@@ -366,5 +484,87 @@ async function logout(): Promise<void> {
   .rail {
     display: none;
   }
+}
+
+/* ── 资料编辑弹层 ───────────────────────────────────────── */
+
+.pf {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--cm-space-3);
+}
+
+.pf__avatar {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--cm-color-brand-bg);
+  cursor: pointer;
+  overflow: hidden;
+
+  &:hover .pf__mask {
+    opacity: 1;
+  }
+}
+
+.pf__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pf__t {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--cm-color-brand-text);
+}
+
+/*  hover 蒙层：告诉用户这块能点（桌面端没有长按换头像的心智） */
+.pf__mask {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--cm-font-size-xs);
+  color: #fff;
+  background: rgba(31, 31, 38, 0.45);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.pf__loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--cm-font-size-xs);
+  color: #fff;
+  background: rgba(31, 31, 38, 0.55);
+}
+
+.pf__file {
+  display: none;
+}
+
+.pf__label {
+  align-self: flex-start;
+  font-size: var(--cm-font-size-sm);
+  font-weight: 600;
+  color: var(--cm-color-text-2);
+}
+
+.pf__hint {
+  margin: 0;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
 }
 </style>

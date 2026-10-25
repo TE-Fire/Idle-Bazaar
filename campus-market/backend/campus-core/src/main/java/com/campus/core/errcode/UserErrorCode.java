@@ -37,6 +37,10 @@ public enum UserErrorCode implements IErrorCode {
     /* ── 询单留言（2026-10-22 新增，business/01/02 同步留言决策）── */
     CHAT_ITEM_NOT_FOUND(4018, "商品不存在"),
     CHAT_PEER_INVALID(4019, "只能与商品卖家询单"),
+
+    /* ── 资料编辑（2026-10-25 新增，业务规则见 notes/20 D3）── */
+    USER_NICKNAME_INVALID(4020, "昵称不能为空，且不超过 64 个字符"),
+    USER_AVATAR_INVALID(4021, "头像地址不合法"),
     ;
 
     @Override

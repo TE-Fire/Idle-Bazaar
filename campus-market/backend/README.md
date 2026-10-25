@@ -122,8 +122,9 @@ curl -H "satoken-admin: TOKEN" http://127.0.0.1:8080/admin/demo/ban      # {"cod
 - [ ] 统计 stats（A8 报表，未落地）
 
 学生端（C 端 `/api/**`）已落地：登录（`/api/auth`，手机号 + 短信验证码，
-演示期验证码随响应回显，开关 `campus.user.sms.echo`）、商品（`/api/item`，
-发布含草稿 / 浏览 / 编辑 / 我的商品 / 删除 / 下架）、订单、举报与申诉提交；
+演示期验证码随响应回显，开关 `campus.user.sms.echo`）、资料编辑（`PUT /api/auth/profile`，
+昵称 / 头像局部更新，改昵称同步失效 `cm:user:pub` 缓存，业务规则见 `notes/20`）、
+商品（`/api/item`，发布含草稿 / 浏览 / 编辑 / 我的商品 / 删除 / 下架）、订单、举报与申诉提交；
 字典 `/api/dict/all` 免登录。鉴权走 `StpUserUtil`（token `satoken-user`，7 天）。
 管理端队列的单据来源已从演示数据切到真实提交。
 

@@ -20,7 +20,7 @@ interface Result<T> {
 
 interface RequestOptions {
   url: string
-  method?: 'GET' | 'POST'
+  method?: 'GET' | 'POST' | 'PUT'
   data?: Record<string, unknown>
 }
 

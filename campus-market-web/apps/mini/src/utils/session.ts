@@ -11,11 +11,12 @@ const SESSION_KEY = 'campus-user-session'
 interface Session {
   userId: string
   nickname: string
+  avatarUrl: string
   tokenName: string
   tokenValue: string
 }
 
-let session: Session = { userId: '', nickname: '', tokenName: '', tokenValue: '' }
+let session: Session = { userId: '', nickname: '', avatarUrl: '', tokenName: '', tokenValue: '' }
 
 /** 启动时恢复；storage 读取是同步 API，放在模块顶层即可 */
 try {
@@ -43,6 +44,6 @@ export function saveSession(next: Partial<Session>): void {
 }
 
 export function clearSession(): void {
-  session = { userId: '', nickname: '', tokenName: '', tokenValue: '' }
+  session = { userId: '', nickname: '', avatarUrl: '', tokenName: '', tokenValue: '' }
   uni.removeStorageSync(SESSION_KEY)
 }

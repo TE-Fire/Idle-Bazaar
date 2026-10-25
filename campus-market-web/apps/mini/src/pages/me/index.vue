@@ -4,7 +4,7 @@
  *
  * <p>「我发布的」已打通到我的商品页（含草稿，学生端商品接口就绪）；
  * 卖出 / 买到 / 收藏依赖订单与用户接口，仍为占位，明确标「待建」。
- * 未登录时点头像区进登录页；登录后显示昵称与退出。
+ * 未登录时点头像区进登录页；已登录进资料编辑页（昵称 / 头像，notes/20 D3）。
  */
 
 import { onShow } from '@dcloudio/uni-app'
@@ -13,6 +13,7 @@ import { getSession, clearSession } from '@/utils/session'
 import { userAuthApi } from '@/api/user'
 
 const nick = ref('')
+const avatar = ref('')
 
 interface Entry {
   key: string
@@ -28,9 +29,11 @@ const entries: Entry[] = [
   { key: 'verify', label: '学号认证', hint: '认证后可提升信任' }
 ]
 
-/** onShow：从登录页返回时要刷新昵称 */
+/** onShow：从登录页 / 编辑页返回时要刷新昵称与头像 */
 onShow(() => {
-  nick.value = getSession().nickname
+  const s = getSession()
+  nick.value = s.nickname
+  avatar.value = s.avatarUrl
 })
 
 function open(e: Entry): void {
@@ -44,6 +47,15 @@ function open(e: Entry): void {
     return
   }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })
+}
+
+/** 头像区：未登录进登录页，已登录进资料编辑（notes/20 D3/D4） */
+function onHead(): void {
+  if (!nick.value) {
+    goLogin()
+    return
+  }
+  void uni.navigateTo({ url: '/pages/profile-edit/index' })
 }
 
 function goLogin(): void {
@@ -63,11 +75,14 @@ async function logout(): Promise<void> {
 
 <template>
   <view class="page">
-    <view class="head" hover-class="entry--active" @click="nick ? undefined : goLogin()">
-      <view class="head__avatar"><text class="head__t">{{ nick ? nick.slice(0, 1) : '我' }}</text></view>
+    <view class="head" hover-class="entry--active" @click="onHead">
+      <view class="head__avatar">
+        <image v-if="avatar" class="head__img" :src="avatar" mode="aspectFill" />
+        <text v-else class="head__t">{{ nick ? nick.slice(0, 1) : '我' }}</text>
+      </view>
       <view class="head__meta">
         <text class="head__nick">{{ nick || '点击登录' }}</text>
-        <text class="head__sub">{{ nick ? '已登录' : '未登录' }}</text>
+        <text class="head__sub">{{ nick ? '已登录 · 点头像编辑资料' : '未登录' }}</text>
       </view>
       <text v-if="nick" class="head__logout" @click.stop="logout">退出</text>
     </view>
@@ -110,6 +125,12 @@ async function logout(): Promise<void> {
   font-size: 56rpx;
   font-weight: 600;
   color: $cm-color-brand-text;
+}
+
+.head__img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
 .head__meta {

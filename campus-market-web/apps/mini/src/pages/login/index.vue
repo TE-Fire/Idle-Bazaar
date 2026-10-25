@@ -66,6 +66,7 @@ async function submit(): Promise<void> {
     saveSession({
       userId: vo.userId,
       nickname: vo.nickname ?? '',
+      avatarUrl: vo.avatarUrl ?? '',
       tokenName: vo.tokenName ?? '',
       tokenValue: vo.tokenValue ?? ''
     })

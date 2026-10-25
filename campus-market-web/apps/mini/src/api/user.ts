@@ -12,10 +12,17 @@ import { request } from '../utils/request'
 export interface UserLoginVO {
   userId: string
   nickname?: string
+  avatarUrl?: string
   authStatus?: number
   creditScore?: number
   tokenName?: string
   tokenValue?: string
+}
+
+/** 资料编辑请求：两个字段都可选，至少传一个；字段不传 = 不修改 */
+export interface UserProfileUpdateReq {
+  nickname?: string
+  avatarUrl?: string
 }
 
 export const userAuthApi = {
@@ -33,6 +40,10 @@ export const userAuthApi = {
       method: 'POST',
       data: { phone, code }
     }),
+
+  /** 编辑昵称 / 头像（局部更新）；成功返回最新用户信息，前端据此刷新会话 */
+  updateProfile: (req: UserProfileUpdateReq) =>
+    request<UserLoginVO>({ url: '/api/auth/profile', method: 'PUT', data: { ...req } }),
 
   logout: () => request<void>({ url: '/api/auth/logout', method: 'POST' })
 }

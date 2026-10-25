@@ -1,7 +1,9 @@
 package com.campus.user.controller;
 
 import com.campus.common.result.Result;
+import com.campus.core.context.UserContext;
 import com.campus.core.dto.req.UserLoginReq;
+import com.campus.core.dto.req.UserProfileUpdateReq;
 import com.campus.core.dto.req.UserSendCodeReq;
 import com.campus.core.dto.resp.SmsCodeVO;
 import com.campus.core.dto.resp.UserLoginVO;
@@ -14,6 +16,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,6 +52,12 @@ public class UserAuthController {
     @GetMapping("/info")
     public Result<UserLoginVO> info() {
         return Result.ok(userAuthService.currentUser());
+    }
+
+    @Operation(summary = "编辑资料", description = "昵称 / 头像局部更新，两个字段至少传一个；未登录 1001，昵称不合法 4020，头像地址不合法 4021")
+    @PutMapping("/profile")
+    public Result<UserLoginVO> updateProfile(@Valid @RequestBody UserProfileUpdateReq req) {
+        return Result.ok(userAuthService.updateProfile(UserContext.getUserId(), req));
     }
 
     @Operation(summary = "退出登录")

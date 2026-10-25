@@ -11,7 +11,7 @@
 
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { userAuthApi, setToken, clearToken, type UserLoginVO } from '@campus/api'
+import { userAuthApi, setToken, clearToken, type UserLoginVO, type UserProfileUpdateReq } from '@campus/api'
 
 const STORAGE_KEY = 'campus-user-session'
 
@@ -87,6 +87,14 @@ export const useUserStore = defineStore('user', () => {
     applySession(await userAuthApi.login(phone, code))
   }
 
+  /**
+   * 编辑资料（昵称 / 头像，notes/20 D3）。
+   * 响应不带令牌字段，applySession 不会动会话令牌，只刷新资料四字段。
+   */
+  const updateProfile = async (req: UserProfileUpdateReq): Promise<void> => {
+    applySession(await userAuthApi.updateProfile(req))
+  }
+
   const logout = async (): Promise<void> => {
     try {
       await userAuthApi.logout()
@@ -115,6 +123,7 @@ export const useUserStore = defineStore('user', () => {
     creditScore,
     isLogin,
     login,
+    updateProfile,
     logout,
     clearSession
   }

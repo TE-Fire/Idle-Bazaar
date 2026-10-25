@@ -31,6 +31,12 @@ export interface SmsCodeVO {
   devCode?: string | null
 }
 
+/** 资料编辑请求：两个字段都可选，至少传一个；字段不传 = 不修改 */
+export interface UserProfileUpdateReq {
+  nickname?: string
+  avatarUrl?: string
+}
+
 export const userAuthApi = {
   /** 发验证码。60 秒内重复发返回 4016 */
   sendCode: (phone: string) =>
@@ -42,6 +48,10 @@ export const userAuthApi = {
 
   /** 当前登录人；未登录 1001（由 http 层统一跳登录） */
   info: () => request<UserLoginVO>({ url: '/api/auth/info' }),
+
+  /** 编辑昵称 / 头像（局部更新）；昵称不合法 4020，头像地址不合法 4021 */
+  updateProfile: (req: UserProfileUpdateReq) =>
+    request<UserLoginVO>({ url: '/api/auth/profile', method: 'PUT', data: { ...req } }),
 
   logout: () => request<void>({ url: '/api/auth/logout', method: 'POST' })
 }
