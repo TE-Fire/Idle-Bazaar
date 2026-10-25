@@ -1,4 +1,4 @@
-package com.campus.core.service;
+package com.campus.core.service.cache;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.campus.core.dto.resp.UserPubVO;
@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 学生公开资料缓存（{@link UserPubVO}），读穿供 {@link ItemService#fillSellers} 回填卖家信息。
+ * 学生公开资料缓存（{@link UserPubVO}），读穿供 {@code ItemService#fillSellers} 回填卖家信息。
  *
  * <p>缓存公开子集而非整个 AppUser：实体含手机号等敏感字段。批量读是因为列表一页要回填
  * 多个卖家，且同一卖家会跨页重复出现。

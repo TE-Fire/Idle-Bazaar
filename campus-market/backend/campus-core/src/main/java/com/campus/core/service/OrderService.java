@@ -22,6 +22,7 @@ import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.TradeOrderMapper;
 import com.campus.core.redis.ItemRedisKeys;
 import com.campus.core.redis.LuaScripts;
+import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

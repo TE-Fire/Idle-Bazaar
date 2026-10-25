@@ -1,4 +1,4 @@
-package com.campus.core.service;
+package com.campus.core.service.cache;
 
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.redis.ItemRedisKeys;
@@ -16,8 +16,8 @@ import java.util.stream.Collectors;
 /**
  * 各分类已成交均价的共享缓存（{@link ItemMapper#avgPriceByCategory()}）。
  *
- * <p>三个调用方共用：管理端商品列表均价展示（{@link ItemAdminService}）、学生端发布
- * 进队的 price_abnormal 快照（{@link ItemService}）、审核队列回填（{@link ReviewAdminService}）。
+ * <p>三个调用方共用：管理端商品列表均价展示（{@code ItemAdminService}）、学生端发布
+ * 进队的 price_abnormal 快照（{@code ItemService}）、审核队列回填（{@code ReviewAdminService}）。
  * 该查询是全量 GROUP BY、成本随订单历史增长，必须走缓存；读写异常降级直查库，
  * Redis 抖动不该让页面 500。
  *

@@ -27,6 +27,7 @@ import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
+import com.campus.core.service.cache.CategoryAvgPriceCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
