@@ -8,11 +8,12 @@
  */
 
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { chatApi, type ChatConversationVO, type ChatMessageVO } from '@campus/api'
-import { formatRelativeTime } from '@campus/shared'
+import { formatPrice, formatRelativeTime, ITEM_STATUS_LABELS } from '@campus/shared'
 
 const route = useRoute()
+const router = useRouter()
 
 const conversations = ref<ChatConversationVO[]>([])
 const loadingList = ref(true)
@@ -25,11 +26,15 @@ const loadingMsg = ref(false)
 /** 最早一条 id：翻历史游标；null = 没有更多 */
 const oldestId = ref<string | null>(null)
 
+/** 顶部商品卡片显隐：用户级偏好存本地，默认展示（与小程序同 key 同口径） */
+const CARD_HIDDEN_KEY = 'chat:item-card:hidden'
+const cardHidden = ref(localStorage.getItem(CARD_HIDDEN_KEY) === '1')
+
 let timer: number | undefined
 
 onMounted(async () => {
   await loadConversations()
-  // 从详情页「聊一聊」进来：query 带 itemId + peerId，选中对应会话（可能还没有）
+  // 从详情页「聊一聊」进来：query 带商品摘要，选中对应会话（可能还没有）
   const itemId = route.query.itemId as string | undefined
   const peerId = route.query.peerId as string | undefined
   if (itemId && peerId) {
@@ -37,11 +42,15 @@ onMounted(async () => {
     if (hit) {
       await openConversation(hit)
     } else {
-      // 没有会话记录也进得去：首条消息发出时才建会话，这里给个空对话壳
+      // 没有会话记录也进得去：首条消息发出时才建会话，这里给个空对话壳；
+      // 商品摘要取自 query（详情页带上来的），顶部卡片才能显示
       selected.value = {
         itemId,
         peerUserId: peerId,
-        itemTitle: '新的询单',
+        itemTitle: (route.query.itemTitle as string | undefined) || '新的询单',
+        itemMainImage: (route.query.itemImage as string | undefined) || undefined,
+        price: (route.query.itemPrice as string | undefined) || undefined,
+        status: (route.query.itemStatus as ChatConversationVO['status']) || undefined,
         peerNick: '',
         lastContent: '',
         unread: 0
@@ -58,6 +67,19 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timer) window.clearInterval(timer)
 })
+
+/** 关闭卡片：偏好落本地，之后本机所有会话都不再显示 */
+function closeCard(): void {
+  cardHidden.value = true
+  localStorage.setItem(CARD_HIDDEN_KEY, '1')
+}
+
+/** 点卡片回商品详情：面交前核对商品现状（价格 / 是否已售） */
+function goItem(): void {
+  if (selected.value) {
+    void router.push({ name: 'item', params: { id: selected.value.itemId } })
+  }
+}
 
 async function loadConversations(): Promise<void> {
   try {
@@ -174,6 +196,26 @@ const sortedConversations = computed(() => conversations.value)
         <strong>{{ selected.peerNick || '对方' }}</strong>
         <span class="chat__head-sub">询单：{{ selected.itemTitle || '商品' }}</span>
       </header>
+
+      <!-- 顶部商品卡片：买家从哪件商品发起询单；非在售态置灰，可点回详情核对 -->
+      <div v-if="!cardHidden && selected.itemTitle" class="itemcard">
+        <img v-if="selected.itemMainImage" class="itemcard__img" :src="selected.itemMainImage" alt="" />
+        <div v-else class="itemcard__img itemcard__img--empty" />
+        <button type="button" class="itemcard__body" @click="goItem">
+          <span class="itemcard__title">{{ selected.itemTitle }}</span>
+          <span class="itemcard__meta">
+            <span
+              v-if="selected.price"
+              class="itemcard__price"
+              :class="{ 'itemcard__price--off': selected.status && selected.status !== 'ON_SALE' }"
+            >{{ formatPrice(Number(selected.price)) }}</span>
+            <span v-if="selected.status && selected.status !== 'ON_SALE'" class="itemcard__status">
+              {{ ITEM_STATUS_LABELS[selected.status] }}
+            </span>
+          </span>
+        </button>
+        <button type="button" class="itemcard__close" title="关闭商品卡片" @click="closeCard">×</button>
+      </div>
 
       <div class="chat__msgs">
         <p v-if="!messages.length && !loadingMsg" class="chat__empty">
@@ -334,6 +376,92 @@ const sortedConversations = computed(() => conversations.value)
 .chat__head-sub {
   font-size: var(--cm-font-size-xs);
   color: var(--cm-color-text-3);
+}
+
+/* ── 顶部商品卡片 ─────────────────────────────────────── */
+
+.itemcard {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-3);
+  margin: var(--cm-space-3) var(--cm-space-5) 0;
+  padding: var(--cm-space-3);
+  background: var(--cm-color-bg);
+  border-radius: var(--cm-radius-lg);
+}
+
+.itemcard__img {
+  width: 56px;
+  height: 56px;
+  border-radius: var(--cm-radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+
+  &--empty {
+    background: var(--cm-color-border);
+  }
+}
+
+.itemcard__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.itemcard__title {
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemcard__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-2);
+}
+
+.itemcard__price {
+  font-size: var(--cm-font-size-sm);
+  font-weight: 600;
+  color: var(--cm-color-price);
+
+  /* 非在售态置灰：双方对一件已售 / 已下架商品继续聊没有意义 */
+  &--off {
+    color: var(--cm-color-text-3);
+    text-decoration: line-through;
+  }
+}
+
+.itemcard__status {
+  font-size: 11px;
+  color: var(--cm-color-text-3);
+  padding: 1px 8px;
+  background: var(--cm-color-surface);
+  border-radius: var(--cm-radius-sm);
+}
+
+.itemcard__close {
+  align-self: flex-start;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--cm-color-text-3);
+  padding: var(--cm-space-1);
+
+  &:hover {
+    color: var(--cm-color-text-1);
+  }
 }
 
 .chat__msgs {

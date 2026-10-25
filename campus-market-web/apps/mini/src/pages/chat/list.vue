@@ -24,10 +24,21 @@ async function load(): Promise<void> {
   }
 }
 
+/**
+ * 打开会话：把列表项手里的商品摘要一并带上，详情页顶部商品卡片直接用，
+ * 不必再拉一次商品详情（卡片数据两个入口都从跳转参数拿，见 detail.vue onLoad）。
+ */
 function open(c: ChatConversationVO): void {
-  void uni.navigateTo({
-    url: `/pages/chat/detail?itemId=${c.itemId}&peerId=${c.peerUserId}`
-  })
+  const q = [
+    `itemId=${c.itemId}`,
+    `peerId=${c.peerUserId}`,
+    `nick=${encodeURIComponent(c.peerNick ?? '')}`,
+    `itemTitle=${encodeURIComponent(c.itemTitle ?? '')}`,
+    `itemImage=${c.itemMainImage ? encodeURIComponent(c.itemMainImage) : ''}`,
+    `itemPrice=${c.price ?? ''}`,
+    `itemStatus=${c.status ?? ''}`
+  ].join('&')
+  void uni.navigateTo({ url: `/pages/chat/detail?${q}` })
 }
 
 // 列表页 onShow 刷新：从详情返回后未读数要是新的

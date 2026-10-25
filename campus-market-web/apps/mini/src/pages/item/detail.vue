@@ -41,11 +41,20 @@ function shotGradient(): string {
   return 'linear-gradient(135deg, #ECEFF3, #D3D9E0)'
 }
 
+/** 进询单会话：把手里的商品摘要带上，会话窗顶部卡片直接用（见 chat/detail onLoad） */
 function onChat(): void {
   if (!item.value) return
-  void uni.navigateTo({
-    url: `/pages/chat/detail?itemId=${item.value.id}&peerId=${item.value.sellerId}&nick=${encodeURIComponent(item.value.sellerNick ?? '')}`
-  })
+  const it = item.value
+  const q = [
+    `itemId=${it.id}`,
+    `peerId=${it.sellerId}`,
+    `nick=${encodeURIComponent(it.sellerNick ?? '')}`,
+    `itemTitle=${encodeURIComponent(it.title)}`,
+    `itemImage=${it.mainImage ? encodeURIComponent(it.mainImage) : ''}`,
+    `itemPrice=${it.price ?? ''}`,
+    `itemStatus=${it.status ?? ''}`
+  ].join('&')
+  void uni.navigateTo({ url: `/pages/chat/detail?${q}` })
 }
 
 /** 我想要：未登录先跳登录（下单要令牌），已登录直接创建待付款订单进详情 */

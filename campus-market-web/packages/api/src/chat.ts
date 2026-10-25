@@ -3,14 +3,20 @@
  *
  * <p>会话按「商品 + 双方」定位：列表项带 itemId + peerUserId，进详情/发消息
  * 都用这两个 id，不传 sessionId（服务端 upsert，前端拿不到也不需要）。
+ * itemTitle / itemMainImage / price / status 供会话窗顶部商品卡片展示。
  */
 
 import { request } from './http'
+import type { ItemStatus } from './item'
 
 export interface ChatConversationVO {
   itemId: string
   itemTitle?: string | null
   itemMainImage?: string | null
+  /** 商品价格（MoneyString）；面交谈价参照，卡片展示 */
+  price?: string | null
+  /** 商品状态枚举名；非 ON_SALE 时卡片置灰提示 */
+  status?: ItemStatus | null
   peerUserId: string
   peerNick?: string | null
   lastContent?: string | null

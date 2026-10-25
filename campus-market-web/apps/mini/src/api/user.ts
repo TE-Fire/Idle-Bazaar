@@ -119,6 +119,10 @@ export interface ChatConversationVO {
   itemId: string
   itemTitle?: string
   itemMainImage?: string
+  /** 2 位小数字符串；会话窗商品卡片展示，面交谈价参照 */
+  price?: string
+  /** 与 ApiItemVO.status 同形的枚举名；非 ON_SALE 时卡片置灰 */
+  status?: 'DRAFT' | 'PENDING' | 'ON_SALE' | 'SOLD' | 'OFFLINE' | 'REJECTED' | 'FORCED_OFFLINE'
   peerUserId: string
   peerNick?: string
   lastContent?: string

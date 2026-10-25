@@ -1,5 +1,6 @@
 package com.campus.core.dto.resp;
 
+import com.campus.core.enums.ItemStatusEnum;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -16,6 +17,12 @@ public class ChatConversationVO {
     private String itemTitle;
 
     private String itemMainImage;
+
+    /** 商品价格；会话窗顶部商品卡片展示，面交谈价有参照 */
+    private BigDecimal price;
+
+    /** 商品状态（枚举名）；已售出 / 已下架等会话卡片上置灰提示 */
+    private ItemStatusEnum status;
 
     private Long peerUserId;
 

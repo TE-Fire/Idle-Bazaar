@@ -146,6 +146,8 @@ public class ChatService {
             vo.setItemId(s.getItemId());
             vo.setItemTitle(item == null ? null : item.getTitle());
             vo.setItemMainImage(item == null ? null : item.getMainImage());
+            vo.setPrice(item == null ? null : item.getPrice());
+            vo.setStatus(item == null ? null : item.getStatus());
             vo.setPeerUserId(peerId);
             vo.setPeerNick(peer == null ? null : peer.getNickname());
             vo.setLastContent(last == null ? null : last.getContent());

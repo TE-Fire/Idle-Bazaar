@@ -80,14 +80,25 @@ function onCompare(): void {
   if (!compare.toggle(goods)) ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
 }
 
-/** 聊一聊：未登录先跳登录（带回跳）；自己的商品不进会话 */
+/** 聊一聊：未登录先跳登录（带回跳）；自己的商品不进会话。
+ *  商品摘要随 query 带上——首聊时会话还没建，ChatView 的壳会话用它显示顶部卡片 */
 function onChat(): void {
   if (!item.value) return
   if (!userStore.userId) {
     void router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
-  void router.push({ name: 'chat', query: { itemId: item.value.id, peerId: item.value.sellerId } })
+  void router.push({
+    name: 'chat',
+    query: {
+      itemId: item.value.id,
+      peerId: item.value.sellerId,
+      itemTitle: item.value.title,
+      itemImage: item.value.mainImage ?? '',
+      itemPrice: item.value.price,
+      itemStatus: item.value.status
+    }
+  })
 }
 
 function onEdit(): void {
