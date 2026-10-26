@@ -16,6 +16,7 @@ import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.ChatSessionMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.MsgMessageMapper;
+import com.campus.core.service.cache.UnreadCounterCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -57,6 +58,7 @@ public class ChatService {
     private final MsgMessageMapper msgMapper;
     private final ItemMapper itemMapper;
     private final AppUserMapper appUserMapper;
+    private final UnreadCounterCache unreadCounterCache;
 
     /**
      * 发送留言，同事务 upsert 会话并插消息。
@@ -87,13 +89,17 @@ public class ChatService {
                 .eq(ChatSession::getId, session.getId())
                 .set(ChatSession::getLastMsgId, msg.getId())
                 .set(ChatSession::getLastMsgAt, LocalDateTime.now()));
+        if (!req.getToUserId().equals(senderId)) {
+            unreadCounterCache.incrAfterCommit(req.getToUserId(), session.getId());
+        }
         return msg.getId();
     }
 
     /**
      * 会话列表：我参与的会话按最近消息倒序，回填商品摘要、对方昵称与未读数。
      *
-     * <p>未读一次 group by 查齐（只取 session_id 一列），不逐会话 count；
+     * <p>未读数走 {@link UnreadCounterCache}（`cm:chat:unread:{userId}`，Hash，
+     * field=sessionId）；缓存未命中时回源一次带索引的批量查询并重建整份。
      * 商品与对方批量查后 Java 组装——一个用户的会话数是商品级，全量取不翻页。
      */
     public List<ChatConversationVO> conversations(Long userId) {
@@ -107,15 +113,8 @@ public class ChatService {
         }
 
         List<Long> sessionIds = sessions.stream().map(ChatSession::getId).toList();
-        Map<Long, Integer> unreadMap = new HashMap<>();
-        for (MsgMessage m : msgMapper.selectList(new LambdaQueryWrapper<MsgMessage>()
-                .select(MsgMessage::getSessionId)
-                .in(MsgMessage::getSessionId, sessionIds)
-                .eq(MsgMessage::getReceiverId, userId)
-                .eq(MsgMessage::getReadFlag, 0)
-                .eq(MsgMessage::getDeleted, 0))) {
-            unreadMap.merge(m.getSessionId(), 1, Integer::sum);
-        }
+        Map<Long, Integer> unreadMap = unreadCounterCache.unreadOf(userId, sessionIds,
+                () -> loadUnreadFromDb(userId, sessionIds));
 
         List<Long> lastMsgIds = sessions.stream()
                 .map(ChatSession::getLastMsgId)
@@ -204,6 +203,21 @@ public class ChatService {
                 .eq(MsgMessage::getReadFlag, 0)
                 .set(MsgMessage::getReadFlag, 1)
                 .set(MsgMessage::getReadTime, LocalDateTime.now()));
+        unreadCounterCache.clearAfterCommit(userId, session.getId());
+    }
+
+    /** 回源：该用户在给定会话内的未读条数。有 `idx_receiver(receiver_id, zone, read_flag)` 兜底 */
+    private Map<Long, Integer> loadUnreadFromDb(Long userId, List<Long> sessionIds) {
+        Map<Long, Integer> unread = new HashMap<>();
+        for (MsgMessage m : msgMapper.selectList(new LambdaQueryWrapper<MsgMessage>()
+                .select(MsgMessage::getSessionId)
+                .in(MsgMessage::getSessionId, sessionIds)
+                .eq(MsgMessage::getReceiverId, userId)
+                .eq(MsgMessage::getReadFlag, 0)
+                .eq(MsgMessage::getDeleted, 0))) {
+            unread.merge(m.getSessionId(), 1, Integer::sum);
+        }
+        return unread;
     }
 
     /** 按「商品 + 双方」找会话；user_a/user_b 大小序与 {@link #upsertSession} 一致 */

@@ -1,16 +1,17 @@
 # Redis 缓存结构与失效设计
 
-> 技术笔记 · 本项目四处缓存的结构选择依据，以及为什么另外几处"看起来该用 Hash"的地方反而保持字符串。
+> 技术笔记 · 本项目五处缓存的结构选择依据，以及为什么另外几处"看起来该用 Hash"的地方反而保持字符串。
 
 缓存结构不该按"数据长什么样"选，而该按**怎么读它**选。同一个"分类 → 均价"的映射，如果每页只查一个分类，Hash 的 `HGET` 是最优解；如果每次要全表，`HGETALL` 与整包 `GET` 都是一个来回，选谁就取决于别的东西——内存形态、能否表达空集、写路径是否只改一个字段。本文按这个思路把项目里的缓存逐个过一遍，结论先行，理由在后。
 
-## 四处缓存各自的结构
+## 五处缓存各自的结构
 
 | 缓存 | 结构 | 载荷 | TTL | 主动失效 |
 |---|---|---|---|---|
 | `cm:dict:all` / `cm:dict:admin:full` | String（JSON） | 整份字典，含分类 / 校区 / 面交点 / 学院 | 60s | 字典写操作后 DEL 两个 key |
 | `cm:item:catAvg` | **Hash** | field = `categoryId`，value = 均价十进制字符串 | 5min | 订单完成 / 裁决完成时 DEL |
 | `cm:user:pub:{userId}` | String（JSON） | `UserPubVO`：昵称 / 信用分 / 认证态 | 10min | 改昵称后 DEL |
+| `cm:chat:unread:{userId}` | **Hash** | field = `sessionId`，value = 该会话未读条数 | 1h（写路径不续期） | 进会话已读后 `HDEL` 该 field |
 | `cm:item:state:{itemId}` + `cm:item:holder` | String + Hash | 占位状态字符串 / field = state key、value = 订单号 | 60s | 回滚 Lua 释放 |
 
 ## 字典：整包读，字符串最省事
@@ -43,9 +44,25 @@ Hash 的另一个卖点是字段级更新：改昵称只 `HSET nickname`，不�
 
 状态用 String 是因为值就是单个枚举字符串，配合 Lua 的 `SET NX EX` 一句话完成"检查并设置"，没什么可设计的。持有者另开 Hash 是因为回滚时要回答一个精确问题——「现在这个占位还是我这单抢的吗」：field 直取比把订单号拼进 value 再解析安全得多，也省掉一次字符串切割。**同一个业务对象拆成两个 key 看似冗余，换来的是两条路径各自一条命令搞定**。
 
+## 会话未读：计数器要的是增量，不是整表
+
+未读数和其他几处缓存有个本质区别：**它的写路径是加减，不是替换**。均价、字典、卖家信息每次变化都得重算或重取一整份，未读数只是「又来了一条消息，加一」。这就是它必须用 Hash 而没法用 String 的原因——整份 JSON 要做 `HINCRBY` 得先读出来、改、再写回去，三条命令加一次反序列化，还得自己处理并发覆盖；Hash 的原生增量是一条命令、服务端原子完成。
+
+改造前每次会话列表都把该用户所有未读消息行扫一遍再在 Java 里计数。`idx_receiver(receiver_id, zone, read_flag)` 兜着索引，不至于全表扫，但**扫描量随未读条数增长**——被刷了三十条消息的用户，每次拉列表都要数三十行。改成 Hash 后读是一次 `HGETALL`（field 数量等于会话数，与消息条数无关），收消息一条 `HINCRBY`，进会话一条 `HDEL`。
+
+实现上有一个无法回避的歧义：**Redis 里「key 不存在」和「所有会话都是 0 未读」是同一个状态**。不区分的话，一个真的没有未读的用户每次拉列表都要回源查一次库，缓存等于没写（notes/10 §八 那个坑的第三次变体）。解法与均价缓存同款，用哨兵 field `_init` 标记「已初始化」：读的时候先看 `HGETALL` 结果里有没有它，没有就整份重建。
+
+真正值得注意的是重建窗口。重建是「回源 → 删 key → `HSET` 整份 → 设 TTL」，如果这中间恰好有人发消息，`HINCRBY` 的增量会被随后的 `HSET` 覆盖掉，少显示一条。窗口只有几毫秒，但**不做 TTL 的话这个偏差就永久留下了**——哨兵还在，读侧永远不会再重建。所以这里设了 1 小时 TTL 且**写路径不续期**：活跃用户每小时也会自然重建一次，偏差最迟一小时纠正。这与字典「TTL 只是写侧失效的兜底」不同，这里的 TTL 承担的是纠错职责。
+
+写路径有两个约束。**一是挂在事务提交后**（`incrAfterCommit` / `clearAfterCommit`），沿用 `ItemImageJanitor` 的做法：发送和标已读都是带事务的，提交前改 Redis 一旦回滚，就会出现「数据库里消息没进去，未读却多了一条」。**二是写失败要主动删 key**，而不是记条日志就放过——留在偏差状态且哨兵有效，等于永远错下去；删掉之后下次读会回源重建，把状态拉回真相。
+
+还有一个反直觉的现象，实测时能看到：给一个还没读过列表的用户发消息，`HINCRBY` 会把 key 建出来，但**里面没有哨兵**（`TTL` 返回 -1，`HGETALL` 只有那一个 field）。这不是 bug，而是自愈入口——读侧看到没哨兵就判未初始化、回源重建，顺手把 TTL 补上。实测路径：`HINCRBY` 后 `HGETALL` 得到 `{4003: 1}`、`TTL=-1`；对方拉一次列表，变成 `{4003: 1, _init: 1}`、`TTL=3598`。
+
 ## 失效与降级的统一口径
 
-四处缓存遵循同一套规则，写在 `RedisKeys` 与各 key 类的注释里：**读穿**（miss 才回库并回填）、**异常降级**（`catch` 后 `log.warn`，直查库或返回本次查库结果，不让 Redis 抖动变成 500）、**失效用 DEL 不用 SET**。最后一条的理由是并发下的顺序不可控：重算后 `SET` 可能把旧快照写回，而 `DEL` 只是让下次读回库，没有这个窗口。
+五处缓存遵循同一套规则，写在 `RedisKeys` 与各 key 类的注释里：**读穿**（miss 才回库并回填）、**异常降级**（`catch` 后 `log.warn`，直查库或返回本次查库结果，不让 Redis 抖动变成 500）、**失效用 DEL 不用 SET**。最后一条的理由是并发下的顺序不可控：重算后 `SET` 可能把旧快照写回，而 `DEL` 只是让下次读回库，没有这个窗口。
+
+未读计数是唯一不走 DEL 失效的一处，因为它的变更语义是增量而非重算——收消息 `HINCRBY`、已读 `HDEL` 单 field，只有整份重建时才 DEL。它的降级方向也一致：Redis 读失败就回源查库，只是跳过回填。
 
 TTL 的定位要分清：字典 60 秒是"写侧已主动失效，TTL 只是兜底"；均价与卖家信息则一度把 TTL 当唯一手段（对应写入口还没落地），所以 2026-10-26 把管理端两处也接到卖家缓存之后，昵称一改就要靠 `evict` 覆盖三处展示，不能再等 10 分钟。
 
@@ -58,6 +75,7 @@ docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning TYPE  cm:item:catAvg  
 docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning HGETALL cm:item:catAvg | head -6
 docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning TTL   cm:item:catAvg      # 连打两次必须递减
 docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning GET   cm:user:pub:3007    # 看载荷有没有多余字段
+docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning HGETALL cm:chat:unread:3002  # 必须有 _init
 ```
 
 结构改型时要特别小心旧值：同一 key 从 String 改成 Hash，读侧会撞 `WRONGTYPE`。`CategoryAvgPriceCache` 的处理是读异常一律当 miss，写侧第一次 `delete` 就把旧 String 删掉了，所以上线后第一次访问会打一条 warn 然后自愈——不依赖人工清 key，但那条 warn 要认得出来。
