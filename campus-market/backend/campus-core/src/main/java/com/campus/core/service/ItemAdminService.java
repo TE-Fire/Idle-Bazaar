@@ -16,6 +16,7 @@ import com.campus.core.dto.resp.DictCampusVO;
 import com.campus.core.dto.resp.DictMeetPointVO;
 import com.campus.core.dto.resp.ItemImageVO;
 import com.campus.core.dto.resp.ItemListVO;
+import com.campus.core.dto.resp.UserPubVO;
 import com.campus.core.entity.AppUser;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
@@ -28,6 +29,7 @@ import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
+import com.campus.core.service.cache.UserPubCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,6 +90,7 @@ public class ItemAdminService {
     private final ReportMapper reportMapper;
     private final DictService dictService;
     private final CategoryAvgPriceCache categoryAvgPriceCache;
+    private final UserPubCache userPubCache;
     private final ItemImageJanitor itemImageJanitor;
 
     /* ══ 一、列表 ═══════════════════════════════════════════ */
@@ -324,11 +327,9 @@ public class ItemAdminService {
         fill.itemIds = rows.stream().map(Item::getId).toList();
         List<Long> sellerIds = rows.stream().map(Item::getSellerId).distinct().toList();
 
-        fill.users = appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
-                        .in(AppUser::getId, sellerIds)
-                        .eq(AppUser::getDeleted, 0))
-                .stream()
-                .collect(Collectors.toMap(AppUser::getId, Function.identity(), (a, b) -> a));
+        // 卖家只取昵称与信用分，走公开资料缓存：全字段查 app_user 会把手机号一并select出来，
+        // 与「对外载体不含敏感字段」的口径相悖，也白白多查一列
+        fill.users = userPubCache.getOrLoad(sellerIds);
 
         fill.reportCounts = reportMapper.countByItem(fill.itemIds).stream()
                 .collect(Collectors.toMap(ReportMapper.ItemReportCountRow::getItemId,
@@ -378,7 +379,7 @@ public class ItemAdminService {
         vo.setMeetPointName(row.getMeetPointId() == null ? null : fill.meetPointNames.get(row.getMeetPointId()));
         vo.setSellerId(row.getSellerId());
 
-        AppUser seller = fill.users.get(row.getSellerId());
+        UserPubVO seller = fill.users.get(row.getSellerId());
         vo.setSellerNick(seller == null ? null : seller.getNickname());
         vo.setSellerCredit(seller == null ? null : seller.getCreditScore());
 
@@ -448,7 +449,7 @@ public class ItemAdminService {
     /** 一页商品的关联数据。字段可变，组装完即丢弃，不做成不可变对象 */
     private static class Fill {
         private List<Long> itemIds;
-        private Map<Long, AppUser> users;
+        private Map<Long, UserPubVO> users;
         private Map<Long, ItemAudit> audits;
         private Map<Long, Long> reportCounts;
         private Map<Long, BigDecimal> avgPrices;

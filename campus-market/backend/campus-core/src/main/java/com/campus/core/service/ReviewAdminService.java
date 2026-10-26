@@ -16,8 +16,8 @@ import com.campus.core.dto.resp.ReviewQueueVO;
 import com.campus.core.dto.resp.ReviewSlaVO;
 import com.campus.core.dto.resp.ReviewTaskVO;
 import com.campus.core.dto.resp.WeightPartsVO;
+import com.campus.core.dto.resp.UserPubVO;
 import com.campus.core.entity.AdminUser;
-import com.campus.core.entity.AppUser;
 import com.campus.core.entity.Appeal;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
@@ -34,7 +34,6 @@ import com.campus.core.enums.ReportStatusEnum;
 import com.campus.core.enums.ReportTargetTypeEnum;
 import com.campus.core.errcode.ReviewErrorCode;
 import com.campus.core.mapper.AdminUserMapper;
-import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.AppealMapper;
 import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
@@ -42,6 +41,7 @@ import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
 import com.campus.core.mapper.TradeOrderMapper;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
+import com.campus.core.service.cache.UserPubCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -96,13 +96,13 @@ public class ReviewAdminService {
     private final ItemAuditMapper itemAuditMapper;
     private final ReportMapper reportMapper;
     private final AppealMapper appealMapper;
-    private final AppUserMapper appUserMapper;
     private final AdminUserMapper adminUserMapper;
     private final TradeOrderMapper tradeOrderMapper;
     private final ItemAdminService itemAdminService;
     private final OrderService orderService;
     private final DictService dictService;
     private final CategoryAvgPriceCache categoryAvgPriceCache;
+    private final UserPubCache userPubCache;
 
     /* ══ 一、队列 ═══════════════════════════════════════════ */
 
@@ -411,7 +411,7 @@ public class ReviewAdminService {
         vo.setItemStatus(ItemStatusEnum.fromCode(item.getStatus()));
         vo.setSellerId(item.getSellerId());
 
-        AppUser seller = fill.users.get(item.getSellerId());
+        UserPubVO seller = fill.users.get(item.getSellerId());
         vo.setSellerNick(seller == null ? null : seller.getNickname());
         vo.setSellerCredit(seller == null ? null : seller.getCreditScore());
 
@@ -478,12 +478,9 @@ public class ReviewAdminService {
                 .stream()
                 .collect(Collectors.toMap(Item::getId, Function.identity(), (a, b) -> a));
 
-        // 卖家（取商品集合中出现的 seller_id）
-        fill.users = appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
-                        .in(AppUser::getId, fill.items.values().stream().map(Item::getSellerId).distinct().toList())
-                        .eq(AppUser::getDeleted, 0))
-                .stream()
-                .collect(Collectors.toMap(AppUser::getId, Function.identity(), (a, b) -> a));
+        // 卖家（取商品集合中出现的 seller_id），只回填昵称与信用分，走公开资料缓存
+        fill.users = userPubCache.getOrLoad(
+                fill.items.values().stream().map(Item::getSellerId).distinct().toList());
 
         // 商品未结举报数（实时；已处理不计，口径见 ReportMapper#countByItem）
         fill.reportCounts = reportMapper.countByItem(ids).stream()
@@ -783,7 +780,7 @@ public class ReviewAdminService {
     /** 队列组装用的单次关联数据容器，组装完即丢弃。 */
     private static class Fill {
         private Map<Long, Item> items = Map.of();
-        private Map<Long, AppUser> users = Map.of();
+        private Map<Long, UserPubVO> users = Map.of();
         private Map<Long, ItemAudit> snapshots = Map.of();
         private Map<Long, Long> reportCounts = Map.of();
         private Map<Long, List<ItemImageVO>> images = Map.of();
