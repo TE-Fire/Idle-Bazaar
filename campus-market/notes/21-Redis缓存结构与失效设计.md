@@ -1,6 +1,6 @@
 # Redis 缓存结构与失效设计
 
-> 技术笔记 · 本项目五处缓存的结构选择依据，以及为什么另外几处"看起来该用 Hash"的地方反而保持字符串。
+> 技术笔记 · 本项目五处缓存的结构选择依据、一处写聚合的取舍，以及为什么另外几处"看起来该用 Hash"的地方反而保持字符串。
 
 缓存结构不该按"数据长什么样"选，而该按**怎么读它**选。同一个"分类 → 均价"的映射，如果每页只查一个分类，Hash 的 `HGET` 是最优解；如果每次要全表，`HGETALL` 与整包 `GET` 都是一个来回，选谁就取决于别的东西——内存形态、能否表达空集、写路径是否只改一个字段。本文按这个思路把项目里的缓存逐个过一遍，结论先行，理由在后。
 
@@ -58,6 +58,16 @@ Hash 的另一个卖点是字段级更新：改昵称只 `HSET nickname`，不�
 
 还有一个反直觉的现象，实测时能看到：给一个还没读过列表的用户发消息，`HINCRBY` 会把 key 建出来，但**里面没有哨兵**（`TTL` 返回 -1，`HGETALL` 只有那一个 field）。这不是 bug，而是自愈入口——读侧看到没哨兵就判未初始化、回源重建，顺手把 TTL 补上。实测路径：`HINCRBY` 后 `HGETALL` 得到 `{4003: 1}`、`TTL=-1`；对方拉一次列表，变成 `{4003: 1, _init: 1}`、`TTL=3598`。
 
+## 浏览量：这不是缓存，是写聚合
+
+前五处都是「挡住读」，浏览量这处挡的是**写**。详情页是最高频的读接口，原来每看一次就 `UPDATE item SET view_count = view_count + 1`——同一件商品被并发浏览时，所有请求争同一行记录锁，而浏览量本身是弱一致统计，没有必要实时落库。改成浏览只做 `HINCRBY cm:item:view`（field = itemId），`@Scheduled` 每 5 分钟批量写回。
+
+聚合点为什么放在 Redis、而不是快手 BufferTrigger 那类进程内聚合组件，有两个具体原因。**一是多实例部署时进程内聚合会退化成「每实例各攒一份」**，聚合度随机器数衰减，Redis 才是天然的全局限量点。**二是详情页要回显浏览量**，`HINCRBY` 一条命令就返回累加后的增量，进程内聚合同样能拿到容器里的数，但那个数在 flush 之后就没了，还得自己再维护一份可读副本。它省的是 Redis 的往返次数（N 次 `HINCRBY` 合成一次），而 `HINCRBY` 本身就是内存 O(1) 操作——毕设的 QPS 下这点往返可以忽略，为它引入新依赖不划算。
+
+取走增量用 Lua 把 `HGETALL` 与 `DEL` 原子化（`lua/view_flush.lua`）。分成两条命令会有一个静默丢数的窗口：取到之后、删除之前新增的浏览，会被随后的 `DEL` 一并抹掉，而且不报错。返回值是扁平数组 `[itemId, delta, ...]`，Java 侧两两一组解析。
+
+落库失败的条目把增量 `HINCRBY` 回去，下一轮重试——否则「已经取走」的增量就永久丢了。这条补偿路径与订单一单一事务的思路一致：单条失败不能拖垮同批其他条目。代价是**数据库里的 `view_count` 最多滞后 5 分钟**，所以展示值一律按「库值 + Redis 增量」拼，详情页和列表看到的是准的；只有直接查库的管理端统计会看到略小的数。
+
 ## 失效与降级的统一口径
 
 五处缓存遵循同一套规则，写在 `RedisKeys` 与各 key 类的注释里：**读穿**（miss 才回库并回填）、**异常降级**（`catch` 后 `log.warn`，直查库或返回本次查库结果，不让 Redis 抖动变成 500）、**失效用 DEL 不用 SET**。最后一条的理由是并发下的顺序不可控：重算后 `SET` 可能把旧快照写回，而 `DEL` 只是让下次读回库，没有这个窗口。
@@ -76,6 +86,7 @@ docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning HGETALL cm:item:catAvg
 docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning TTL   cm:item:catAvg      # 连打两次必须递减
 docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning GET   cm:user:pub:3007    # 看载荷有没有多余字段
 docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning HGETALL cm:chat:unread:3002  # 必须有 _init
+docker exec cm-redis redis-cli -a 'PWD' --no-auth-warning HGETALL cm:item:view          # 浏览后应有增量，落库后清空
 ```
 
 结构改型时要特别小心旧值：同一 key 从 String 改成 Hash，读侧会撞 `WRONGTYPE`。`CategoryAvgPriceCache` 的处理是读异常一律当 miss，写侧第一次 `delete` 就把旧 String 删掉了，所以上线后第一次访问会打一条 warn 然后自愈——不依赖人工清 key，但那条 warn 要认得出来。

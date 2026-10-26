@@ -16,6 +16,12 @@ public final class ItemRedisKeys {
     /** 各分类已成交均价，Hash：field = categoryId，value = 均价（十进制字符串） */
     public static final String CATEGORY_AVG = MODULE + "catAvg";
 
+    /**
+     * 浏览量增量聚合，Hash：field = itemId，value = 尚未落库的浏览次数。
+     * 定时任务用 {@code lua/view_flush.lua} 原子取走后批量写回 {@code item.view_count}。
+     */
+    public static final String VIEW = MODULE + "view";
+
     /** 商品占位状态的 key 前缀，值是 ON_SALE / LOCKED / SOLD 之一（见 SPECIAL 常量） */
     private static final String STATE_PREFIX = MODULE + "state:";
 

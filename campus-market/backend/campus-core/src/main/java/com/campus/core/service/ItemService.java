@@ -28,6 +28,7 @@ import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.campus.core.service.cache.UserPubCache;
+import com.campus.core.service.cache.ViewCounterCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -73,6 +75,8 @@ public class ItemService {
     private final CategoryAvgPriceCache categoryAvgPriceCache;
 
     private final UserPubCache userPubCache;
+
+    private final ViewCounterCache viewCounterCache;
 
     private final ReportMapper reportMapper;
 
@@ -167,7 +171,7 @@ public class ItemService {
         q.orderByDesc(Item::getUpdateTime).orderByDesc(Item::getId);
 
         Page<Item> page = itemMapper.selectPage(new Page<>(pageNum, pageSize), q);
-        List<ApiItemVO> list = page.getRecords().stream().map(this::toApiVO).toList();
+        List<ApiItemVO> list = toApiVOs(page.getRecords());
         return PageResult.of(list, page.getTotal(), pageNum, pageSize);
     }
 
@@ -230,26 +234,23 @@ public class ItemService {
         q.orderByDesc(Item::getPublishedAt).orderByDesc(Item::getId);
 
         Page<Item> page = itemMapper.selectPage(new Page<>(pageNum, pageSize), q);
-        List<ApiItemVO> list = page.getRecords().stream().map(this::toApiVO).toList();
+        List<ApiItemVO> list = toApiVOs(page.getRecords());
         fillSellers(list);
         return PageResult.of(list, page.getTotal(), pageNum, pageSize);
     }
 
     /** 商品详情并累加浏览量；不去重（热度粗略信号，做到 UV 精确要另建去重表，不划算） */
-    @Transactional(rollbackFor = Exception.class)
     public ApiItemVO detail(Long itemId) {
         Item item = itemMapper.selectById(itemId);
         BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
         BizAssert.isTrue(ItemStatusEnum.fromCode(item.getStatus()) != ItemStatusEnum.FORCED_OFFLINE,
                 ItemErrorCode.ITEM_NOT_FOUND);
 
-        int viewCount = nvl(item.getViewCount()) + 1;
-        itemMapper.update(null, new LambdaUpdateWrapper<Item>()
-                .eq(Item::getId, itemId)
-                .set(Item::getViewCount, viewCount));
+        // 浏览量走 Redis 增量聚合，这里不再写库；HINCRBY 返回的正是库值之上的累计增量
+        long viewDelta = viewCounterCache.incr(itemId);
 
-        ApiItemVO vo = toApiVO(item);
-        vo.setViewCount(viewCount);
+        ApiItemVO vo = toApiVO(item, new VoContext(dictService, Map.of(itemId, viewDelta)));
+        vo.setViewCount((int) (nvl(item.getViewCount()) + viewDelta));
         vo.setImages(itemImageMapper.selectList(new LambdaQueryWrapper<ItemImage>()
                         .eq(ItemImage::getItemId, itemId)
                         .eq(ItemImage::getDeleted, 0)
@@ -408,39 +409,69 @@ public class ItemService {
         saveImages(itemId, images);
     }
 
-    /** 分类名与面交点名：字典是小表且已缓存（见 DictService 的管理端全量缓存），可直接全量取值 */
-    private ApiItemVO toApiVO(Item item) {
-        Map<Long, String> categoryNames = dictService.categories().stream()
-                .collect(Collectors.toMap(DictCategoryVO::getId, DictCategoryVO::getName, (a, b) -> a));
-        Map<Long, String> meetPointNames = dictService.meetPoints().stream()
-                .collect(Collectors.toMap(DictMeetPointVO::getId, DictMeetPointVO::getName, (a, b) -> a));
-        Map<Long, String> campusNames = dictService.campuses().stream()
-                .collect(Collectors.toMap(DictCampusVO::getId, DictCampusVO::getName, (a, b) -> a));
+    /**
+     * 批量组装。字典名称与浏览量增量都在请求内只取一次：前者是整表读，
+     * 后者按一页的 id 一次 {@code HMGET}——逐行取的话一页 10 条要 30 次缓存往返。
+     */
+    private List<ApiItemVO> toApiVOs(List<Item> rows) {
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = rows.stream().map(Item::getId).toList();
+        VoContext ctx = new VoContext(dictService, viewCounterCache.deltas(ids));
+        return rows.stream().map(it -> toApiVO(it, ctx)).toList();
+    }
 
+    private ApiItemVO toApiVO(Item item, VoContext ctx) {
         ApiItemVO vo = new ApiItemVO();
         vo.setId(item.getId());
         vo.setTitle(item.getTitle());
         vo.setMainImage(item.getMainImage());
         vo.setCategoryId(item.getCategoryId());
-        vo.setCategoryName(categoryNames.get(item.getCategoryId()));
+        vo.setCategoryName(ctx.categories.get(item.getCategoryId()));
         vo.setPrice(item.getPrice());
         vo.setOriginPrice(item.getOriginPrice());
         vo.setGrade(item.getGrade());
         vo.setCampusId(item.getCampusId());
-        vo.setCampusName(campusNames.get(item.getCampusId()));
+        vo.setCampusName(ctx.campuses.get(item.getCampusId()));
         vo.setMeetPointId(item.getMeetPointId());
-        vo.setMeetPointName(meetPointNames.get(item.getMeetPointId()));
+        vo.setMeetPointName(ctx.meetPoints.get(item.getMeetPointId()));
         vo.setSellerId(item.getSellerId());
         vo.setNegotiable(item.getNegotiable());
         vo.setDeliveryIncluded(item.getDeliveryIncluded());
         vo.setDescription(item.getDescription());
         vo.setStatus(ItemStatusEnum.fromCode(item.getStatus()));
         vo.setPublishAt(item.getPublishedAt());
-        vo.setViewCount(item.getViewCount());
+        vo.setViewCount((int) (nvl(item.getViewCount()) + ctx.viewDeltas.getOrDefault(item.getId(), 0L)));
         return vo;
     }
 
-    /** 卖家昵称与信用分批量回填；人均一行，避免列表逐条查库 */
+    /**
+     * 请求内复用的组装上下文：字典名称映射 + 浏览量增量。
+     * 字典都是整表读且已缓存，取一次后逐行查表；增量是 Redis 里尚未落库的部分，
+     * 与库值相加才是展示值——否则列表会比详情页少一截。
+     */
+    private static final class VoContext {
+
+        private final Map<Long, String> categories;
+        private final Map<Long, String> meetPoints;
+        private final Map<Long, String> campuses;
+        private final Map<Long, Long> viewDeltas;
+
+        private VoContext(DictService dictService, Map<Long, Long> viewDeltas) {
+            this.categories = nameMap(dictService.categories(), DictCategoryVO::getId, DictCategoryVO::getName);
+            this.meetPoints = nameMap(dictService.meetPoints(), DictMeetPointVO::getId, DictMeetPointVO::getName);
+            this.campuses = nameMap(dictService.campuses(), DictCampusVO::getId, DictCampusVO::getName);
+            this.viewDeltas = viewDeltas;
+        }
+
+        private static <T> Map<Long, String> nameMap(List<T> rows,
+                                                    Function<T, Long> idFn,
+                                                    Function<T, String> nameFn) {
+            return rows.stream().collect(Collectors.toMap(idFn, nameFn, (a, b) -> a));
+        }
+    }
+
     /**
      * 回填卖家公开信息（昵称 / 信用分 / 认证态）。走 {@link UserPubCache} 读穿：
      * 同一卖家在列表多页重复出现，公开资料却极少变；查不到（已软删）就不回填。
