@@ -523,19 +523,19 @@ INSERT INTO admin_role_perm (id, role_id, perm_code) VALUES
  (30007,2001,'user.verify'),(30008,2001,'user.ban'),(30009,2001,'review.judge'),
  (30010,2001,'review.forceoff'),(30011,2001,'review.appeal'),(30012,2001,'order.refund'),
  (30013,2001,'order.arbitrate'),(30014,2001,'content.edit'),(30015,2001,'settings.edit'),
- (30016,2001,'log.view'),(30017,2001,'review.view'),
+ (30016,2001,'log.view'),(30017,2001,'review.view'),(30018,2001,'order.view'),
  -- REVIEWER：审核相关，不能碰用户封禁与系统设置（关键互斥）
  (30101,2002,'dashboard.view'),(30102,2002,'report.view'),(30103,2002,'item.view'),
  (30104,2002,'review.judge'),(30105,2002,'review.forceoff'),(30106,2002,'review.appeal'),
- (30107,2002,'review.view'),
+ (30107,2002,'review.view'),(30108,2002,'order.view'),
  -- OPERATOR：运营，能处置商品/用户认证/订单，不能裁决审核，也不能碰字典（content.edit 已收敛为超管专属）
  (30201,2003,'dashboard.view'),(30202,2003,'report.view'),(30203,2003,'item.view'),
  (30204,2003,'item.offline'),(30205,2003,'user.view'),(30206,2003,'user.verify'),
- (30207,2003,'order.refund'),(30208,2003,'order.arbitrate'),
+ (30207,2003,'order.refund'),(30208,2003,'order.arbitrate'),(30212,2003,'order.view'),
  (30210,2003,'log.view'),(30211,2003,'review.view'),
  -- READONLY：答辩巡盘用
  (30301,2004,'dashboard.view'),(30302,2004,'report.view'),(30303,2004,'item.view'),
- (30304,2004,'user.view'),(30305,2004,'review.view');
+ (30304,2004,'user.view'),(30305,2004,'review.view'),(30306,2004,'order.view');
 
 -- ── 校区 ────────────────────────────────────────────────
 INSERT INTO dict_campus (id, name, sort) VALUES

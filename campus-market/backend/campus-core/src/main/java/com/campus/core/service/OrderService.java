@@ -70,6 +70,9 @@ public class OrderService {
     /** 裁决留痕统一文案：让 `cancel_reason` 在同为终态的订单里能区分出「被裁决」这一来源 */
     private static final String DISPUTE_SETTLED_REASON = "管理端裁决结案";
 
+    /** 强制退款的留痕前缀，与裁决结案区分开：一个是代卖家退款，一个是判输赢 */
+    private static final String FORCE_REFUND_REASON = "管理端强制退款";
+
     /** 纠纷默认理由：前端允许只发起不填理由，申诉单 reason 不能空着进队列 */
     private static final String DISPUTE_DEFAULT_REASON = "订单纠纷，申请平台裁决";
 
@@ -534,6 +537,30 @@ public class OrderService {
             // 卖家赢：成交成立，订单进入已成交统计，均价缓存随之失效
             categoryAvgPriceCache.evict();
         }
+    }
+
+    /**
+     * 管理端强制退款（A6）：把「退款中 / 纠纷中」直接转已退款并恢复商品。
+     *
+     * <p>**只受理这两个悬置态**。已付款 / 待面交的交易还在正常进行，卖家未必违约，
+     * 管理端替卖家退款属于越权处置；已完成、已取消、已退款是终态，重复处置没有意义。
+     * 状态校验同时写在 Java 与 WHERE 里：Java 侧给可读报错，WHERE 侧保证并发下只有一方生效。
+     *
+     * <p>不走 `handleRefund`：那个方法要求操作人是卖家，且只认退款中。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void forceRefund(Long orderId, String note) {
+        TradeOrder order = requireOrder(orderId);
+        String reason = trim(note);
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .in(TradeOrder::getStatus, OrderStatusEnum.REFUNDING.getCode(),
+                        OrderStatusEnum.DISPUTING.getCode())
+                .set(TradeOrder::getStatus, OrderStatusEnum.REFUNDED.getCode())
+                .set(TradeOrder::getCancelReason,
+                        reason == null ? FORCE_REFUND_REASON : FORCE_REFUND_REASON + "：" + reason));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只能对退款中 / 纠纷中订单强制退款");
+        restoreItemOnRefund(order);
     }
 
     /* ══ 六、查询 ═════════════════════════════════════════════ */

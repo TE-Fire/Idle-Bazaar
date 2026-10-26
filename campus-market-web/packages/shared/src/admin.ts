@@ -300,27 +300,37 @@ export const SLA_LEVEL_LABELS: Record<SlaLevel, { label: string; color: string }
 
 /* ───────────────────────── 五、订单（A-B7 / F-A6） ───────────────────────── */
 
+/**
+ * 订单状态（八态，与后端 `OrderStatusEnum` 枚举名逐字一致）
+ *
+ * <p>**不再是 mock 那套 UNPAID/PAID/MEETING/DONE**：那套是原型期的自造码，
+ * 与 `trade_order.status`、后端 `@JsonValue` 输出的枚举名对不上，真实接口接进来时
+ * 状态标签会整列显示成兜底文案。以库里 1–8 的语义为准：
+ * 待付款 / 待面交 / 已验货 / 已完成 / 已取消 / 退款中 / 已退款 / 纠纷中。
+ *
+ * <p>`VERIFIED`（已验货）是面交扫码核销后的独立中间态，不是终态。
+ */
 export const ORDER_STATUS = {
-  UNPAID: 'UNPAID',
-  PAID: 'PAID',
-  MEETING: 'MEETING',
-  DONE: 'DONE',
+  WAIT_PAY: 'WAIT_PAY',
+  WAIT_MEET: 'WAIT_MEET',
+  VERIFIED: 'VERIFIED',
+  COMPLETED: 'COMPLETED',
   CANCELED: 'CANCELED',
   REFUNDING: 'REFUNDING',
   REFUNDED: 'REFUNDED',
-  DISPUTE: 'DISPUTE'
+  DISPUTING: 'DISPUTING'
 } as const
 export type OrderStatus = (typeof ORDER_STATUS)[keyof typeof ORDER_STATUS]
 
 export const ORDER_STATUS_LABELS: Record<OrderStatus, { label: string; color: string }> = {
-  UNPAID: { label: '待付款', color: 'default' },
-  PAID: { label: '已付款', color: 'blue' },
-  MEETING: { label: '待面交', color: 'blue' },
-  DONE: { label: '已完成', color: 'green' },
+  WAIT_PAY: { label: '待付款', color: 'default' },
+  WAIT_MEET: { label: '待面交', color: 'blue' },
+  VERIFIED: { label: '已验货', color: 'cyan' },
+  COMPLETED: { label: '已完成', color: 'green' },
   CANCELED: { label: '已取消', color: 'default' },
   REFUNDING: { label: '退款中', color: 'orange' },
   REFUNDED: { label: '已退款', color: 'orange' },
-  DISPUTE: { label: '纠纷中', color: 'red' }
+  DISPUTING: { label: '纠纷中', color: 'red' }
 }
 
 /**
@@ -360,11 +370,16 @@ export interface TradeOrder {
   }
 }
 
-/** 纠纷裁决的三种结果（business/03 F-A6） */
+/**
+ * 纠纷裁决的两种结果（business/03 F-A6 本期口径）
+ *
+ * <p>**没有「部分退款」**：订单终态只有已退款 / 已完成，库里没有部分退状态，
+ * 学生端也没有对应流程，收了这个选项也落不了库。`value` 直接就是
+ * `POST /admin/order/{id}/arbitrate` 的 `result` 取值，前端不做二次翻译。
+ */
 export const ARBITRATE_ACTIONS = [
-  { value: 'refundBuyer', label: '退款买家' },
-  { value: 'paySeller', label: '放款卖家' },
-  { value: 'partial', label: '部分退款' }
+  { value: 'REFUND_BUYER', label: '退款买家', hint: '订单转已退款，商品恢复在售' },
+  { value: 'PAY_SELLER', label: '放款卖家', hint: '订单转已完成，货款归卖家' }
 ] as const
 
 /* ───────────────────────── 六、系统设置（A-B9） ───────────────────────── */

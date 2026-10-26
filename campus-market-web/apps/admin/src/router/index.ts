@@ -98,7 +98,7 @@ const routes: RouteRecordRaw[] = [
         path: 'orders',
         name: 'orders',
         component: () => import('@/views/OrdersView.vue'),
-        meta: { title: '订单管理', perm: PERM_CODES.ORDER_REFUND }
+        meta: { title: '订单管理', perm: PERM_CODES.ORDER_VIEW }
       },
       {
         // A7 内容管理（A-B6 / F-A7）：五张字典是全端一致性的源头

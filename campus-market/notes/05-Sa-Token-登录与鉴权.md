@@ -277,19 +277,19 @@ List<String> perms = StpAdminUtil.stpLogic.getPermissionList();
 
 ## 九、本项目的权限模型与覆盖现状
 
-四个角色 × 17 个权限点（`db/schema.sql` 种子数据，`business/03` F-A1 矩阵）：
+四个角色 × 18 个权限点（`db/schema.sql` 种子数据，`business/03` F-A1 矩阵）：
 
 | 角色 | role_code | 权限点 |
 |---|---|---|
-| 超级管理员 | SUPER (2001) | 全部 17 个 |
-| 审核员 | REVIEWER (2002) | dashboard/report/item.view/review.*（view、judge、forceoff、appeal 四个全有）—— **无 user.ban、无 settings.edit** |
-| 运营 | OPERATOR (2003) | dashboard/report/item.view/item.offline/user.view/user.verify/order.*/review.view/log.view —— **无 review.judge、无 content.edit**（字典 2026-09-30 起仅超管） |
-| 只读 | READONLY (2004) | dashboard.view/report.view/item.view/user.view/review.view |
+| 超级管理员 | SUPER (2001) | 全部 18 个 |
+| 审核员 | REVIEWER (2002) | dashboard/report/item.view/order.view/review.*（view、judge、forceoff、appeal 四个全有）—— **无 user.ban、无 settings.edit** |
+| 运营 | OPERATOR (2003) | dashboard/report/item.view/item.offline/user.view/user.verify/order.*（view、refund、arbitrate）/review.view/log.view —— **无 review.judge、无 content.edit**（字典 2026-09-30 起仅超管） |
+| 只读 | READONLY (2004) | dashboard.view/report.view/item.view/user.view/review.view/order.view |
 
 覆盖现状与风险：
 
-- `@SaCheckPermission` 目前只在 `AdminUserController` 3 个方法、`PermDemoController` 2 个方法上。
-  商品 / 订单 / 审核等业务接口还没写，写了就必须挂。
+- `@SaCheckPermission` 已覆盖商品、审核、订单、管理员账号、操作日志、字典等全部管理端 controller；
+  2026-10-26 补 `order.view` 时顺带核过一遍，四个角色对 `order.*` 的授权与矩阵一致。
 - `getRoleList` 无消费方：没有 `@SaCheckRole`，业务也不读角色列表。要么用起来要么删——留着是假象。
 - **真实风险**：拦截器只补登录态，权限全靠方法注解。新增接口漏挂注解 = "登录即可访问"，
   静默放权，编译不报错、测试不失败。建议新增业务 controller 时把"挂注解"列为评审项；

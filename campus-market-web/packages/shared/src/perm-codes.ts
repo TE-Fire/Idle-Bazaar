@@ -32,6 +32,8 @@ export const PERM_CODES = {
   REVIEW_APPEAL: 'review.appeal',
 
   /* ── 订单 ── */
+  /** 进订单页、看列表与详情的只读点；四个角色都有（只读角色巡盘也要能看订单） */
+  ORDER_VIEW: 'order.view',
   ORDER_REFUND: 'order.refund',
   ORDER_ARBITRATE: 'order.arbitrate',
 
@@ -61,6 +63,7 @@ export const PERM_LABELS: Record<PermCode, string> = {
   [PERM_CODES.REVIEW_JUDGE]: '审核判定',
   [PERM_CODES.REVIEW_FORCE_OFF]: '强制下架',
   [PERM_CODES.REVIEW_APPEAL]: '申诉复核',
+  [PERM_CODES.ORDER_VIEW]: '查看订单',
   [PERM_CODES.ORDER_REFUND]: '订单退款',
   [PERM_CODES.ORDER_ARBITRATE]: '纠纷仲裁',
   [PERM_CODES.CONTENT_EDIT]: '内容维护',
@@ -88,7 +91,10 @@ export const PERM_GROUPS: ReadonlyArray<{ group: string; codes: PermCode[] }> = 
       PERM_CODES.REVIEW_APPEAL
     ]
   },
-  { group: '订单', codes: [PERM_CODES.ORDER_REFUND, PERM_CODES.ORDER_ARBITRATE] },
+  {
+    group: '订单',
+    codes: [PERM_CODES.ORDER_VIEW, PERM_CODES.ORDER_REFUND, PERM_CODES.ORDER_ARBITRATE]
+  },
   {
     group: '内容与系统',
     codes: [PERM_CODES.CONTENT_EDIT, PERM_CODES.SETTINGS_EDIT, PERM_CODES.LOG_VIEW]

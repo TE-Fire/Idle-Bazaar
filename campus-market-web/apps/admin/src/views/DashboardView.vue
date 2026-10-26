@@ -58,7 +58,7 @@ const pending = computed(() =>
     item: QUEUE_TASKS.filter((t) => t.kind === 'item').length,
     report: QUEUE_TASKS.filter((t) => t.kind === 'report').length,
     appeal: QUEUE_TASKS.filter((t) => t.kind === 'appeal').length,
-    refund: ORDERS.filter((o) => o.status === 'REFUNDING' || o.status === 'DISPUTE').length
+    refund: ORDERS.filter((o) => o.status === 'REFUNDING' || o.status === 'DISPUTING').length
   })
 )
 
@@ -352,7 +352,7 @@ const alerts = computed<AlertItem[]>(() => [
     label: '异常交易',
     desc: '纠纷 / 退款中订单，或成交快照已被卖家改动',
     count: ORDERS.filter(
-      (o) => o.status === 'DISPUTE' || o.status === 'REFUNDING' || snapshotDrifted(o)
+      (o) => o.status === 'DISPUTING' || o.status === 'REFUNDING' || snapshotDrifted(o)
     ).length,
     route: 'orders'
   },
