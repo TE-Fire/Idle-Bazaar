@@ -499,7 +499,76 @@ CREATE TABLE sys_sensitive_word (
 ) ENGINE=InnoDB COMMENT='敏感词库（启动时载入内存，Redis 发布订阅热更新）';
 
 -- ════════════════════════════════════════════════════════════
--- 十、种子数据（建库后必灌，否则前端字典为空）
+-- 十、社交模块（关注/动态/评论/海报；notes/22 为字段唯一来源）
+-- ════════════════════════════════════════════════════════════
+
+CREATE TABLE user_follow (
+  id           bigint   NOT NULL COMMENT '雪花ID',
+  follower_id  bigint   NOT NULL COMMENT '关注者',
+  followee_id  bigint   NOT NULL COMMENT '被关注者',
+  create_time  datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted      bigint   NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_follow (follower_id, followee_id, deleted) COMMENT 'B类删除：取关写时间戳，重新关注复用同一行置0',
+  KEY idx_followee (followee_id, deleted, create_time) COMMENT '粉丝列表/粉丝数'
+) ENGINE=InnoDB COMMENT='关注关系（B类软删，复用行）';
+
+CREATE TABLE user_moment (
+  id           bigint        NOT NULL COMMENT '雪花ID',
+  user_id      bigint        NOT NULL COMMENT '作者',
+  type         tinyint       NOT NULL DEFAULT 1 COMMENT '1纯状态 2分享商品',
+  content      varchar(1000) DEFAULT NULL COMMENT '文本内容（图态可空）',
+  images       json          DEFAULT NULL COMMENT '图片URL数组（≤9，复用上传通道）',
+  item_id      bigint        DEFAULT NULL COMMENT 'type=2 时关联商品',
+  audit_status tinyint       NOT NULL DEFAULT 0 COMMENT '0正常 1敏感词屏蔽 2举报下架',
+  create_time  datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time  datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted      bigint        NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY idx_user (user_id, deleted, create_time) COMMENT '个人主页动态',
+  KEY idx_square (deleted, audit_status, create_time) COMMENT '广场流：仅未删且正常'
+) ENGINE=InnoDB COMMENT='用户动态';
+
+CREATE TABLE moment_like (
+  id           bigint   NOT NULL COMMENT '雪花ID',
+  moment_id    bigint   NOT NULL COMMENT '动态',
+  user_id      bigint   NOT NULL COMMENT '点赞用户',
+  create_time  datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted      bigint   NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_moment_user (moment_id, user_id, deleted) COMMENT 'B类删除：取消点赞写时间戳，再赞复用同一行',
+  KEY idx_moment (moment_id, deleted) COMMENT '点赞数'
+) ENGINE=InnoDB COMMENT='动态点赞（B类软删）';
+
+CREATE TABLE moment_comment (
+  id           bigint       NOT NULL COMMENT '雪花ID',
+  moment_id    bigint       NOT NULL COMMENT '动态',
+  user_id      bigint       NOT NULL COMMENT '评论用户',
+  reply_to     bigint       DEFAULT NULL COMMENT '回复目标用户id（扁平列表只@人，不定位父楼）',
+  content      varchar(500) NOT NULL COMMENT '评论内容',
+  audit_status tinyint      NOT NULL DEFAULT 0 COMMENT '0正常 1敏感词屏蔽 2举报下架',
+  create_time  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted      bigint       NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY idx_moment (moment_id, deleted, create_time) COMMENT '动态评论列表'
+) ENGINE=InnoDB COMMENT='动态评论（A类留墓碑）';
+
+CREATE TABLE item_comment (
+  id           bigint       NOT NULL COMMENT '雪花ID',
+  item_id      bigint       NOT NULL COMMENT '商品',
+  user_id      bigint       NOT NULL COMMENT '评论用户',
+  reply_to     bigint       DEFAULT NULL COMMENT '回复目标用户id（可空）',
+  content      varchar(500) NOT NULL COMMENT '评论内容',
+  audit_status tinyint      NOT NULL DEFAULT 0 COMMENT '0正常 1敏感词屏蔽 2举报下架',
+  create_time  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  deleted      bigint       NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY idx_item (item_id, deleted, create_time) COMMENT '商品评论列表（仅 item.status=3 可评）',
+  KEY idx_user (user_id, deleted) COMMENT '我的商品评论'
+) ENGINE=InnoDB COMMENT='商品评论（A类留墓碑）';
+
+-- ════════════════════════════════════════════════════════════
+-- 十一、种子数据（建库后必灌，否则前端字典为空）
 -- ════════════════════════════════════════════════════════════
 
 -- 色值取 design/01 §4.1：A/B 绿、C 橙、D 灰；文案取 design/02 §成色表（与前端 mock/dict.ts 一致）
