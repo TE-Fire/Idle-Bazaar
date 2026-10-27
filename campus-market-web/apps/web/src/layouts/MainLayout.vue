@@ -15,7 +15,7 @@
 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, CopyDocument, Position, Top } from '@element-plus/icons-vue'
+import { ChatDotRound, CopyDocument, Position, Star, Top } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { uploadImage, userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
@@ -173,6 +173,9 @@ async function logout(): Promise<void> {
           </RouterLink>
           <RouterLink :to="{ name: 'chat' }" class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</RouterLink>
           <RouterLink :to="{ name: 'orders' }" class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</RouterLink>
+          <RouterLink v-if="session.isLogin" :to="{ name: 'follow' }" class="lnk">
+            <el-icon :size="16"><Star /></el-icon>关注
+          </RouterLink>
           <!-- 登录态：未登录显示入口，已登录显示头像 + 昵称 + 我的商品 + 退出 -->
           <RouterLink v-if="!session.isLogin" :to="{ name: 'login' }" class="lnk">登录</RouterLink>
           <template v-else>
@@ -548,7 +551,8 @@ async function logout(): Promise<void> {
 .pf__t {
   font-size: 28px;
   font-weight: 700;
-  color: var(--cm-color-brand-text);
+  /* 品牌黄作文字色对比度不足（web 端也没定义 brand-text），直接用正文色 */
+  color: var(--cm-color-text-1);
 }
 
 /*  hover 蒙层：告诉用户这块能点（桌面端没有长按换头像的心智） */

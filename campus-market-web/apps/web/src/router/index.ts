@@ -35,6 +35,14 @@ const routes: RouteRecordRaw[] = [
       { path: 'my-items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我的商品' } },
       // 我的订单：买 / 卖两个视角共用一页，状态筛服务端（notes/13 第七节）
       { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { title: '我的订单' } },
+      // 关注 / 粉丝：/follow 看自己，/user/:id/follow 看他人；?tab=fans 切到粉丝
+      { path: 'follow', name: 'follow', component: () => import('@/views/FollowListView.vue'), meta: { title: '关注与粉丝' } },
+      {
+        path: 'user/:id/follow',
+        name: 'user-follow',
+        component: () => import('@/views/FollowListView.vue'),
+        meta: { title: '关注与粉丝' }
+      },
       // 订单详情：状态动作都在这页（付款 / 退款 / 核销 / 收货 / 纠纷），?role=seller 切卖家视角
       {
         path: 'order/:id',

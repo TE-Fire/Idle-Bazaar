@@ -39,6 +39,14 @@
       }
     },
     {
+      "path": "pages/follows/index",
+      "style": {
+        "navigationBarTitleText": "关注与粉丝",
+        "enablePullDownRefresh": true,
+        "onReachBottomDistance": 50
+      }
+    },
+    {
       "path": "pages/login/index",
       "style": {
         "navigationBarTitleText": "登录"

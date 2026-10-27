@@ -362,6 +362,7 @@ public class FollowService {
             UserPubVO p = pubs.get(id);
             if (p != null) {
                 vo.setNickname(p.getNickname());
+                vo.setAvatarUrl(p.getAvatarUrl());
                 vo.setCreditScore(p.getCreditScore());
                 vo.setAuthStatus(p.getAuthStatus());
             }

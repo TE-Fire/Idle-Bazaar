@@ -26,6 +26,7 @@ const entries: Entry[] = [
   { key: 'published', label: '我发布的', hint: '草稿 / 在售 / 审核中' },
   { key: 'bought', label: '我买到的', hint: '待付款 / 待面交 / 退款' },
   { key: 'sold', label: '我卖出的', hint: '待面交 / 核销 / 仲裁' },
+  { key: 'follows', label: '关注 / 粉丝', hint: '我关注的与我粉丝' },
   { key: 'fav', label: '我的收藏', hint: '降价提醒' },
   { key: 'verify', label: '学号认证', hint: '认证后可提升信任' }
 ]
@@ -45,6 +46,11 @@ function open(e: Entry): void {
   if (e.key === 'bought' || e.key === 'sold') {
     const role = e.key === 'bought' ? 'buyer' : 'seller'
     void uni.navigateTo({ url: `/pages/order/list?role=${role}` })
+    return
+  }
+  if (e.key === 'follows') {
+    // 默认落在「关注」tab；粉丝从页内大数字切换
+    void uni.navigateTo({ url: '/pages/follows/index' })
     return
   }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })

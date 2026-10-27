@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 /**
  * 关注 / 粉丝列表的一条（notes/22 S2）。
  *
- * <p>只带公开资料：昵称、信用分、认证态来自 {@link UserPubVO} 缓存，
+ * <p>只带公开资料：昵称、头像、信用分、认证态来自 {@link UserPubVO} 缓存，
  * 手机号 / 真实姓名 / 学号等敏感字段不进来。
  */
 @Data
@@ -16,6 +16,8 @@ public class FollowUserVO {
     private Long userId;
 
     private String nickname;
+
+    private String avatarUrl;
 
     private Integer creditScore;
 
