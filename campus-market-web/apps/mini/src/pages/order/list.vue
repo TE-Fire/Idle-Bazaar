@@ -5,13 +5,17 @@
  * <p>role 决定查哪一边：同一个用户既是买家又是卖家，后端按 buyer_id / seller_id
  * 走两个索引（OrderController.list 的 role 参数）。tab 切换即切 role。
  *
+ * <p>role 有两个来源：**入口 query**（「我的」页点「我卖出的」带 ?role=seller）与页内 tab。
+ * query 必须在 onLoad 读掉——漏掉的话从「我卖出的」进来仍是买家视角，
+ * 卖家的「同意退款 / 拒绝退款」在详情页就永远出不来。
+ *
  * <p>状态 chips 是**前端本地过滤**：一次拉一页 50 条（演示期数据量内），
  * 避免每个 chips 一次请求；数据量大后再改服务端 status 参数（接口已支持）。
  *
  * <p>onShow 刷新：从详情页做完操作（付款/核销/退款）返回，列表要看到新状态。
  */
 
-import { onShow } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userOrderApi, type OrderStatus, type OrderVO } from '@/api/user'
 
@@ -26,7 +30,7 @@ const FILTERS: Array<{ label: string; match: (s: OrderStatus) => boolean }> = [
   { label: '待面交', match: (s) => s === 'WAIT_MEET' || s === 'VERIFIED' },
   { label: '退款中', match: (s) => s === 'REFUNDING' },
   { label: '纠纷中', match: (s) => s === 'DISPUTING' },
-  { label: '已完成', match: (s) => s === 'COMPLETED' || s === 'REFUNDED' || s === 'CANCELLED' }
+  { label: '已完成', match: (s) => s === 'COMPLETED' || s === 'REFUNDED' || s === 'CANCELED' }
 ]
 const filterIdx = ref(0)
 
@@ -35,7 +39,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   WAIT_MEET: '待面交',
   VERIFIED: '已验货',
   COMPLETED: '已完成',
-  CANCELLED: '已取消',
+  CANCELED: '已取消',
   REFUNDING: '退款中',
   REFUNDED: '已退款',
   DISPUTING: '纠纷中'
@@ -66,6 +70,11 @@ function switchRole(r: 'buyer' | 'seller'): void {
 function goDetail(o: OrderVO): void {
   void uni.navigateTo({ url: `/pages/order/detail?id=${o.id}&role=${role.value}` })
 }
+
+onLoad((query) => {
+  const q = query as { role?: string }
+  if (q.role === 'seller') role.value = 'seller'
+})
 
 onShow(() => {
   void fetchList()

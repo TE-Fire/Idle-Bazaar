@@ -12,7 +12,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
-import { userItemApi, type ApiItemVO } from '@campus/api'
+import { userDictApi, userItemApi, type ApiItemVO, type CategoryVO } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -25,7 +25,23 @@ const userStore = useUserStore()
 const item = ref<ApiItemVO | null>(null)
 const loading = ref(true)
 
+/** 分类字典：把商品挂的二级分类 id 还原成「一级 / 二级」，商品表只存二级 id */
+const dictCats = ref<CategoryVO[]>([])
+const catPath = computed(() => {
+  const id = item.value?.categoryId
+  if (!id) return ''
+  const self = dictCats.value.find((c) => c.id === id)
+  if (!self) return item.value?.categoryName ?? ''
+  const parent = self.parentId ? dictCats.value.find((c) => c.id === self.parentId) : undefined
+  return parent ? `${parent.name} / ${self.name}` : self.name
+})
+
 onMounted(async () => {
+  // 字典不阻塞详情：拉不到就退化成只显示二级分类名
+  void userDictApi
+    .all()
+    .then((d) => (dictCats.value = d.categories))
+    .catch(() => undefined)
   try {
     item.value = await userItemApi.detail(String(route.params.id ?? ''))
   } catch {
@@ -51,15 +67,15 @@ const isMine = computed(() => !!item.value && userStore.userId === item.value.se
 
 function onCompare(): void {
   if (!item.value) return
-  // 对比 store 是 mock 时代的联合类型；真实分类名/校区名不在枚举里，按字符串收
+  // 对比 store 的字段来自 shared 契约，分类 / 校区均为字典字符串
   const goods: GoodsItem = {
     id: item.value.id,
     title: item.value.title,
-    category: (item.value.categoryName ?? '其他') as GoodsItem['category'],
+    category: item.value.categoryName ?? '其他',
     price: Number(item.value.price),
     originalPrice: item.value.originPrice ? Number(item.value.originPrice) : undefined,
     condition: item.value.grade as GoodsItem['condition'],
-    campus: (item.value.campusName ?? '') as GoodsItem['campus'],
+    campus: item.value.campusName ?? '',
     meetPoint: item.value.meetPointName ?? '待定',
     negotiable: !!item.value.negotiable,
     delivery: !!item.value.deliveryIncluded,
@@ -148,6 +164,8 @@ function onEdit(): void {
         </div>
 
         <dl class="params">
+          <dt>分类</dt>
+          <dd class="params__wide">{{ catPath }}</dd>
           <dt>成色</dt>
           <dd>{{ item.grade }} 级 · {{ CONDITION_LABELS[item.grade as 'A'] }}</dd>
           <dt>校区</dt>
@@ -319,6 +337,11 @@ function onEdit(): void {
   gap: var(--cm-space-2) var(--cm-space-4);
   margin: var(--cm-space-4) 0;
   font-size: var(--cm-font-size-sm);
+}
+
+/* 分类名是「一级 / 二级」，比其余值长，独占一行（4 列网格跨 3 列） */
+.params__wide {
+  grid-column: span 3;
 }
 
 .params dt {

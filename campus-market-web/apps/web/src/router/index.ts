@@ -33,6 +33,15 @@ const routes: RouteRecordRaw[] = [
       { path: 'publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { title: '发布闲置' } },
       // 我的商品：卖家视角全状态（含草稿），操作按状态给出
       { path: 'my-items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我的商品' } },
+      // 我的订单：买 / 卖两个视角共用一页，状态筛服务端（notes/13 第七节）
+      { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { title: '我的订单' } },
+      // 订单详情：状态动作都在这页（付款 / 退款 / 核销 / 收货 / 纠纷），?role=seller 切卖家视角
+      {
+        path: 'order/:id',
+        name: 'order-detail',
+        component: () => import('@/views/OrderDetailView.vue'),
+        meta: { title: '订单详情' }
+      },
       // P4 对比：桌面独占，2–4 件参数横评
       { path: 'compare', name: 'compare', component: () => import('@/views/CompareView.vue'), meta: { title: '对比' } },
       // P6 消息：询单会话（同步留言，无实时推送）；?itemId=&peerId= 从详情页带入选中会话

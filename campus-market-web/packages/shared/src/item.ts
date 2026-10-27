@@ -47,24 +47,12 @@ export const ITEM_STATUS_LABELS: Record<ItemStatus, string> = {
   FORCED_OFFLINE: '已强制下架'
 }
 
-/** 分类条（prototypes/web/web-home.html .cat） */
-export const CATEGORIES = [
-  '首页',
-  '教材教辅',
-  '数码电子',
-  '自行车',
-  '宿舍家具',
-  '服饰鞋包',
-  '运动器材',
-  '乐器',
-  '票务卡券',
-  '其他闲置'
-] as const
-export type Category = (typeof CATEGORIES)[number]
-
-/** 校区 / 面交点（原型侧栏三档） */
-export const CAMPUSES = ['中心校区', '东校区', '南苑宿舍区'] as const
-export type Campus = (typeof CAMPUSES)[number]
+/*
+ * 分类与校区不在这份契约里定死：它们是**字典表数据**，管理端可增删改停用，
+ * 名字由后端 `categoryName` / `campusName` 下发。
+ * 早期这里写死过两份常量（分类含「自行车 / 宿舍家具 / 乐器」，校区是
+ * 「中心校区 / 南苑宿舍区」），与库里实际字典对不上，筛选时只有名字恰好相同的项能命中。
+ */
 
 /** 卡片角标：急出与「N 人想要」用价格色底，其余半透黑底（design/01 §4.1） */
 export const ITEM_TAGS = ['急出', '可议价', '包配送'] as const
@@ -82,13 +70,15 @@ export type ItemTag = (typeof ITEM_TAGS)[number]
 export interface GoodsItem {
   id: string
   title: string
-  category: Category
+  /** 分类名（字典下发，通常是二级分类，如「手机平板」） */
+  category: string
   /** 现价（元） */
   price: number
   /** 原价（元），可为空 */
   originalPrice?: number
   condition: ConditionGrade
-  campus: Campus
+  /** 校区名（字典下发） */
+  campus: string
   /** 面交点：校园内的具体交接位置 */
   meetPoint: string
   negotiable: boolean

@@ -8,10 +8,15 @@
  * <p>结果为空时给「放宽条件的建议」，不能只显示"暂无数据"（F-W1 判据）。
  *
  * <p>数据来自 `/api/item/list`（`userItemApi.list`）：后端只返在售商品，发布时间倒序。
- * 一次拉满一页（pageSize=50，后端上限）后**筛选 / 排序 / 分页全在客户端做**——
- * 后端列表接口暂只支持 keyword/categoryId/campusId 三个服务端条件，
- * 价格、成色、卖家、时间范围与排序尚未参数化（见 utils/item-map.ts 的边界说明）。
- * 在售量超过 50 后必须回头补服务端筛选参数，否则第 50 名之后的商品永不可见。
+ * 一次拉满一页（pageSize=50，后端上限）后**筛选 / 排序 / 分页大多在客户端做**——
+ * 例外是**分类**：必须由服务端 `categoryId` 过滤。原因是商品表存的是二级分类
+ * （「手机平板」），而首页分类入口传的是一级（「数码电子」），后端 `expandCategory`
+ * 会把一级展开成其下全部二级；前端做不到这件事，本地按名字等值比较永远不相等。
+ * 曾经就是这么错的：只有「其他闲置」这种商品直接挂在一级上的分类能筛出东西。
+ *
+ * <p>分类与校区的**选项都来自 `/api/dict/all`**，不写死——字典可在管理端增删改，
+ * 前端枚举一旦与库里对不上，选项点了没结果，且看不出是哪里错。
+ * 其余条件（价格、成色、卖家、时间范围、排序）尚未参数化，在售量超过 50 后要回头补。
  *
  * <p>2026-09-30 按闲鱼 Web 版改版：
  * - 顶部分类条取消，分类收进左侧「全部分类」卡（闲鱼的分类入口在首页左上）；
@@ -24,16 +29,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  CAMPUSES,
-  CATEGORIES,
   CONDITION_GRADES,
   CONDITION_LABELS,
   formatPrice,
-  type Campus,
   type ConditionGrade,
   type GoodsItem
 } from '@campus/shared'
-import { userItemApi } from '@campus/api'
+import { userDictApi, userItemApi } from '@campus/api'
 import ProductCard from '@/components/ProductCard.vue'
 import FilterGroup from '@/components/FilterGroup.vue'
 import { toGoodsItem } from '@/utils/item-map'
@@ -48,11 +50,13 @@ const router = useRouter()
 /* ── 筛选条件 ───────────────────────────────────────────── */
 
 const keyword = ref('')
+/** 一级分类 id（字典下发）。商品挂二级分类，服务端按一级展开成其下全部二级 */
 const category = ref('')
 const priceMin = ref<number | null>(null)
 const priceMax = ref<number | null>(null)
 const conditions = ref<ConditionGrade[]>([])
-const campuses = ref<Campus[]>([])
+/** 校区名（与商品 `campusName` 同名比较，字典驱动） */
+const campuses = ref<string[]>([])
 const verifiedOnly = ref(false)
 const creditGood = ref(false)
 /** 「只看可议价 / 包校园配送」挂在价格组里（原型侧栏如此），但它们是商品属性，不是卖家属性 */
@@ -70,6 +74,27 @@ const view = ref<ViewMode>('grid')
 const page = ref(1)
 const pageSize = 12
 
+/* ── 字典选项（分类 / 校区）────────────────────────────── */
+
+/** 一级分类（parentId 缺省）。二级不出现在筛选入口，选一级时后端会展开 */
+const catOptions = ref<Array<{ id: string; name: string }>>([])
+const campusOptions = ref<string[]>([])
+
+async function loadDict(): Promise<void> {
+  try {
+    const dict = await userDictApi.all()
+    catOptions.value = dict.categories
+      .filter((c) => !c.parentId)
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+      .map((c) => ({ id: c.id, name: c.name }))
+    campusOptions.value = [...dict.campuses]
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+      .map((c) => c.name)
+  } catch {
+    // 字典拉不到时分类入口为空，商品仍可浏览——不要把整页拖进错误态
+  }
+}
+
 /* ── 数据源（/api/item/list）────────────────────────────── */
 
 const items = ref<GoodsItem[]>([])
@@ -81,7 +106,10 @@ async function fetchItems(): Promise<void> {
   loadError.value = false
   try {
     // 服务端只返在售、按发布时间倒序；50 是后端 pageSize 上限
-    const res = await userItemApi.list({ pageSize: 50 })
+    const res = await userItemApi.list({
+      pageSize: 50,
+      categoryId: category.value || undefined
+    })
     items.value = res.list.map(toGoodsItem)
   } catch {
     loadError.value = true
@@ -90,14 +118,35 @@ async function fetchItems(): Promise<void> {
   }
 }
 
-onMounted(fetchItems)
+onMounted(() => {
+  void loadDict()
+  void fetchItems()
+})
 
-/** 顶栏搜索与分类条是 URL 驱动的，换 URL 要同步进筛选状态 */
+/** 顶栏搜索与分类条是 URL 驱动的，换 URL 要同步进筛选状态；切分类要重拉（服务端过滤） */
 watch(
   () => [route.query.q, route.query.cat],
-  ([q, cat]) => {
+  ([q, cat], old) => {
     keyword.value = (q as string) ?? ''
     category.value = (cat as string) ?? ''
+    page.value = 1
+    // 首次（old 为 undefined）由 onMounted 负责拉取，这里只处理后续切换
+    if (old) void fetchItems()
+  },
+  { immediate: true }
+)
+
+/**
+ * 顶栏校区下拉（`?campus=<校区名>`，'' = 全部）作为进页面时的初值。
+ *
+ * <p>单向：URL → 本地。侧栏多选无法用单个 query 表达，所以侧栏改动不回写 URL；
+ * 两边都做同步会互相触发（侧栏清掉 query 后又被 URL 清空侧栏），得不偿失。
+ * 实际生效条件以 chips 显示的为准。
+ */
+watch(
+  () => route.query.campus,
+  (v) => {
+    campuses.value = v ? [v as string] : []
     page.value = 1
   },
   { immediate: true }
@@ -108,17 +157,27 @@ watch(
 /** 公告条：可关（闲鱼顶部的「网页版发布闲置功能升级啦！」） */
 const notice = ref(true)
 
-/** 纯首页（无分类 / 无关键词）才铺促销卡位；一进检索态就收掉，让位给结果 */
+/** 纯首页（无分类 / 无关键词 / 无校区限制）才铺促销卡位；一进检索态就收掉，让位给结果 */
 const isPureHome = computed(
-  () => route.name === 'home' && !route.query.cat && !route.query.q
+  () => route.name === 'home' && !route.query.cat && !route.query.q && !route.query.campus
 )
 
-/** 左侧分类卡（顶栏分类条取消后的替代入口） */
-const CAT_LIST = CATEGORIES.filter((c) => c !== '首页')
+/** 左侧分类卡（顶栏分类条取消后的替代入口）：选项来自字典，不含「全部」——清空分类就是全部 */
+const CAT_LIST = computed(() => catOptions.value)
 
-function pickCat(c: string): void {
+/** 当前分类名：URL 里存的是 id，chips 与空态文案要显示人话 */
+const categoryName = computed(
+  () => catOptions.value.find((c) => c.id === category.value)?.name ?? ''
+)
+
+function pickCat(id: string): void {
   // 走 URL 而不是直改 category.value：与顶栏 / 促销卡的入口共用同一份 watch 同步
-  void router.push({ name: 'list', query: { cat: c || undefined } })
+  void router.push({ name: 'list', query: { cat: id || undefined } })
+}
+
+/** 促销卡位按分类名跳转：卡面文案是写死的装饰层，名字要先映射回字典 id */
+function pickCatByName(name: string): void {
+  pickCat(catOptions.value.find((c) => c.name === name)?.id ?? '')
 }
 
 /** 促销卡位：主推卡 + 三张品类卡。文案与配色写死（装饰层），点击进对应分类 */
@@ -140,8 +199,11 @@ const HERO: HeroCard[] = [
   { cat: '运动器材', title: '运动器材', sub: '挥汗如雨', price: '¥59 起', cls: 'hero--pink' }
 ]
 
-/** 「猜你喜欢」快捷分类：第一个是「全部」，其余逐分类过滤 */
-const QUICK = [{ label: '猜你喜欢', value: '' }, ...CAT_LIST.map((c) => ({ label: c, value: c }))]
+/** 「猜你喜欢」快捷分类：第一个是「全部」，其余按一级分类过滤（值是 id） */
+const QUICK = computed(() => [
+  { label: '猜你喜欢', value: '' },
+  ...catOptions.value.map((c) => ({ label: c.name, value: c.id }))
+])
 
 /** 排序胶囊组：闲鱼把排序平铺而不是藏进下拉——扫一眼就能换 */
 const SORTS: { key: SortKey; label: string }[] = [
@@ -159,7 +221,7 @@ const filtered = computed(() => {
   const now = Date.now()
 
   return items.value.filter((it) => {
-    if (category.value && it.category !== category.value) return false
+    // 分类不在这里比：前端拿不到父级关系，已由服务端 categoryId 过滤
     if (kw && !`${it.title}${it.description}`.includes(kw)) return false
     if (priceMin.value !== null && it.price < priceMin.value) return false
     if (priceMax.value !== null && it.price > priceMax.value) return false
@@ -214,7 +276,7 @@ const chips = computed<Chip[]>(() => {
   if (category.value)
     out.push({
       key: 'cat',
-      label: category.value,
+      label: categoryName.value || '已选分类',
       clear: () => router.push({ name: 'home' })
     })
   if (priceMin.value !== null || priceMax.value !== null)
@@ -288,12 +350,12 @@ watch([filtered], () => {
           <h4 class="cats__hd">全部分类</h4>
           <a
             v-for="c in CAT_LIST"
-            :key="c"
-            :class="{ on: category === c }"
+            :key="c.id"
+            :class="{ on: category === c.id }"
             href="javascript:void(0)"
-            @click="pickCat(c)"
+            @click="pickCat(c.id)"
           >
-            {{ c }}
+            {{ c.name }}
           </a>
         </nav>
 
@@ -320,7 +382,14 @@ watch([filtered], () => {
           </FilterGroup>
 
           <FilterGroup title="校区 / 面交点" clearable @clear="campuses = []">
-            <label v-for="c in CAMPUSES" :key="c"><input v-model="campuses" type="checkbox" :value="c" /> {{ c }}</label>
+            <!-- 「全部」= 不限校区（campuses 为空即全部），选项来自字典，不写死 -->
+            <label>
+              <input type="checkbox" :checked="campuses.length === 0" @change="campuses = []" />
+              全部校区
+            </label>
+            <label v-for="c in campusOptions" :key="c">
+              <input v-model="campuses" type="checkbox" :value="c" /> {{ c }}
+            </label>
           </FilterGroup>
 
           <FilterGroup title="卖家" clearable @clear="((verifiedOnly = false), (creditGood = false))">
@@ -346,7 +415,7 @@ watch([filtered], () => {
             :key="h.title"
             class="hero__card"
             :class="h.cls"
-            @click="pickCat(h.cat)"
+            @click="pickCatByName(h.cat)"
           >
             <div class="hero__txt">
               <strong>{{ h.title }}</strong>
@@ -415,7 +484,9 @@ watch([filtered], () => {
 
         <!-- 空态：给可执行的放宽建议，不放一句「暂无数据」就完事 -->
         <el-empty v-else-if="!paged.length" description="没有符合条件的商品">
-          <el-button type="primary" @click="relax">放宽条件（去掉校区与价格限制）</el-button>
+          <el-button type="primary" @click="relax">去掉校区与价格限制</el-button>
+          <!-- 分类是服务端条件，只放宽本地条件解不开，要给「清空全部」的出口 -->
+          <el-button @click="clearAll">清空全部条件</el-button>
         </el-empty>
 
         <div v-else class="grid" :class="`grid--${view}`">

@@ -18,7 +18,6 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   ITEM_STATUS,
-  type Category,
   type ConditionGrade,
   type GoodsItem,
   type ItemStatus
@@ -186,11 +185,11 @@ const form = ref({
 const preview = computed<GoodsItem>(() => ({
   id: 'preview',
   title: form.value.title || '标题预览（填入标题后显示）',
-  category: (categoryName.value || '其他闲置') as Category,
+  category: categoryName.value || '其他闲置',
   price: form.value.price ?? 0,
   originalPrice: form.value.originPrice ?? undefined,
   condition: form.value.grade,
-  campus: (campuses.value.find((c) => c.id === form.value.campusId)?.name ?? '待选校区') as GoodsItem['campus'],
+  campus: campuses.value.find((c) => c.id === form.value.campusId)?.name ?? '待选校区',
   meetPoint: meetPoints.value.find((m) => m.id === form.value.meetPointId)?.name ?? '待填面交点',
   negotiable: form.value.negotiable,
   delivery: form.value.delivery,

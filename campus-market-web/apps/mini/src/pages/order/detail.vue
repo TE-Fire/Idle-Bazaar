@@ -28,7 +28,7 @@ const STATUS_TEXT: Record<OrderStatus, string> = {
   WAIT_MEET: '已付款，等待面交核销',
   VERIFIED: '已验货，等待买家确认收货',
   COMPLETED: '交易完成',
-  CANCELLED: '订单已取消',
+  CANCELED: '订单已取消',
   REFUNDING: '退款申请处理中',
   REFUNDED: '已退款',
   DISPUTING: '纠纷处理中，平台将介入裁决'

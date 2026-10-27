@@ -8,11 +8,12 @@
  * <p>三处字段缺口在此消化：
  *   ① wantCount：学生端 VO 不下发收藏数，恒 0——卡片据此隐藏「N 人想要」而不是显示 0；
  *   ② verified：取 sellerAuthStatus === 2（已认证）；
- *   ③ category / campus 是字典中文名，直接强转联合类型——后端字典停用项也会返回名字，筛选仍按名匹配。
+ *   ③ category / campus 是字典中文名，原样透传为 string，不做枚举校验——
+ *      字典项是运行期数据，前端写死枚举必然与库里对不上。
  */
 
 import type { ApiItemVO } from '@campus/api'
-import type { Campus, Category, ConditionGrade, GoodsItem } from '@campus/shared'
+import type { ConditionGrade, GoodsItem } from '@campus/shared'
 
 /** 占位渐变两色：由雪花 id 哈希取色，同一商品每次刷新一致（截图复现，同 mock 的 LCG 思路） */
 export function tintsOf(id: string): [string, string] {
@@ -34,11 +35,11 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
   return {
     id: String(vo.id),
     title: vo.title,
-    category: (vo.categoryName ?? '') as Category,
+    category: vo.categoryName ?? '',
     price: Number(vo.price),
     originalPrice: vo.originPrice != null ? Number(vo.originPrice) : undefined,
     condition: vo.grade as ConditionGrade,
-    campus: (vo.campusName ?? '') as Campus,
+    campus: vo.campusName ?? '',
     meetPoint: vo.meetPointName ?? '',
     negotiable: vo.negotiable === 1,
     delivery: vo.deliveryIncluded === 1,

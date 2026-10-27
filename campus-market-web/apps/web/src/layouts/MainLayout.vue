@@ -13,24 +13,48 @@
  * 发布按钮 / 对比角标这几处（design/01 原则 1）。
  */
 
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { CAMPUSES } from '@campus/shared'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ChatDotRound, CopyDocument, Position, Top } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { uploadImage } from '@campus/api'
+import { uploadImage, userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import CompareBar from '@/components/CompareBar.vue'
 
+const route = useRoute()
 const router = useRouter()
 const compare = useCompareStore()
 const session = useUserStore()
 
 const keyword = ref('')
 
-/** 顶栏校区切换：骨架期只做展示，不参与筛选（筛选由侧栏校区组负责） */
-const campus = ref<string>(CAMPUSES[0])
+/**
+ * 顶栏校区切换：**单选、作用于全站列表**，选项来自字典（'' = 全部校区）。
+ *
+ * <p>状态放 URL `?campus=<校区名>` 而不是组件内 ref：这样刷新 / 分享链接 / 浏览器后退
+ * 都能保持，首页也能直接从 query 读初值。选项以前写死三个（中心校区 / 南苑宿舍区），
+ * 与库里字典（主校区 / 东校区 / 北校区）对不上，选哪个都筛不出商品。
+ */
+const campusOptions = ref<string[]>([])
+const campus = computed({
+  get: () => (route.query.campus as string) ?? '',
+  set: (v: string) => {
+    // 切校区 = 看该校区的东西，统一落到列表页；保留已有的关键词 / 分类条件
+    void router.push({ name: 'list', query: { ...route.query, campus: v || undefined } })
+  }
+})
+
+onMounted(async () => {
+  try {
+    const dict = await userDictApi.all()
+    campusOptions.value = [...dict.campuses]
+      .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+      .map((c) => c.name)
+  } catch {
+    // 字典不可用就只剩「全部校区」，不影响浏览
+  }
+})
 
 /** 热搜词：闲鱼把一批高频词铺在搜索框下面。这里写死一组校园高频词，点击即搜 */
 const HOT_WORDS = ['笔记本电脑', '考研资料', '自行车', 'iPad', '电动车', '台灯', '吉他', '篮球'] as const
@@ -141,13 +165,14 @@ async function logout(): Promise<void> {
 
         <nav class="nav__right">
           <el-select v-model="campus" class="campus" size="default">
-            <el-option v-for="c in CAMPUSES" :key="c" :label="c" :value="c" />
+            <el-option label="全部校区" value="" />
+            <el-option v-for="c in campusOptions" :key="c" :label="c" :value="c" />
           </el-select>
           <RouterLink :to="{ name: 'publish' }" class="nav__publish">
             <el-icon :size="14"><Position /></el-icon>发布闲置
           </RouterLink>
           <RouterLink :to="{ name: 'chat' }" class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</RouterLink>
-          <a class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</a>
+          <RouterLink :to="{ name: 'orders' }" class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</RouterLink>
           <!-- 登录态：未登录显示入口，已登录显示头像 + 昵称 + 我的商品 + 退出 -->
           <RouterLink v-if="!session.isLogin" :to="{ name: 'login' }" class="lnk">登录</RouterLink>
           <template v-else>

@@ -39,16 +39,13 @@ const compare = useCompareStore()
 
 /**
  * 主图优先用真实 URL（item.images[0]），发布页实时预览（previewSrc）次之，都没有才落 tints 占位。
- * 第二张图给 hover 交叉淡入用；只有一张图时仍显示反转占位，保持骨架期的悬浮结构。
+ * 第二张图只给 hover 交叉淡入用，**没有就不渲染**——见模板里的说明。
  */
 const mainImg = computed(() => props.previewSrc || props.item.images?.[0] || '')
 const secondImg = computed(() => props.item.images?.[1] || '')
 
-/** 占位图渐变：第二张把两色反过来并压暗一档，hover 切换时才看得出变化 */
-const bg = (tints: [string, string], flip = false): string => {
-  const [a, b] = flip ? [tints[1], tints[0]] : tints
-  return `linear-gradient(135deg, ${a}, ${b})`
-}
+/** 占位图渐变：真实数据没有图时（骨架期 / 外链失效）兜一个成色色块 */
+const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints[0]}, ${tints[1]})`
 
 const selected = computed(() => compare.has(props.item.id))
 const timeText = computed(() => formatRelativeTime(props.item.publishedAt))
@@ -85,7 +82,12 @@ function onCompare(e: MouseEvent): void {
         class="pic pic--a"
         :style="mainImg ? { backgroundImage: `url(${mainImg})` } : { background: bg(item.tints) }"
       />
-      <div v-if="!previewSrc" class="pic pic--b" :style="secondImg ? { backgroundImage: `url(${secondImg})` } : { background: bg(item.tints, true) }" />
+      <!--
+        交叉淡入只在真有第二张图时挂载。**不能给它兜占位色**：
+        单图商品（真实数据绝大多数如此）hover 时那张纯色块会淡入到 100%
+        并把主图整个盖住，看起来就是「悬停后图没了」。
+      -->
+      <div v-if="!previewSrc && secondImg" class="pic pic--b" :style="{ backgroundImage: `url(${secondImg})` }" />
 
       <!-- 角标：急出用价格色底，其余半透黑底（design/01 §4.1） -->
       <span v-if="item.badge === '急出'" class="card__badge card__badge--hot">急出</span>

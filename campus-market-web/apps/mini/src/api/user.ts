@@ -212,7 +212,7 @@ export type OrderStatus =
   | 'WAIT_MEET'
   | 'VERIFIED'
   | 'COMPLETED'
-  | 'CANCELLED'
+  | 'CANCELED'
   | 'REFUNDING'
   | 'REFUNDED'
   | 'DISPUTING'
