@@ -510,6 +510,7 @@ CREATE TABLE user_follow (
   deleted      bigint   NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   UNIQUE KEY uk_follow (follower_id, followee_id, deleted) COMMENT 'B类删除：取关写时间戳，重新关注复用同一行置0',
+  KEY idx_follower (follower_id, deleted, create_time) COMMENT '关注列表/关注数',
   KEY idx_followee (followee_id, deleted, create_time) COMMENT '粉丝列表/粉丝数'
 ) ENGINE=InnoDB COMMENT='关注关系（B类软删，复用行）';
 
