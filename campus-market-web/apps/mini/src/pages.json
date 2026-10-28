@@ -21,15 +21,9 @@
       }
     },
     {
-      "path": "pages/my-items/index",
+      "path": "pages/transactions/index",
       "style": {
-        "navigationBarTitleText": "我的商品"
-      }
-    },
-    {
-      "path": "pages/order/list",
-      "style": {
-        "navigationBarTitleText": "我的订单"
+        "navigationBarTitleText": "我的交易"
       }
     },
     {
