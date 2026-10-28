@@ -141,7 +141,8 @@ public class FollowService {
     }
 
     /** 当前查看者是否关注了目标用户（按钮态） */
-    public boolean isFollowing(long viewerId, long followeeId) {        if (viewerId == followeeId) {
+    public boolean isFollowing(long viewerId, long followeeId) {
+        if (viewerId == followeeId) {
             return false;
         }
         String marker = FollowRedisKeys.loadedFollowing(viewerId);
@@ -292,17 +293,24 @@ public class FollowService {
         return vo;
     }
 
+    /**
+     * 冷启动重建：`loaded:*` 标记置上才认为该 ZSET 可信，否则按库重建。
+     * 重建互斥只靠 JVM 段锁，前提是单 jar 部署；多实例需换 Redis 锁。
+     */
     private void ensureLoaded(long userId, boolean fans) {
         String marker = fans ? FollowRedisKeys.loadedFollowers(userId) : FollowRedisKeys.loadedFollowing(userId);
+        // 快路径：标记在即已重建过，直接信任 ZSET
         if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(marker))) {
             return;
         }
+        // 同一用户同一集合只允许一个线程重建，否则并发 DEL 会抹掉别的事务刚写入的关系
         synchronized (loadLocks[(int) (userId & 63)]) {
+            // 二次确认：等锁期间可能已被前一个线程建好
             if (Boolean.TRUE.equals(stringRedisTemplate.hasKey(marker))) {
                 return;
             }
             String key = fans ? FollowRedisKeys.followers(userId) : FollowRedisKeys.following(userId);
-            // 重建前先清空：避免上次半途失败留下的残留成员混进来
+            // 先清空：上次重建半途失败会留下残缺成员
             stringRedisTemplate.delete(key);
             LambdaQueryWrapper<UserFollow> qw = new LambdaQueryWrapper<UserFollow>()
                     .eq(UserFollow::getDeleted, 0L);
@@ -316,6 +324,7 @@ public class FollowService {
                 long other = fans ? r.getFollowerId() : r.getFolloweeId();
                 stringRedisTemplate.opsForZSet().add(key, String.valueOf(other), toScore(r.getCreateTime()));
             }
+            // 标记最后写：中途失败则标记不落，下个请求重新完整重建
             stringRedisTemplate.opsForValue().set(marker, "1");
         }
     }
