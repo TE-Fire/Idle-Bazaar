@@ -10,6 +10,10 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userAuthApi } from '@/api/user'
 import { saveSession } from '@/utils/session'
+import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
+
+/** dev 构建才挂载测试账号切换器 */
+const isDev = import.meta.env.DEV
 
 const phone = ref('')
 const code = ref('')
@@ -26,6 +30,15 @@ const canSubmit = (): boolean => PHONE_RE.test(phone.value) && /^\d{6}$/.test(co
 onLoad((query) => {
   if (query?.redirect) redirect.value = query.redirect
 })
+
+/** 返回：有上一页则 navigateBack，冷启动（无栈）则回首页 */
+function goBack(): void {
+  if (getCurrentPages().length > 1) {
+    uni.navigateBack()
+  } else {
+    uni.reLaunch({ url: '/pages/index/index' })
+  }
+}
 
 function startCooldown(seconds: number): void {
   cooldown.value = seconds
@@ -86,6 +99,12 @@ async function submit(): Promise<void> {
 
 <template>
   <view class="page">
+    <view class="topbar">
+      <text class="topbar__back" @click="goBack">‹ 返回</text>
+    </view>
+
+    <DevLoginSwitcher v-if="isDev" />
+
     <view class="hero">
       <text class="hero__t">登录</text>
       <text class="hero__sub">手机号 + 短信验证码，校园二手账号通用</text>
@@ -119,6 +138,21 @@ async function submit(): Promise<void> {
   padding: $cm-space-6 $cm-space-4;
   background: $cm-color-bg;
   min-height: 100vh;
+}
+
+/* 顶部返回条：uni 默认导航栏在 H5/小程序下无浏览器返回键心智，这里补一个明确的「返回」 */
+.topbar {
+  display: flex;
+  align-items: center;
+  height: 56rpx;
+  margin-bottom: $cm-space-2;
+}
+
+.topbar__back {
+  font-size: $cm-font-size-md;
+  font-weight: 600;
+  color: $cm-color-text-1;
+  padding: $cm-space-1 $cm-space-2;
 }
 
 .hero {

@@ -21,7 +21,11 @@ import type { GoodsItem } from '@campus/shared'
 import { userDictApi, userItemApi } from '@/api/user'
 import { toGoodsItem } from '@/utils/item-map'
 import GoodsCard from '@/components/GoodsCard.vue'
+import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
 import { pendingCategoryId } from '@/utils/nav-intent'
+
+/** dev 构建才挂载测试账号切换器（左侧停靠，避开右下发布 FAB） */
+const isDev = import.meta.env.DEV
 
 /** 频道 chips：原型给的兴趣频道，前端本地过滤标题（服务端无此维度） */
 const CHANNELS = ['猜你喜欢', '教材专区', '数码好价', '毕业清仓', '同城面交', '女生闲置']
@@ -251,6 +255,8 @@ void fetchCats()
 
     <!-- 悬浮发布按钮：56pt=112rpx，右下，避开安全区；滚动隐藏、停 300ms 淡入 -->
     <view class="fab" :class="{ 'fab--hide': !fabShown }" hover-class="fab--active" @click="goPublish">⊕</view>
+
+    <DevLoginSwitcher v-if="isDev" position="left" />
   </view>
 </template>
 
