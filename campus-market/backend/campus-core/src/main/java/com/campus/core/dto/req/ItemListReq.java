@@ -24,6 +24,9 @@ public class ItemListReq {
     /** 校区 id；空 = 全部 */
     private String campusId;
 
+    /** 卖家 id；空 = 全部。学生端个人主页按卖家拉在售列表用 */
+    private String sellerId;
+
     private Integer pageNum = 1;
 
     private Integer pageSize = 10;

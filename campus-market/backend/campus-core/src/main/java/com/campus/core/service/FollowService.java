@@ -118,9 +118,30 @@ public class FollowService {
         }
     }
 
+    /** 目标用户的关注数：ZSET 已加载走 ZCARD，加载不动退回 COUNT，两边口径一致 */
+    public long countFollowing(long userId) {
+        try {
+            ensureLoaded(userId, false);
+            return zcard(FollowRedisKeys.following(userId));
+        } catch (Exception e) {
+            log.warn("[follow] 读关注数失败，退回查库：{}", userId, e);
+            return countActive(false, userId);
+        }
+    }
+
+    /** 目标用户的粉丝数，口径同上 */
+    public long countFans(long userId) {
+        try {
+            ensureLoaded(userId, true);
+            return zcard(FollowRedisKeys.followers(userId));
+        } catch (Exception e) {
+            log.warn("[follow] 读粉丝数失败，退回查库：{}", userId, e);
+            return countActive(true, userId);
+        }
+    }
+
     /** 当前查看者是否关注了目标用户（按钮态） */
-    public boolean isFollowing(long viewerId, long followeeId) {
-        if (viewerId == followeeId) {
+    public boolean isFollowing(long viewerId, long followeeId) {        if (viewerId == followeeId) {
             return false;
         }
         String marker = FollowRedisKeys.loadedFollowing(viewerId);

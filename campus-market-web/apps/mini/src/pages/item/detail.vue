@@ -79,6 +79,12 @@ function onBuy(): void {
     })
     .catch(() => uni.hideLoading())
 }
+
+/** 卖家卡 → TA 的个人主页 */
+function goSeller(): void {
+  if (!item.value) return
+  void uni.navigateTo({ url: `/pages/user/index?userId=${item.value.sellerId}` })
+}
 </script>
 
 <template>
@@ -112,12 +118,13 @@ function onBuy(): void {
       </view>
     </view>
 
-    <view class="box seller">
+    <view class="box seller" hover-class="seller--active" @click="goSeller">
       <view class="avatar" :style="{ backgroundImage: shotGradient() }" />
       <view class="seller__meta">
         <text class="seller__nick">{{ item.sellerNick ?? '卖家' }}</text>
-        <text class="seller__sub">信用 {{ item.sellerCredit ?? 100 }} 分</text>
+        <text class="seller__sub">信用 {{ item.sellerCredit ?? 100 }} 分 · 进主页</text>
       </view>
+      <text class="seller__arrow">›</text>
     </view>
 
     <view class="box">
@@ -215,6 +222,16 @@ function onBuy(): void {
 .seller {
   flex-direction: row;
   align-items: center;
+}
+
+.seller--active {
+  transform: scale(0.99);
+}
+
+.seller__arrow {
+  margin-left: auto;
+  font-size: $cm-font-size-lg;
+  color: $cm-color-text-3;
 }
 
 .avatar {

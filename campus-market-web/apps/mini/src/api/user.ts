@@ -169,6 +169,8 @@ export interface ItemListParams {
   /** 一级分类 id，命中其下所有二级 */
   categoryId?: string
   campusId?: string
+  /** 卖家 id：个人主页按卖家拉在售列表用 */
+  sellerId?: string
   pageNum?: number
   pageSize?: number
 }

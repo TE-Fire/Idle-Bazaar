@@ -47,6 +47,13 @@
       }
     },
     {
+      "path": "pages/user/index",
+      "style": {
+        "navigationBarTitleText": "个人主页",
+        "onReachBottomDistance": 50
+      }
+    },
+    {
       "path": "pages/login/index",
       "style": {
         "navigationBarTitleText": "登录"

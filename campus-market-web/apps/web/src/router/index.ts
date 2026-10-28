@@ -43,6 +43,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/FollowListView.vue'),
         meta: { title: '关注与粉丝' }
       },
+      // 个人主页：资料卡 + 关注按钮 + TA 的在售闲置（动态 Tab 是 S4 占位）
+      {
+        path: 'user/:id',
+        name: 'user-profile',
+        component: () => import('@/views/UserProfileView.vue'),
+        meta: { title: '个人主页' }
+      },
       // 订单详情：状态动作都在这页（付款 / 退款 / 核销 / 收货 / 纠纷），?role=seller 切卖家视角
       {
         path: 'order/:id',

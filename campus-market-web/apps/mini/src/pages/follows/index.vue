@@ -90,6 +90,11 @@ function initial(nick?: string): string {
   return (nick || '?').slice(0, 1)
 }
 
+/** 行点击进 TA 的主页（资料 + 在售商品 + 关注入口） */
+function goProfile(u: FollowUserVO): void {
+  void uni.navigateTo({ url: `/pages/user/index?userId=${u.userId}` })
+}
+
 function metaText(u: FollowUserVO): string {
   const parts: string[] = []
   if (u.creditScore != null) parts.push(`信用 ${u.creditScore}`)
@@ -147,7 +152,7 @@ onPullDownRefresh(() => {
     </view>
 
     <view v-else class="list">
-      <view v-for="u in list" :key="u.userId" class="row">
+      <view v-for="u in list" :key="u.userId" class="row" hover-class="row--active" @click="goProfile(u)">
         <image v-if="u.avatarUrl" class="row__avatar" :src="u.avatarUrl" mode="aspectFill" />
         <view v-else class="row__avatar row__avatar--t"><text class="row__t">{{ initial(u.nickname) }}</text></view>
 
@@ -226,6 +231,10 @@ onPullDownRefresh(() => {
   margin-bottom: $cm-space-2;
   background: $cm-color-surface;
   border-radius: $cm-radius-lg;
+}
+
+.row--active {
+  transform: scale(0.98);
 }
 
 .row__avatar {

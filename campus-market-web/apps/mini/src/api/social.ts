@@ -33,7 +33,31 @@ export interface FollowListVO {
   fansCount: string
 }
 
+/** 用户公开主页聚合：计数是 long → 字符串 */
+export interface UserProfileVO {
+  userId: string
+  nickname?: string
+  avatarUrl?: string
+  creditScore?: number
+  authStatus?: number
+  followingCount: string
+  fansCount: string
+  onSaleCount: string
+  /** 查看者是否已关注（自己的主页恒 false） */
+  following: boolean
+  self: boolean
+}
+
 export const userSocialApi = {
+  /** 用户公开主页。userId 留空 = 看自己 */
+  profile: (userId?: string) => {
+    const data: Record<string, unknown> = {}
+    if (userId) {
+      data.userId = userId
+    }
+    return request<UserProfileVO>({ url: '/api/social/profile', data })
+  },
+
   follow: (followeeId: string) =>
     request<void>({ url: '/api/social/follow', method: 'POST', data: { followeeId } }),
 

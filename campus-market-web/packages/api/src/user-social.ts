@@ -49,7 +49,29 @@ export interface FollowListParams {
   pageSize?: number
 }
 
+/** 用户公开主页聚合（后端 `UserProfileVO`）：计数是 long → 字符串 */
+export interface UserProfileVO {
+  userId: string
+  nickname?: string
+  avatarUrl?: string
+  creditScore?: number
+  /** 认证：0未认证 1审核中 2已认证 3未通过 */
+  authStatus?: number
+  followingCount: string
+  fansCount: string
+  /** 在售商品数 */
+  onSaleCount: string
+  /** 查看者是否已关注（自己的主页恒 false） */
+  following: boolean
+  /** 是否自己的主页 */
+  self: boolean
+}
+
 export const userSocialApi = {
+  /** 用户公开主页。userId 留空 = 看自己 */
+  profile: (userId?: string) =>
+    request<UserProfileVO>({ url: '/api/social/profile', params: userId ? { userId } : {} }),
+
   /** 关注。已关注幂等成功；关注自己 / 用户不存在 → 1000 */
   follow: (followeeId: string) =>
     request<void>({ url: '/api/social/follow', method: 'POST', data: { followeeId } }),

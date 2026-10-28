@@ -71,6 +71,8 @@ export interface MyItemParams {
   categoryId?: string
   status?: ItemStatus
   campusId?: string
+  /** 卖家 id：个人主页按卖家拉在售列表用 */
+  sellerId?: string
   pageNum?: number
   pageSize?: number
 }

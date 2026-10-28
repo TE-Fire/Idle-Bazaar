@@ -121,6 +121,12 @@ function onEdit(): void {
   if (!item.value) return
   void router.push({ path: '/publish', query: { edit: item.value.id } })
 }
+
+/** 卖家卡 → TA 的个人主页；自己的商品点进自己的主页也没问题 */
+function goSeller(): void {
+  if (!item.value) return
+  void router.push({ name: 'user-profile', params: { id: item.value.sellerId } })
+}
 </script>
 
 <template>
@@ -188,12 +194,12 @@ function onEdit(): void {
           </template>
         </div>
 
-        <!-- 卖家卡 -->
-        <div class="seller">
+        <!-- 卖家卡：点击进 TA 的主页（资料 + 在售闲置） -->
+        <div class="seller seller--link" @click="goSeller">
           <span class="avatar" :style="{ background: bg(false) }" />
           <div class="seller__meta">
             <span class="nick">{{ item.sellerNick ?? '卖家' }}</span>
-            <span class="sub">信用 {{ item.sellerCredit ?? 100 }} 分</span>
+            <span class="sub">信用 {{ item.sellerCredit ?? 100 }} 分 · 进主页 →</span>
           </div>
         </div>
 
@@ -372,6 +378,15 @@ function onEdit(): void {
   padding: var(--cm-space-3) var(--cm-space-4);
   background: var(--cm-color-bg);
   border-radius: var(--cm-radius-lg);
+}
+
+.seller--link {
+  cursor: pointer;
+  transition: background 160ms ease-out;
+
+  &:hover {
+    background: var(--cm-color-brand-bg);
+  }
 }
 
 .avatar {

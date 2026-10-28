@@ -231,6 +231,10 @@ public class ItemService {
         if (campusId != null) {
             q.eq(Item::getCampusId, campusId);
         }
+        Long sellerId = toId(req.getSellerId());
+        if (sellerId != null) {
+            q.eq(Item::getSellerId, sellerId);
+        }
         q.orderByDesc(Item::getPublishedAt).orderByDesc(Item::getId);
 
         Page<Item> page = itemMapper.selectPage(new Page<>(pageNum, pageSize), q);

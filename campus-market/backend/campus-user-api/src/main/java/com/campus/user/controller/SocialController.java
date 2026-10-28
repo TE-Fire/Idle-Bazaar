@@ -6,7 +6,9 @@ import com.campus.common.result.Result;
 import com.campus.core.context.UserContext;
 import com.campus.core.dto.req.FollowReq;
 import com.campus.core.dto.resp.FollowListVO;
+import com.campus.core.dto.resp.UserProfileVO;
 import com.campus.core.service.FollowService;
+import com.campus.core.service.UserProfileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -31,6 +33,15 @@ import org.springframework.web.bind.annotation.RestController;
 public class SocialController {
 
     private final FollowService followService;
+
+    private final UserProfileService userProfileService;
+
+    @Operation(summary = "用户公开主页",
+            description = "userId 为空看自己；带资料、关注/粉丝数、在售数与查看者关注态")
+    @GetMapping("/profile")
+    public Result<UserProfileVO> profile(@RequestParam(required = false) Long userId) {
+        return Result.ok(userProfileService.profile(UserContext.getUserId(), userId));
+    }
 
     @Operation(summary = "关注", description = "已关注则幂等成功；不能关注自己")
     @PostMapping("/follow")

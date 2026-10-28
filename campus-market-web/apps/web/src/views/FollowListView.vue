@@ -6,8 +6,8 @@
  * 刷新与后退都能回到同一个 tab；两个计数做成头部的大数字，点击即切 tab——用户关心的是
  * 「多少人关注我」而不是翻页，计数必须比列表先看到（notes/23 第二节）。
  *
- * <p>列表行不跳「个人主页」：主页（动态 Tab）还没做，跳到半成品更糟。行内只给关注 / 取关，
- * 将来主页落地把行点击接到 `/user/:id`。
+ * <p>列表行点击进 TA 的个人主页（资料 + 在售闲置 + 关注入口）；主页落地前曾临时
+ * 跳「TA 的关注列表」，现在统一走主页——主页才是关注关系的自然落点。
  *
  * <p>关注 / 取关是幂等的，本地只做乐观更新：成功后改该行 `following` 与计数，失败不折腾界面
  * （http 层已提示），下次进页自然回到服务端真值。
@@ -109,6 +109,11 @@ function formatTime(iso?: string): string {
   return iso ? iso.replace('T', ' ').slice(0, 16) : ''
 }
 
+/** 行点击进 TA 的主页；自己的主页也可以进（显示「这是你的主页」） */
+function goProfile(u: FollowUserVO): void {
+  void router.push({ name: 'user-profile', params: { id: u.userId } })
+}
+
 function initial(nick?: string): string {
   return (nick || '?').slice(0, 1)
 }
@@ -152,7 +157,7 @@ onMounted(() => {
     </p>
 
     <ul v-loading="loading" class="list">
-      <li v-for="u in list" :key="u.userId" class="row">
+      <li v-for="u in list" :key="u.userId" class="row" @click="goProfile(u)">
         <div class="row__avatar">
           <img v-if="u.avatarUrl" :src="u.avatarUrl" alt="" />
           <span v-else class="row__t">{{ initial(u.nickname) }}</span>
@@ -175,7 +180,7 @@ onMounted(() => {
           class="row__btn"
           :class="{ 'row__btn--on': u.following }"
           :disabled="pending[u.userId]"
-          @click="toggle(u)"
+          @click.stop="toggle(u)"
         >
           {{ pending[u.userId] ? '处理中' : u.following ? '已关注' : tab === 'fans' ? '回关' : '关注' }}
         </button>
@@ -283,6 +288,13 @@ onMounted(() => {
   background: var(--cm-color-surface);
   border: 1px solid var(--cm-color-border);
   border-radius: var(--cm-radius-xl);
+  cursor: pointer;
+  transition: border-color 160ms ease-out, box-shadow 160ms ease-out;
+
+  &:hover {
+    border-color: var(--cm-color-brand-border);
+    box-shadow: var(--cm-shadow-1);
+  }
 }
 
 .row__avatar {
