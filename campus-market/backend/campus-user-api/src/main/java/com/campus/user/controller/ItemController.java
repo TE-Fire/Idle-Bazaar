@@ -3,9 +3,12 @@ package com.campus.user.controller;
 import com.campus.common.result.PageResult;
 import com.campus.common.result.Result;
 import com.campus.core.context.UserContext;
+import com.campus.core.dto.req.ItemCommentReq;
 import com.campus.core.dto.req.ItemListReq;
 import com.campus.core.dto.req.ItemPublishReq;
 import com.campus.core.dto.resp.ApiItemVO;
+import com.campus.core.dto.resp.ItemCommentVO;
+import com.campus.core.service.ItemCommentService;
 import com.campus.core.service.ItemService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -32,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ItemController {
 
     private final ItemService itemService;
+    private final ItemCommentService itemCommentService;
 
     @Operation(summary = "发布商品", description = "提交即送审：落 PENDING 并插入 item_audit 进队，不直接上架；draft=true 暂存草稿，不进队、图片与描述可后补")
     @PostMapping("/publish")
@@ -76,5 +81,20 @@ public class ItemController {
     public Result<Void> offline(@PathVariable Long id) {
         itemService.offline(UserContext.getUserId(), id);
         return Result.ok();
+    }
+
+    @Operation(summary = "发商品评论", description = "仅限在售商品（4025）；不限买家，内容过敏感词后入库")
+    @PostMapping("/{id}/comment")
+    public Result<Void> comment(@PathVariable Long id, @Valid @RequestBody ItemCommentReq req) {
+        itemCommentService.publish(UserContext.getUserId(), id, req);
+        return Result.ok();
+    }
+
+    @Operation(summary = "商品评论列表", description = "正序分页；下架商品仍可读历史评论")
+    @GetMapping("/{id}/comments")
+    public Result<PageResult<ItemCommentVO>> comments(@PathVariable Long id,
+                                                      @RequestParam(defaultValue = "1") int pageNum,
+                                                      @RequestParam(defaultValue = "20") int pageSize) {
+        return Result.ok(itemCommentService.list(id, pageNum, pageSize));
     }
 }

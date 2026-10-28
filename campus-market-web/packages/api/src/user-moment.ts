@@ -115,3 +115,46 @@ export const userMomentApi = {
       data: replyTo ? { content, replyTo } : { content }
     })
 }
+
+/** 商品评论一行（后端 `ItemCommentVO`，形状与动态评论一致） */
+export interface ItemCommentVO {
+  id: string
+  itemId: string
+  userId: string
+  author?: MomentAuthorVO
+  /** 回复目标**用户** id */
+  replyTo?: string
+  replyToNick?: string
+  content: string
+  createTime: string
+}
+
+export interface ItemCommentPageVO {
+  list: ItemCommentVO[]
+  total: string
+  pageNum: string
+  pageSize: string
+}
+
+/**
+ * 商品评论（notes/22 S7）。
+ *
+ * <p>与购后星级评价 `user_review` 是两套：这里不限买家、可多次发，只要求商品在售。
+ * 下架后不能新增（4025），但历史评论仍可读。
+ */
+export const userItemCommentApi = {
+  /** 评论列表，正序分页 */
+  list: (itemId: string, pageNum = 1, pageSize = 20) =>
+    request<ItemCommentPageVO>({
+      url: `/api/item/${itemId}/comments`,
+      params: { pageNum, pageSize }
+    }),
+
+  /** 发评论；内容服务端过敏感词，replyTo 是目标**用户** id */
+  publish: (itemId: string, content: string, replyTo?: string) =>
+    request<void>({
+      url: `/api/item/${itemId}/comment`,
+      method: 'POST',
+      data: replyTo ? { content, replyTo } : { content }
+    })
+}

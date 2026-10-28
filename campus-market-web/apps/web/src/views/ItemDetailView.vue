@@ -12,9 +12,18 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
-import { userDictApi, userItemApi, userMomentApi, type ApiItemVO, type CategoryVO } from '@campus/api'
+import {
+  userDictApi,
+  userItemApi,
+  userItemCommentApi,
+  userMomentApi,
+  type ApiItemVO,
+  type CategoryVO,
+  type ItemCommentVO
+} from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
+import SharePoster from '@/components/SharePoster.vue'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
@@ -26,6 +35,17 @@ const item = ref<ApiItemVO | null>(null)
 const loading = ref(true)
 /** 分享到广场在途：防连点重复发动态 */
 const sharing = ref(false)
+/** 海报弹层：纯前端 canvas，打开时才绘制 */
+const posterOpen = ref(false)
+
+/** 商品评论（notes/22 S7）：仅登录可发、仅 ON_SALE 可发，下架后仍可读历史 */
+const comments = ref<ItemCommentVO[]>([])
+const commentTotal = ref('0')
+const commentText = ref('')
+const commentSending = ref(false)
+/** 回复目标：存用户 id + 昵称，不定位父楼（与后端扁平列表一致） */
+const replyTarget = ref<{ userId: string; nickname: string } | null>(null)
+const canComment = computed(() => item.value?.status === 'ON_SALE')
 
 /** 分类字典：把商品挂的二级分类 id 还原成「一级 / 二级」，商品表只存二级 id */
 const dictCats = ref<CategoryVO[]>([])
@@ -46,6 +66,7 @@ onMounted(async () => {
     .catch(() => undefined)
   try {
     item.value = await userItemApi.detail(String(route.params.id ?? ''))
+    void loadComments()
   } catch {
     // 不存在 / 已下架：http 层已提示，这里落空态
   } finally {
@@ -125,9 +146,54 @@ async function onShare(): Promise<void> {
   }
 }
 
+/** 拉评论：一次取 50 条，商品评论量小不分页 */
+async function loadComments(): Promise<void> {
+  if (!item.value) return
+  try {
+    const p = await userItemCommentApi.list(item.value.id, 1, 50)
+    comments.value = p.list
+    commentTotal.value = p.total
+  } catch {
+    // http 层已提示；评论拉不到不影响商品主体信息
+  }
+}
+
+/** 未登录一律先登录再回来，避免用户写完才发现发不出去 */
+function requireLogin(): boolean {
+  if (userStore.userId) return true
+  void router.push({ name: 'login', query: { redirect: route.fullPath } })
+  return false
+}
+
+function startReply(c: ItemCommentVO): void {
+  if (!requireLogin()) return
+  replyTarget.value = { userId: c.userId, nickname: c.author?.nickname ?? '同学' }
+}
+
+/** 发评论：正文由服务端过敏感词（低危词会变 *），所以发完重拉而不是本地插 */
+async function sendComment(): Promise<void> {
+  if (!item.value || commentSending.value) return
+  const text = commentText.value.trim()
+  if (!text) return
+  if (!requireLogin()) return
+  commentSending.value = true
+  try {
+    await userItemCommentApi.publish(item.value.id, text, replyTarget.value?.userId)
+    ElMessage.success('评论已发布')
+    commentText.value = ''
+    replyTarget.value = null
+    await loadComments()
+  } catch {
+    // http 层已提示（4024 敏感词 / 4025 商品不在售）
+  } finally {
+    commentSending.value = false
+  }
+}
+
 /** 聊一聊：未登录先跳登录（带回跳）；自己的商品不进会话。
  *  商品摘要随 query 带上——首聊时会话还没建，ChatView 的壳会话用它显示顶部卡片 */
-function onChat(): void {  if (!item.value) return
+function onChat(): void {
+  if (!item.value) return
   if (!userStore.userId) {
     void router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
@@ -241,9 +307,65 @@ function goSeller(): void {
     <section class="desc">
       <div class="desc__hd">
         <h2>商品描述</h2>
-        <el-button link type="primary" :loading="sharing" @click="onShare">分享到广场</el-button>
+        <div class="desc__acts">
+          <el-button link type="primary" @click="posterOpen = true">生成海报</el-button>
+          <el-button link type="primary" :loading="sharing" @click="onShare">分享到广场</el-button>
+        </div>
       </div>
       <p class="desc__text">{{ item.description || '卖家没有填写描述。' }}</p>
+    </section>
+
+    <!-- 商品评论（notes/22 S7）：与购后星级评价是两套，这里只做售前问答 -->
+    <section class="cmt">
+      <div class="cmt__hd">
+        <h2>商品评论</h2>
+        <span class="cmt__n">{{ commentTotal }} 条</span>
+      </div>
+
+      <p v-if="!comments.length" class="cmt__empty">还没有人评论，来问两句</p>
+
+      <ul v-else class="cmt__list">
+        <li v-for="c in comments" :key="c.id" class="cmt__row">
+          <span class="cmt__ava" :style="{ background: bg(false) }" />
+          <div class="cmt__body">
+            <div class="cmt__top">
+              <span class="cmt__nick">{{ c.author?.nickname ?? '同学' }}</span>
+              <span class="cmt__time">{{ formatRelativeTime(c.createTime) }}</span>
+            </div>
+            <p class="cmt__text">
+              <span v-if="c.replyToNick" class="cmt__at">回复 @{{ c.replyToNick }}：</span>{{ c.content }}
+            </p>
+            <button type="button" class="cmt__reply" @click="startReply(c)">回复</button>
+          </div>
+        </li>
+      </ul>
+
+      <div class="cmt__editor">
+        <div v-if="replyTarget" class="cmt__replyto">
+          <span>回复 @{{ replyTarget.nickname }}</span>
+          <button type="button" @click="replyTarget = null">取消</button>
+        </div>
+        <el-input
+          v-model="commentText"
+          type="textarea"
+          :rows="2"
+          maxlength="500"
+          show-word-limit
+          :disabled="!canComment"
+          :placeholder="canComment ? '问问成色、配件或交易方式' : '商品已下架，暂不可评论'"
+        />
+        <div class="cmt__foot">
+          <span class="cmt__hint">评论对所有人可见，请文明交流</span>
+          <el-button
+            type="primary"
+            :disabled="!canComment || !commentText.trim()"
+            :loading="commentSending"
+            @click="sendComment"
+          >
+            发表评论
+          </el-button>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -253,6 +375,8 @@ function goSeller(): void {
       <el-button type="primary" @click="router.push({ name: 'home' })">回首页逛逛</el-button>
     </el-empty>
   </div>
+
+  <SharePoster v-if="posterOpen && item" :item="item" @close="posterOpen = false" />
 </template>
 
 <style scoped lang="scss">
@@ -477,11 +601,154 @@ function goSeller(): void {
   font-weight: 600;
 }
 
+.desc__acts {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-2);
+}
+
 .desc__text {
   margin: 0;
   white-space: pre-line;
   line-height: 1.6;
   color: var(--cm-color-text-2);
+}
+
+/* ── 商品评论：售前问答，扁平一层不套楼 ── */
+.cmt {
+  margin-top: var(--cm-space-4);
+  padding: var(--cm-space-5);
+  background: var(--cm-color-surface);
+  border-radius: var(--cm-radius-2xl);
+  box-shadow: var(--cm-shadow-1);
+}
+
+.cmt__hd {
+  display: flex;
+  align-items: baseline;
+  gap: var(--cm-space-2);
+  margin-bottom: var(--cm-space-3);
+}
+
+.cmt__hd h2 {
+  margin: 0;
+  font-size: var(--cm-font-size-md);
+  font-weight: 600;
+}
+
+.cmt__n {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.cmt__empty {
+  margin: var(--cm-space-4) 0;
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-3);
+}
+
+.cmt__list {
+  margin: 0 0 var(--cm-space-4);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-4);
+}
+
+.cmt__row {
+  display: flex;
+  gap: var(--cm-space-3);
+}
+
+.cmt__ava {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.cmt__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.cmt__top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--cm-space-2);
+}
+
+.cmt__nick {
+  font-size: var(--cm-font-size-sm);
+  font-weight: 600;
+  color: var(--cm-color-text-1);
+}
+
+.cmt__time {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.cmt__text {
+  margin: 2px 0 0;
+  font-size: var(--cm-font-size-sm);
+  line-height: 1.6;
+  color: var(--cm-color-text-2);
+  word-break: break-word;
+}
+
+.cmt__at {
+  color: var(--cm-color-brand-dark);
+}
+
+.cmt__reply {
+  margin-top: var(--cm-space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.cmt__reply:hover {
+  color: var(--cm-color-brand-dark);
+}
+
+.cmt__editor {
+  padding-top: var(--cm-space-4);
+  border-top: 1px solid var(--cm-color-border);
+}
+
+.cmt__replyto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--cm-space-2);
+  padding: 0 var(--cm-space-2);
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-brand-dark);
+}
+
+.cmt__replyto button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.cmt__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--cm-space-3);
+}
+
+.cmt__hint {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
 }
 
 @media (max-width: 1023px) {
