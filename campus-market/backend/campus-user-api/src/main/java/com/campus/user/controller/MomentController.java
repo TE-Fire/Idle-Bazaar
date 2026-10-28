@@ -46,6 +46,13 @@ public class MomentController {
         return Result.ok(momentService.square(UserContext.getUserId(), pageNum, pageSize));
     }
 
+    @Operation(summary = "关注流", description = "只看已关注作者的正常动态，时间倒序")
+    @GetMapping("/following")
+    public Result<MomentPageVO> following(@RequestParam(defaultValue = "1") int pageNum,
+                                          @RequestParam(defaultValue = "10") int pageSize) {
+        return Result.ok(momentService.following(UserContext.getUserId(), pageNum, pageSize));
+    }
+
     @Operation(summary = "个人主页动态", description = "指定作者的正常动态，时间倒序")
     @GetMapping("/user/{userId}")
     public Result<MomentPageVO> userMoments(@PathVariable Long userId,

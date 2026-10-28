@@ -15,6 +15,7 @@ import com.campus.core.entity.ItemComment;
 import com.campus.core.entity.MomentComment;
 import com.campus.core.entity.Report;
 import com.campus.core.entity.UserMoment;
+import com.campus.core.enums.CreditReasonEnum;
 import com.campus.core.enums.ReportStatusEnum;
 import com.campus.core.enums.ReportTargetTypeEnum;
 import com.campus.core.errcode.ReviewErrorCode;
@@ -64,6 +65,7 @@ public class SocialReportAdminService {
     private final MomentCommentMapper momentCommentMapper;
     private final UserPubCache userPubCache;
     private final NoticeService noticeService;
+    private final CreditService creditService;
     private final ObjectMapper objectMapper;
 
     /** 举报列表：只出社交三类，按提交时间倒序 */
@@ -136,6 +138,9 @@ public class SocialReportAdminService {
             noticeService.push(authorId, String.format(
                     "你发布的%s因「%s」被举报成立，已下架。如有异议可在对应详情页申诉。",
                     type.getDesc(), note == null || note.isBlank() ? reason : note));
+            // 举报成立扣 10 分（CreditReasonEnum.REPORTED），与商品举报同一口径
+            creditService.change(authorId, CreditReasonEnum.REPORTED, reportId,
+                    "社交内容举报成立：" + type.getDesc());
         }
         log.debug("社交举报 {} 裁决 result={} type={} target={}", reportId, result, type, report.getTargetId());
     }

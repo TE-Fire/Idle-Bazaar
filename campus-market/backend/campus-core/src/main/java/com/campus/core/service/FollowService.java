@@ -23,6 +23,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -74,6 +75,8 @@ public class FollowService {
 
     private final UserPubCache userPubCache;
 
+    private final NoticeService noticeService;
+
     /** 重建串行化：按 userId 取模分 64 段，避免为每个用户常驻一把锁 */
     private final Object[] loadLocks = initLocks();
 
@@ -81,20 +84,39 @@ public class FollowService {
     public void follow(long followerId, long followeeId) {
         BizAssert.isTrue(followerId != followeeId, CommonErrorCode.PARAM_ERROR, "不能关注自己");
         requireUser(followeeId);
+        boolean added;
         try {
             ensureLoaded(followerId, false);
             ensureLoaded(followeeId, true);
-            stringRedisTemplate.execute(FOLLOW_SCRIPT,
+            Long r = stringRedisTemplate.execute(FOLLOW_SCRIPT,
                     List.of(FollowRedisKeys.following(followerId),
                             FollowRedisKeys.followers(followeeId),
                             FollowRedisKeys.PENDING),
                     String.valueOf(followerId), String.valueOf(followeeId),
                     String.valueOf(System.currentTimeMillis()));
+            added = r != null && r == 1L;
         } catch (Exception e) {
             log.warn("[follow] Redis 关注失败，退回直写库：{} → {}", followerId, followeeId, e);
             applyFollow(followerId, followeeId);
             syncZsetAfterDirect(followerId, followeeId, true);
+            // 直写分支判不出是否新增，交给去重 key 兜住重复通知
+            added = true;
         }
+        if (added) {
+            notifyFollow(followerId, followeeId);
+        }
+    }
+
+    /** 被关注通知：同一对关系 7 天内只推一次（取关再关注不重复打扰） */
+    private void notifyFollow(long followerId, long followeeId) {
+        if (!noticeService.firstTime("follow:" + followerId + ":" + followeeId, Duration.ofDays(7))) {
+            return;
+        }
+        UserPubVO me = userPubCache.getOrLoad(List.of(followerId)).get(followerId);
+        if (me == null || me.getNickname() == null || me.getNickname().isBlank()) {
+            return;
+        }
+        noticeService.pushInteract(followeeId, me.getNickname() + " 关注了你");
     }
 
     /** 取关。本就没关注则幂等成功 */
@@ -115,6 +137,43 @@ public class FollowService {
             log.warn("[follow] Redis 取关失败，退回直写库：{} → {}", followerId, followeeId, e);
             applyUnfollow(followerId, followeeId, System.currentTimeMillis());
             syncZsetAfterDirect(followerId, followeeId, false);
+        }
+    }
+
+    /**
+     * 我关注的人 id，最近关注优先，最多 {@code limit} 个。
+     *
+     * <p>关注流必须读这里而不是查库：关注关系在 Redis 先写、每 5 秒才落库，读库会让刚关注的人
+     * 在流里「消失」一个刷库周期。Redis 不可用时退回查库，最多滞后一次刷库，不报错。
+     *
+     * <p>上限由调用方给（关注流拼 `IN` 用），别信「用户不会关注很多人」。
+     */
+    public List<Long> followingIds(long userId, int limit) {
+        int cap = Math.max(limit, 1);
+        try {
+            ensureLoaded(userId, false);
+            Set<String> members = stringRedisTemplate.opsForZSet()
+                    .reverseRange(FollowRedisKeys.following(userId), 0, cap - 1L);
+            if (members == null) {
+                return List.of();
+            }
+            List<Long> ids = new ArrayList<>(members.size());
+            for (String s : members) {
+                try {
+                    ids.add(Long.parseLong(s));
+                } catch (NumberFormatException e) {
+                    log.warn("[follow] 关注集合存在脏 member，已跳过：{}", s);
+                }
+            }
+            return ids;
+        } catch (Exception e) {
+            log.warn("[follow] 读关注 id 失败，退回查库：{}", userId, e);
+            return userFollowMapper.selectList(new LambdaQueryWrapper<UserFollow>()
+                            .eq(UserFollow::getFollowerId, userId)
+                            .eq(UserFollow::getDeleted, 0L)
+                            .orderByDesc(UserFollow::getCreateTime)
+                            .last("LIMIT " + cap))
+                    .stream().map(UserFollow::getFolloweeId).toList();
         }
     }
 

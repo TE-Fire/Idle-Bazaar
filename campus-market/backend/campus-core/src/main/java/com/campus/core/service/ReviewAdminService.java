@@ -27,6 +27,7 @@ import com.campus.core.entity.TradeOrder;
 import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.AuditStatusEnum;
+import com.campus.core.enums.CreditReasonEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.enums.QueueKindEnum;
@@ -103,6 +104,7 @@ public class ReviewAdminService {
     private final DictService dictService;
     private final CategoryAvgPriceCache categoryAvgPriceCache;
     private final UserPubCache userPubCache;
+    private final CreditService creditService;
 
     /* ══ 一、队列 ═══════════════════════════════════════════ */
 
@@ -273,6 +275,7 @@ public class ReviewAdminService {
                     CommonErrorCode.PARAM_ERROR, "举报成立时处置依据必填").trim());
             offline.setNote(note);
             itemAdminService.forceOffline(report.getTargetId(), offline);
+            deductForReportedItem(report);
         }
 
         int n = reportMapper.update(null, new LambdaUpdateWrapper<Report>()
@@ -290,8 +293,20 @@ public class ReviewAdminService {
         log.debug("举报 {} 裁决 result={} 耗时 {}ms", reportId, result, System.currentTimeMillis() - begin);
     }
 
-    /* ══ 四、申诉裁决 ═══════════════════════════════════════ */
+    /**
+     * 举报成立给卖家扣 10 分。只有举报裁决这一处扣：强制下架本身不扣，
+     * 否则举报成立（内部会调 forceOffline）会被记两次。
+     */
+    private void deductForReportedItem(Report report) {
+        Item item = itemMapper.selectById(report.getTargetId());
+        if (item == null || item.getSellerId() == null) {
+            return;
+        }
+        creditService.change(item.getSellerId(), CreditReasonEnum.REPORTED, report.getId(),
+                "商品举报成立");
+    }
 
+    /* ══ 四、申诉裁决 ═══════════════════════════════════════ */
     /**
      * 申诉裁决：result=2 维持（商品不动）/ 3 撤销（按原处置反向恢复）。
      * 换人复审（F-A4）：复审人不得为原处置人，否则 REVIEW_APPEAL_SAME_HANDLER（3002）。
@@ -683,6 +698,12 @@ public class ReviewAdminService {
                 u.set(Item::getPublishedAt, LocalDateTime.now());
             }
             itemMapper.update(null, u);
+            // 举报成立时扣过分，误判纠正要还回去；按报单 id 记流水，便于与扣分对账
+            if (AppealBizTypeEnum.REPORT.getCode().equals(appeal.getBizType())
+                    && item.getSellerId() != null) {
+                creditService.change(item.getSellerId(), CreditReasonEnum.REPORT_REVOKED,
+                        appeal.getBizId(), "举报误判撤销");
+            }
             return append(note, "申诉成立，商品恢复为在售");
         }
         if (status == ItemStatusEnum.REJECTED) {

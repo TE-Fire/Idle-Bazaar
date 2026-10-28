@@ -19,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.Set;
  * 商品评论（notes/22 S7）：仅登录用户可发、仅在售商品可评，与购后星级评价 user_review 并存。
  *
  * <p>「在售」是发布入口的硬门槛：下架后不能新增，但历史评论照常可读（走 idx_item，正序）。
+ * 发布成功通知卖家（30 分钟一次），不通知买家本人。
  */
 @Service
 @RequiredArgsConstructor
@@ -37,13 +39,15 @@ public class ItemCommentService {
     private static final int AUDIT_NORMAL = 0;
     private static final int MAX_LEN = 500;
     private static final int MAX_PAGE_SIZE = 50;
+    private static final int NOTICE_BRIEF_LEN = 30;
 
     private final ItemCommentMapper commentMapper;
     private final ItemMapper itemMapper;
     private final UserPubCache userPubCache;
     private final SensitiveWordService sensitiveWordService;
+    private final NoticeService noticeService;
 
-    /** 发评论：敏感词过滤后入库，audit_status=正常(0) */
+    /** 发评论：敏感词过滤后入库，audit_status=正常(0)；通知卖家 */
     @Transactional
     public void publish(long userId, long itemId, ItemCommentReq req) {
         Item item = itemMapper.selectById(itemId);
@@ -63,6 +67,27 @@ public class ItemCommentService {
         c.setContent(sensitiveWordService.filter(content));
         c.setAuditStatus(AUDIT_NORMAL);
         commentMapper.insert(c);
+
+        notifySeller(item, userId, c.getContent());
+    }
+
+    private void notifySeller(Item item, long operatorId, String clean) {
+        Long sellerId = item.getSellerId();
+        if (sellerId == null || sellerId == operatorId) {
+            return;
+        }
+        if (!noticeService.firstTime("item-cmt:" + item.getId() + ":" + operatorId,
+                Duration.ofMinutes(30))) {
+            return;
+        }
+        UserPubVO me = userPubCache.getOrLoad(List.of(operatorId)).get(operatorId);
+        if (me == null || me.getNickname() == null || me.getNickname().isBlank()) {
+            return;
+        }
+        String brief = clean.length() > NOTICE_BRIEF_LEN
+                ? clean.substring(0, NOTICE_BRIEF_LEN) + "…" : clean;
+        noticeService.pushInteract(sellerId,
+                me.getNickname() + " 评论了你的商品「" + item.getTitle() + "」：" + brief);
     }
 
     /** 评论列表：正序分页；下架商品也能读历史评论 */

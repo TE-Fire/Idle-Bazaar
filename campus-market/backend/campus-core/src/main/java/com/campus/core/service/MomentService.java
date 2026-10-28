@@ -31,6 +31,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,22 +42,29 @@ import java.util.Set;
 /**
  * 动态与评论（notes/22 S3–S6）。
  *
- * <p>审核三态在本期只有「正常(0)」会写：高危敏感词在发布/评论时直接拒（不入库），
- * 低危词替换后仍写正常(0)；「敏感词屏蔽(1)/举报下架(2)」由批次 3 的举报处置置位。
- * 广场流与评论列表一律只取 `deleted=0 AND audit_status=0`。
+ * <p>审核三态：高危敏感词在发布/评论时直接拒（不入库），低危词替换后仍写正常(0)；
+ * 「敏感词屏蔽(1)」只有作者自己在个人主页能看到（带 `auditStatus` 标），
+ * 「举报下架(2)」对所有人不可见。广场流与关注流只取正常(0)。
  *
  * <p>点赞与关注同构为 B 类软删（revive 复用行），评论为 A 类留墓碑。
  * 列表的作者/商品点赞/评论计数均为**批量查**后内存组装，不逐条打库。
+ *
+ * <p>互动通知（被赞/被评）在写路径末尾推送，失败只 warn 不影响主流程；
+ * 同一人对同一动态的点赞 24 小时内只推一次、评论 30 分钟一次，避免取消再赞刷屏。
  */
 @Service
 @RequiredArgsConstructor
 public class MomentService {
 
     private static final int AUDIT_NORMAL = 0;
+    private static final int AUDIT_MASKED = 1;
     private static final int TYPE_STATUS = 1;
     private static final int TYPE_SHARE = 2;
     private static final int MAX_IMAGES = 9;
     private static final int MAX_COMMENT_LEN = 500;
+    private static final int NOTICE_BRIEF_LEN = 30;
+    /** 关注流最多拼多少个 followee：关注数无上限，`IN` 列表不设口子会打爆 SQL */
+    private static final int FOLLOW_FEED_MAX_FOLLOWEES = 300;
 
     private final UserMomentMapper momentMapper;
     private final MomentLikeMapper likeMapper;
@@ -64,6 +72,8 @@ public class MomentService {
     private final ItemMapper itemMapper;
     private final UserPubCache userPubCache;
     private final SensitiveWordService sensitiveWordService;
+    private final NoticeService noticeService;
+    private final FollowService followService;
     private final ObjectMapper objectMapper;
 
     /** 发布动态；返回新动态 id */
@@ -115,46 +125,91 @@ public class MomentService {
         return pageVO(p, viewerId);
     }
 
-    /** 个人主页动态：指定作者，时间倒序 */
-    public MomentPageVO userMoments(long viewerId, long targetUserId, int pageNum, int pageSize) {
+    /**
+     * 关注流：只看自己关注的作者，时间倒序。
+     *
+     * <p>关注关系用子查询而不是先查关注 id 再 `IN`：关注上千人时 IN 列表会撑爆语句长度，
+     * 子查询走 `idx_follower` 只取一遍。`viewerId` 是 long，拼接无注入面。
+     */
+    /** 关注流：只看我关注的人，时间倒序。关注关系读 Redis（见 FollowService#followingIds） */
+    public MomentPageVO following(long viewerId, int pageNum, int pageSize) {
+        List<Long> followees = followService.followingIds(viewerId, FOLLOW_FEED_MAX_FOLLOWEES);
+        if (followees.isEmpty()) {
+            MomentPageVO empty = new MomentPageVO();
+            empty.setList(List.of());
+            empty.setTotal(0L);
+            empty.setPageNum(Math.max(pageNum, 1));
+            empty.setPageSize(pageSize);
+            return empty;
+        }
         Page<UserMoment> p = momentMapper.selectPage(new Page<>(pageNum, pageSize),
                 new LambdaQueryWrapper<UserMoment>()
-                        .eq(UserMoment::getUserId, targetUserId)
                         .eq(UserMoment::getDeleted, 0L)
                         .eq(UserMoment::getAuditStatus, AUDIT_NORMAL)
+                        .in(UserMoment::getUserId, followees)
                         .orderByDesc(UserMoment::getCreateTime));
         return pageVO(p, viewerId);
     }
 
-    /** 动态详情：正文 + 评论列表（正序） */
+    /**
+     * 个人主页动态：指定作者，时间倒序。
+     *
+     * <p>看自己的主页时纳入「敏感词屏蔽(1)」——否则用户发出去的内容自己看不见，会以为发布失败；
+     * 看别人时只出正常内容。「举报下架(2)」对自己也不可见，下架是平台结论，不是待处理的草稿。
+     */
+    public MomentPageVO userMoments(long viewerId, long targetUserId, int pageNum, int pageSize) {
+        boolean self = viewerId == targetUserId;
+        LambdaQueryWrapper<UserMoment> w = new LambdaQueryWrapper<UserMoment>()
+                .eq(UserMoment::getUserId, targetUserId)
+                .eq(UserMoment::getDeleted, 0L)
+                .orderByDesc(UserMoment::getCreateTime);
+        if (self) {
+            w.in(UserMoment::getAuditStatus, AUDIT_NORMAL, AUDIT_MASKED);
+        } else {
+            w.eq(UserMoment::getAuditStatus, AUDIT_NORMAL);
+        }
+        return pageVO(momentMapper.selectPage(new Page<>(pageNum, pageSize), w), viewerId);
+    }
+
+    /** 动态详情：正文 + 评论列表（正序）；作者本人可看自己被屏蔽的动态 */
     public MomentDetailVO detail(long viewerId, long momentId) {
-        UserMoment m = assertNormal(momentId);
+        UserMoment m = momentMapper.selectOne(new LambdaQueryWrapper<UserMoment>()
+                .eq(UserMoment::getId, momentId)
+                .eq(UserMoment::getDeleted, 0L));
+        boolean mine = m != null && m.getUserId() != null && m.getUserId() == viewerId;
+        BizAssert.isTrue(m != null && (Integer.valueOf(AUDIT_NORMAL).equals(m.getAuditStatus())
+                || (mine && Integer.valueOf(AUDIT_MASKED).equals(m.getAuditStatus()))),
+                UserErrorCode.MOMENT_NOT_FOUND);
         MomentDetailVO vo = new MomentDetailVO();
         vo.setMoment(toVOList(List.of(m), viewerId).get(0));
         vo.setComments(loadComments(momentId));
         return vo;
     }
 
-    /** 点赞：幂等，B 类软删复用行 */
+    /** 点赞：幂等，B 类软删复用行；真正新增时通知作者 */
     public void like(long userId, long momentId) {
-        assertNormal(momentId);
-        if (likeMapper.revive(momentId, userId) > 0) {
-            return;
+        UserMoment m = assertNormal(momentId);
+        boolean added = likeMapper.revive(momentId, userId) > 0;
+        if (!added) {
+            Long active = likeMapper.selectCount(new LambdaQueryWrapper<MomentLike>()
+                    .eq(MomentLike::getMomentId, momentId)
+                    .eq(MomentLike::getUserId, userId)
+                    .eq(MomentLike::getDeleted, 0L));
+            if (active != null && active > 0) {
+                return;
+            }
+            MomentLike l = new MomentLike();
+            l.setMomentId(momentId);
+            l.setUserId(userId);
+            try {
+                likeMapper.insert(l);
+                added = true;
+            } catch (DuplicateKeyException e) {
+                // 并发首赞撞唯一键，视为已赞（同一关系恒一行）
+            }
         }
-        Long active = likeMapper.selectCount(new LambdaQueryWrapper<MomentLike>()
-                .eq(MomentLike::getMomentId, momentId)
-                .eq(MomentLike::getUserId, userId)
-                .eq(MomentLike::getDeleted, 0L));
-        if (active != null && active > 0) {
-            return;
-        }
-        MomentLike l = new MomentLike();
-        l.setMomentId(momentId);
-        l.setUserId(userId);
-        try {
-            likeMapper.insert(l);
-        } catch (DuplicateKeyException e) {
-            // 并发首赞撞唯一键，视为已赞（同一关系恒一行）
+        if (added) {
+            notifyLike(m, userId);
         }
     }
 
@@ -164,10 +219,10 @@ public class MomentService {
         likeMapper.softDelete(momentId, userId, System.currentTimeMillis());
     }
 
-    /** 发评论：敏感词过滤后入库，audit_status=正常(0) */
+    /** 发评论：敏感词过滤后入库，audit_status=正常(0)；通知动态作者与被回复者 */
     @Transactional
     public void comment(long userId, long momentId, MomentCommentReq req) {
-        assertNormal(momentId);
+        UserMoment m = assertNormal(momentId);
         String content = req.getContent() == null ? null : req.getContent().trim();
         BizAssert.notBlank(content, CommonErrorCode.PARAM_ERROR, "评论内容不能为空");
         BizAssert.isTrue(content.length() <= MAX_COMMENT_LEN,
@@ -181,6 +236,50 @@ public class MomentService {
         c.setContent(clean);
         c.setAuditStatus(AUDIT_NORMAL);
         commentMapper.insert(c);
+
+        notifyComment(m, userId, req.getReplyTo(), clean);
+    }
+
+    /* ── 互动通知 ── */
+
+    private void notifyLike(UserMoment m, long operatorId) {
+        if (m.getUserId() == null || m.getUserId() == operatorId) {
+            return;
+        }
+        if (!noticeService.firstTime("like:" + m.getId() + ":" + operatorId, Duration.ofHours(24))) {
+            return;
+        }
+        String nick = nickOf(operatorId);
+        if (nick != null) {
+            noticeService.pushInteract(m.getUserId(), nick + " 赞了你的动态");
+        }
+    }
+
+    private void notifyComment(UserMoment m, long operatorId, Long replyTo, String clean) {
+        // 同一人对同一条动态半小时内只推一条：连发多条评论时不把信箱刷成列表
+        if (!noticeService.firstTime("cmt:" + m.getId() + ":" + operatorId, Duration.ofMinutes(30))) {
+            return;
+        }
+        String nick = nickOf(operatorId);
+        if (nick == null) {
+            return;
+        }
+        String brief = clean.length() > NOTICE_BRIEF_LEN
+                ? clean.substring(0, NOTICE_BRIEF_LEN) + "…" : clean;
+        if (m.getUserId() != null && m.getUserId() != operatorId) {
+            noticeService.pushInteract(m.getUserId(), nick + " 评论了你的动态：" + brief);
+        }
+        // 被回复者与作者可能是同一人，同一事件不重复推
+        if (replyTo != null && replyTo != operatorId
+                && (m.getUserId() == null || !replyTo.equals(m.getUserId()))) {
+            noticeService.pushInteract(replyTo, nick + " 回复了你的评论：" + brief);
+        }
+    }
+
+    /** 通知文案里的操作者昵称；用户不存在 / 无昵称则返回 null，调用方跳过推送 */
+    private String nickOf(long userId) {
+        UserPubVO u = userPubCache.getOrLoad(List.of(userId)).get(userId);
+        return u == null || u.getNickname() == null || u.getNickname().isBlank() ? null : u.getNickname();
     }
 
     /* ── 组装 ── */
@@ -250,6 +349,7 @@ public class MomentService {
             vo.setLikeCount(likeCounts.getOrDefault(m.getId(), 0L));
             vo.setLiked(likedByMe.contains(m.getId()));
             vo.setCommentCount(commentCounts.getOrDefault(m.getId(), 0L));
+            vo.setAuditStatus(m.getAuditStatus());
 
             if (Integer.valueOf(TYPE_SHARE).equals(m.getType())) {
                 vo.setItemId(m.getItemId());

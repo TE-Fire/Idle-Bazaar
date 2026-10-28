@@ -43,5 +43,8 @@ public class MomentVO {
 
     private long commentCount;
 
+    /** 0 正常 1 敏感词屏蔽（仅作者自己在个人主页可见） 2 举报下架 */
+    private Integer auditStatus;
+
     private LocalDateTime createTime;
 }
