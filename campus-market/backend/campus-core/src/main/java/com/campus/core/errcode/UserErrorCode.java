@@ -41,6 +41,12 @@ public enum UserErrorCode implements IErrorCode {
     /* ── 资料编辑（2026-10-25 新增，业务规则见 notes/20 D3）── */
     USER_NICKNAME_INVALID(4020, "昵称不能为空，且不超过 64 个字符"),
     USER_AVATAR_INVALID(4021, "头像地址不合法"),
+
+    /* ── 社交：动态 / 评论（2026-10-28 新增，notes/22 S3–S7）── */
+    MOMENT_NOT_FOUND(4022, "动态不存在或已下架"),
+    MOMENT_ITEM_INVALID(4023, "分享的商品不存在或不在售"),
+    SENSITIVE_WORD_HIT(4024, "内容含有敏感词，请修改后重试"),
+    ITEM_NOT_COMMENTABLE(4025, "商品当前不可评论（仅在售商品可评）"),
     ;
 
     @Override
