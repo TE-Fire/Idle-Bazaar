@@ -10,8 +10,11 @@ import com.campus.core.entity.Appeal;
 import com.campus.core.entity.AppUser;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
+import com.campus.core.entity.ItemComment;
+import com.campus.core.entity.MomentComment;
 import com.campus.core.entity.Report;
 import com.campus.core.entity.TradeOrder;
+import com.campus.core.entity.UserMoment;
 import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
@@ -20,12 +23,16 @@ import com.campus.core.enums.ReportTargetTypeEnum;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.errcode.OrderErrorCode;
 import com.campus.core.errcode.ReviewErrorCode;
+import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AppealMapper;
 import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.ItemAuditMapper;
+import com.campus.core.mapper.ItemCommentMapper;
 import com.campus.core.mapper.ItemMapper;
+import com.campus.core.mapper.MomentCommentMapper;
 import com.campus.core.mapper.ReportMapper;
 import com.campus.core.mapper.TradeOrderMapper;
+import com.campus.core.mapper.UserMomentMapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +68,12 @@ public class ReportService {
 
     private final TradeOrderMapper orderMapper;
 
+    private final UserMomentMapper momentMapper;
+
+    private final ItemCommentMapper itemCommentMapper;
+
+    private final MomentCommentMapper momentCommentMapper;
+
     private final ObjectMapper objectMapper;
 
     /**
@@ -72,16 +85,43 @@ public class ReportService {
     @Transactional(rollbackFor = Exception.class)
     public Long report(Long userId, ReportCreateReq req) {
         ReportTargetTypeEnum targetType = ReportTargetTypeEnum.fromCodeOrNull(req.getTargetType());
-        BizAssert.notNull(targetType, CommonErrorCode.PARAM_ERROR, "举报对象类型只能是 1 商品 / 2 用户");
+        BizAssert.notNull(targetType, CommonErrorCode.PARAM_ERROR,
+                "举报对象类型只能是 1 商品 / 2 用户 / 3 动态 / 4 商品评论 / 5 动态评论");
 
-        if (targetType == ReportTargetTypeEnum.ITEM) {
-            Item item = itemMapper.selectById(req.getTargetId());
-            BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
-            BizAssert.isTrue(!userId.equals(item.getSellerId()),
-                    ReviewErrorCode.CANNOT_REPORT_SELF);
-        } else {
-            AppUser target = appUserMapper.selectById(req.getTargetId());
-            BizAssert.notNull(target, CommonErrorCode.NOT_FOUND);
+        switch (targetType) {
+            case ITEM -> {
+                Item item = itemMapper.selectById(req.getTargetId());
+                BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
+                BizAssert.isTrue(!userId.equals(item.getSellerId()),
+                        ReviewErrorCode.CANNOT_REPORT_SELF);
+            }
+            case USER -> {
+                AppUser target = appUserMapper.selectById(req.getTargetId());
+                BizAssert.notNull(target, CommonErrorCode.NOT_FOUND);
+            }
+            // 社交三类：只允许举报仍在架的内容（已屏蔽 / 已删除的没有处置对象），且不能举报自己
+            case MOMENT -> {
+                UserMoment m = momentMapper.selectOne(new LambdaQueryWrapper<UserMoment>()
+                        .eq(UserMoment::getId, req.getTargetId())
+                        .eq(UserMoment::getDeleted, 0L));
+                BizAssert.notNull(m, UserErrorCode.MOMENT_NOT_FOUND);
+                BizAssert.isTrue(!userId.equals(m.getUserId()), ReviewErrorCode.CANNOT_REPORT_SELF);
+            }
+            case ITEM_COMMENT -> {
+                ItemComment c = itemCommentMapper.selectOne(new LambdaQueryWrapper<ItemComment>()
+                        .eq(ItemComment::getId, req.getTargetId())
+                        .eq(ItemComment::getDeleted, 0L));
+                BizAssert.notNull(c, CommonErrorCode.NOT_FOUND);
+                BizAssert.isTrue(!userId.equals(c.getUserId()), ReviewErrorCode.CANNOT_REPORT_SELF);
+            }
+            case MOMENT_COMMENT -> {
+                MomentComment c = momentCommentMapper.selectOne(new LambdaQueryWrapper<MomentComment>()
+                        .eq(MomentComment::getId, req.getTargetId())
+                        .eq(MomentComment::getDeleted, 0L));
+                BizAssert.notNull(c, CommonErrorCode.NOT_FOUND);
+                BizAssert.isTrue(!userId.equals(c.getUserId()), ReviewErrorCode.CANNOT_REPORT_SELF);
+            }
+            default -> throw new BizException(CommonErrorCode.PARAM_ERROR);
         }
 
         Long dup = reportMapper.selectCount(new LambdaQueryWrapper<Report>()
@@ -169,17 +209,38 @@ public class ReportService {
     }
 
     /**
-     * 被举报方的判定：`target_type = 1` 时是商品卖家，否则是被举报的用户本人。
+     * 被举报方的判定：商品举报打到**卖家**头上、社交三类打到**内容作者**头上，
+     * 其余（用户举报）就是 target_id 本人。
      *
-     * <p>两条通道必须合并判断——商品举报打到**卖家**头上，但单据上记的是商品 id，
-     * 只比 `target_id` 会把「举报人」误判成「被举报人」。
+     * <p>几条通道必须合并判断——单据上记的是被举报内容的 id，只比 `target_id`
+     * 会把「举报人」误判成「被举报人」。
      */
     private boolean isReportTarget(Report target, Long userId) {
-        if (ReportTargetTypeEnum.ITEM.getCode().equals(target.getTargetType())) {
-            Item item = itemMapper.selectById(target.getTargetId());
-            return item != null && userId.equals(item.getSellerId());
+        ReportTargetTypeEnum type = ReportTargetTypeEnum.fromCodeOrNull(target.getTargetType());
+        if (type == null) {
+            return false;
         }
-        return userId.equals(target.getTargetId());
+        switch (type) {
+            case ITEM -> {
+                Item item = itemMapper.selectById(target.getTargetId());
+                return item != null && userId.equals(item.getSellerId());
+            }
+            case MOMENT -> {
+                UserMoment m = momentMapper.selectById(target.getTargetId());
+                return m != null && userId.equals(m.getUserId());
+            }
+            case ITEM_COMMENT -> {
+                ItemComment c = itemCommentMapper.selectById(target.getTargetId());
+                return c != null && userId.equals(c.getUserId());
+            }
+            case MOMENT_COMMENT -> {
+                MomentComment c = momentCommentMapper.selectById(target.getTargetId());
+                return c != null && userId.equals(c.getUserId());
+            }
+            default -> {
+                return userId.equals(target.getTargetId());
+            }
+        }
     }
 
     /** 凭证序列化失败不该阻断提交——它是辅助材料，理由是必填项 */
