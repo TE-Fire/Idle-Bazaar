@@ -79,3 +79,47 @@ export const userSocialApi = {
     return request<FollowListVO>({ url: '/api/social/follow/list', data })
   }
 }
+
+/* ── 举报与系统通知（notes/22 批次 3）── */
+
+/** 举报对象类型，与后端 ReportTargetTypeEnum 对齐 */
+export const REPORT_TARGET = {
+  ITEM: 1,
+  USER: 2,
+  MOMENT: 3,
+  ITEM_COMMENT: 4,
+  MOMENT_COMMENT: 5
+} as const
+
+/** 预置原因：管理端按原因归类，自由文本没法聚合 */
+export const REPORT_REASONS = ['广告导流', '辱骂攻击', '违法违规', '虚假信息', '其他']
+
+export const reportApi = {
+  /** 同人同对象有未处理单据时返回 3005 */
+  submit: (targetType: number, targetId: string, reason: string) =>
+    request<string>({ url: '/api/report', method: 'POST', data: { targetType, targetId, reason } })
+}
+
+export interface NoticeVO {
+  id: string
+  content: string
+  /** 0 未读 1 已读 */
+  readFlag: number
+  createTime: string
+}
+
+export interface NoticePageVO {
+  list: NoticeVO[]
+  total: string
+  pageNum: string
+  pageSize: string
+}
+
+export const noticeApi = {
+  list: (pageNum = 1, pageSize = 20) =>
+    request<NoticePageVO>({ url: '/api/notice/list', data: { pageNum, pageSize } }),
+
+  unread: () => request<string>({ url: '/api/notice/unread' }),
+
+  readAll: () => request<void>({ url: '/api/notice/read-all', method: 'POST' })
+}

@@ -13,6 +13,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
 import {
+  REPORT_TARGET,
   userDictApi,
   userItemApi,
   userItemCommentApi,
@@ -24,6 +25,7 @@ import {
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import SharePoster from '@/components/SharePoster.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
@@ -37,6 +39,15 @@ const loading = ref(true)
 const sharing = ref(false)
 /** 海报弹层：纯前端 canvas，打开时才绘制 */
 const posterOpen = ref(false)
+
+/** 评论举报弹层 */
+const reportOpen = ref(false)
+const reportId = ref('')
+
+function openCommentReport(id: string): void {
+  reportId.value = id
+  reportOpen.value = true
+}
 
 /** 商品评论（notes/22 S7）：仅登录可发、仅 ON_SALE 可发，下架后仍可读历史 */
 const comments = ref<ItemCommentVO[]>([])
@@ -335,7 +346,17 @@ function goSeller(): void {
             <p class="cmt__text">
               <span v-if="c.replyToNick" class="cmt__at">回复 @{{ c.replyToNick }}：</span>{{ c.content }}
             </p>
-            <button type="button" class="cmt__reply" @click="startReply(c)">回复</button>
+            <div class="cmt__acts">
+              <button type="button" class="cmt__reply" @click="startReply(c)">回复</button>
+              <button
+                v-if="c.userId !== userStore.userId"
+                type="button"
+                class="cmt__reply"
+                @click="openCommentReport(c.id)"
+              >
+                举报
+              </button>
+            </div>
           </div>
         </li>
       </ul>
@@ -377,6 +398,7 @@ function goSeller(): void {
   </div>
 
   <SharePoster v-if="posterOpen && item" :item="item" @close="posterOpen = false" />
+  <ReportDialog v-model="reportOpen" :target-type="REPORT_TARGET.ITEM_COMMENT" :target-id="reportId" />
 </template>
 
 <style scoped lang="scss">
@@ -702,8 +724,13 @@ function goSeller(): void {
   color: var(--cm-color-brand-dark);
 }
 
-.cmt__reply {
+.cmt__acts {
+  display: flex;
+  gap: var(--cm-space-3);
   margin-top: var(--cm-space-1);
+}
+
+.cmt__reply {
   padding: 0;
   border: 0;
   background: none;

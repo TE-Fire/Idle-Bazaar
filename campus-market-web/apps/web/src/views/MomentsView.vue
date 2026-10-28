@@ -14,9 +14,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userMomentApi, type MomentVO } from '@campus/api'
+import { userMomentApi, REPORT_TARGET, type MomentVO } from '@campus/api'
 import MomentCard from '@/components/MomentCard.vue'
 import MomentComposer from '@/components/MomentComposer.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const PAGE_SIZE = 10
@@ -30,6 +31,15 @@ const total = ref(0)
 const loading = ref(false)
 /** 正在请求的那条动态 id：防止连点重复请求 */
 const likePending = ref<string | null>(null)
+
+/** 举报弹窗：只记被举报的动态 id，类型固定为「动态」 */
+const reportOpen = ref(false)
+const reportId = ref('')
+
+function openReport(m: MomentVO): void {
+  reportId.value = m.id
+  reportOpen.value = true
+}
 
 const composerOpen = ref(false)
 const sentinel = ref<HTMLElement | null>(null)
@@ -139,6 +149,7 @@ onBeforeUnmount(() => {
         :moment="m"
         @toggle-like="toggleLike"
         @comment="goDetail"
+        @report="openReport"
       />
     </div>
 
@@ -149,6 +160,7 @@ onBeforeUnmount(() => {
     </div>
 
     <MomentComposer v-model="composerOpen" @published="onPublished" />
+    <ReportDialog v-model="reportOpen" :target-type="REPORT_TARGET.MOMENT" :target-id="reportId" />
   </div>
 </template>
 

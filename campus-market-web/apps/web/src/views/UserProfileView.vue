@@ -15,12 +15,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userItemApi, userMomentApi, userSocialApi, type MomentVO, type UserProfileVO } from '@campus/api'
+import { userItemApi, userMomentApi, userSocialApi, REPORT_TARGET, type MomentVO, type UserProfileVO } from '@campus/api'
 import type { GoodsItem } from '@campus/shared'
 import { toGoodsItem } from '@/utils/item-map'
 import ProductCard from '@/components/ProductCard.vue'
 import MomentCard from '@/components/MomentCard.vue'
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -57,6 +58,15 @@ const nickname = computed(() => profile.value?.nickname || '校园用户')
 
 /** 自己的主页：直接在这里编辑资料（与顶栏下拉共用弹层） */
 const editSelfOpen = ref(false)
+
+/** 举报弹窗（只这个主页的动态流里有入口） */
+const reportOpen = ref(false)
+const reportId = ref('')
+
+function openReport(m: MomentVO): void {
+  reportId.value = m.id
+  reportOpen.value = true
+}
 
 async function loadProfile(): Promise<void> {
   loading.value = true
@@ -278,6 +288,7 @@ onMounted(() => {
           :moment="m"
           @toggle-like="toggleMomentLike"
           @comment="goMomentDetail"
+          @report="openReport"
         />
       </div>
       <div v-if="moments.length < momentTotal" class="more">
@@ -286,6 +297,7 @@ onMounted(() => {
     </template>
 
     <ProfileEditDialog v-model="editSelfOpen" />
+    <ReportDialog v-model="reportOpen" :target-type="REPORT_TARGET.MOMENT" :target-id="reportId" />
   </div>
 
   <div v-else-if="!loading" class="cm-shell">

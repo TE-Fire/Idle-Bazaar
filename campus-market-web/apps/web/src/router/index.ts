@@ -59,6 +59,13 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/MomentDetailView.vue'),
         meta: { title: '动态详情' }
       },
+      // 系统通知（批次 3）：平台单向广播，与私信分开
+      {
+        path: 'notices',
+        name: 'notices',
+        component: () => import('@/views/NoticesView.vue'),
+        meta: { title: '系统通知' }
+      },
       // 订单详情：状态动作都在这页（付款 / 退款 / 核销 / 收货 / 纠纷），?role=seller 切卖家视角
       {
         path: 'order/:id',

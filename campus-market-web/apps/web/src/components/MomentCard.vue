@@ -16,6 +16,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { formatRelativeTime } from '@campus/shared'
 import type { MomentVO } from '@campus/api'
+import { useUserStore } from '@/stores/user'
 
 const props = withDefaults(
   defineProps<{
@@ -29,9 +30,14 @@ const props = withDefaults(
 const emit = defineEmits<{
   (e: 'toggle-like', m: MomentVO): void
   (e: 'comment', m: MomentVO): void
+  (e: 'report', m: MomentVO): void
 }>()
 
 const router = useRouter()
+const userStore = useUserStore()
+
+/** 自己的动态不显示举报入口——后端也会拒（3006），但按钮不该先给出来 */
+const isMine = computed(() => Boolean(userStore.userId) && userStore.userId === props.moment.userId)
 
 const author = computed(() => props.moment.author)
 const nickname = computed(() => author.value?.nickname || '校园用户')
@@ -120,6 +126,10 @@ function onComment(): void {
       <button type="button" class="act" @click="onComment">
         <span class="act__ico">💬</span>
         <span class="act__n">{{ moment.commentCount && Number(moment.commentCount) > 0 ? moment.commentCount : '评论' }}</span>
+      </button>
+      <button v-if="!isMine" type="button" class="act act--right" @click="emit('report', moment)">
+        <span class="act__ico">⚑</span>
+        <span class="act__n">举报</span>
       </button>
     </footer>
   </article>
@@ -353,6 +363,11 @@ function onComment(): void {
   &--on {
     color: #e0245e;
     font-weight: 700;
+  }
+
+  &--right {
+    margin-left: auto;
+    color: var(--cm-color-text-3);
   }
 }
 

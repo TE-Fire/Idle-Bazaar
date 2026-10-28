@@ -21,6 +21,12 @@
       }
     },
     {
+      "path": "pages/notice/index",
+      "style": {
+        "navigationBarTitleText": "系统通知"
+      }
+    },
+    {
       "path": "pages/publish/index",
       "style": {
         "navigationBarTitleText": "发布闲置"

@@ -18,8 +18,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { formatRelativeTime } from '@campus/shared'
-import { userMomentApi, type MomentCommentVO, type MomentVO } from '@campus/api'
+import { userMomentApi, REPORT_TARGET, type MomentCommentVO, type MomentVO } from '@campus/api'
 import MomentCard from '@/components/MomentCard.vue'
+import ReportDialog from '@/components/ReportDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -39,6 +40,21 @@ const sending = ref(false)
 const replyTarget = ref<{ userId: string; nick: string } | null>(null)
 /** 正在点赞的动态 id（详情只有一条，仍用 id 比较以复用同样逻辑） */
 const likePending = ref<string | null>(null)
+
+/** 举报弹窗：动态与动态评论共用一个弹层，类型随入口切换 */
+const reportOpen = ref(false)
+const reportType = ref<number>(REPORT_TARGET.MOMENT)
+const reportId = ref('')
+
+function openReport(type: number, id: string): void {
+  reportType.value = type
+  reportId.value = id
+  reportOpen.value = true
+}
+
+function reportMoment(m: MomentVO): void {
+  openReport(REPORT_TARGET.MOMENT, m.id)
+}
 
 const replyHint = computed(() => (replyTarget.value ? `回复 @${replyTarget.value.nick}：` : '说点什么…'))
 
@@ -130,7 +146,7 @@ onMounted(() => {
     <button type="button" class="back" @click="router.back()">← 返回</button>
 
     <template v-if="moment">
-      <MomentCard :moment="moment" in-detail @toggle-like="toggleLike" @comment="() => {}" />
+      <MomentCard :moment="moment" in-detail @toggle-like="toggleLike" @comment="() => {}" @report="reportMoment" />
 
       <section class="cmt">
         <h2 class="cmt__title">评论 {{ comments.length ? `(${comments.length})` : '' }}</h2>
@@ -151,7 +167,17 @@ onMounted(() => {
               <p class="row__text">
                 <span v-if="c.replyTo" class="row__reply">回复 @{{ c.replyToNick || 'TA' }}：</span>{{ c.content }}
               </p>
-              <button type="button" class="row__act" @click="setReply(c)">回复</button>
+              <div class="row__acts">
+                <button type="button" class="row__act" @click="setReply(c)">回复</button>
+                <button
+                  v-if="c.userId !== session.userId"
+                  type="button"
+                  class="row__act"
+                  @click="openReport(REPORT_TARGET.MOMENT_COMMENT, c.id)"
+                >
+                  举报
+                </button>
+              </div>
             </div>
           </li>
         </ul>
@@ -181,6 +207,8 @@ onMounted(() => {
 
     <div v-else-if="loading" class="state">加载中…</div>
     <div v-else-if="missing" class="state">这条动态不存在或已被删除</div>
+
+    <ReportDialog v-model="reportOpen" :target-type="reportType" :target-id="reportId" />
   </div>
 </template>
 
@@ -303,8 +331,13 @@ onMounted(() => {
   color: var(--cm-color-brand-text);
 }
 
-.row__act {
+.row__acts {
+  display: flex;
+  gap: var(--cm-space-3);
   margin-top: 4px;
+}
+
+.row__act {
   padding: 0;
   font-size: var(--cm-font-size-xs);
   color: var(--cm-color-text-3);
@@ -313,7 +346,7 @@ onMounted(() => {
   cursor: pointer;
 
   &:hover {
-    color: var(--cm-color-brand-text);
+    color: var(--cm-color-brand-dark);
   }
 }
 

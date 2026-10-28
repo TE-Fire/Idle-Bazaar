@@ -91,6 +91,17 @@ const routes: RouteRecordRaw[] = [
       },
       {
         /*
+         * 社交举报（notes/22 批次 3）：动态与评论不进审核队列——队列按商品举报次数加权，
+         * 这两类解析不出商品会污染排序。单开一页，处置动作只有「下架内容」。
+         * 权限复用 review.view（看）与 review.judge（裁决），不新增权限点。
+         */
+        path: 'social-reports',
+        name: 'social-reports',
+        component: () => import('@/views/SocialReportsView.vue'),
+        meta: { title: '社交举报', perm: PERM_CODES.REVIEW_VIEW }
+      },
+      {
+        /*
          * A6 订单管理（A-B7 / F-A6）：纠纷裁决看商品快照。
          * 17 个权限点里没有 order.view，菜单级只能借 order.refund 做门禁——
          * 代价是只读角色看不到订单页。要打通需后端补一个 order.view，记进待办。

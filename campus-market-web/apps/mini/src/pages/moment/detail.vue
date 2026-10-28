@@ -17,7 +17,10 @@ import { onLoad } from '@dcloudio/uni-app'
 import { formatRelativeTime } from '@campus/shared'
 import MomentCard from '@/components/MomentCard.vue'
 import { momentApi, type MomentCommentVO, type MomentVO } from '@/api/moment'
+import { REPORT_TARGET, reportTarget } from '@/utils/report'
 import { getSession } from '@/utils/session'
+
+const myId = getSession().userId
 
 const momentId = ref('')
 const moment = ref<MomentVO | null>(null)
@@ -138,7 +141,16 @@ onLoad((query) => {
             <text class="row__text">
               <text v-if="c.replyTo" class="row__reply">回复 @{{ c.replyToNick || 'TA' }}：</text>{{ c.content }}
             </text>
-            <text class="row__act" @click="setReply(c)">回复</text>
+            <view class="row__acts">
+              <text class="row__act" @click="setReply(c)">回复</text>
+              <text
+                v-if="c.userId !== myId"
+                class="row__act"
+                @click="reportTarget(REPORT_TARGET.MOMENT_COMMENT, c.id)"
+              >
+                举报
+              </text>
+            </view>
           </view>
         </view>
       </view>
@@ -280,8 +292,13 @@ onLoad((query) => {
   color: $cm-color-brand-text;
 }
 
-.row__act {
+.row__acts {
   align-self: flex-start;
+  display: flex;
+  gap: $cm-space-3;
+}
+
+.row__act {
   font-size: 20rpx;
   color: $cm-color-text-3;
 }

@@ -36,6 +36,7 @@ const orderEntries: OrderEntry[] = [
 const serviceEntries: ServiceEntry[] = [
   { key: 'moments', label: '我的动态' },
   { key: 'plaza', label: '逛广场' },
+  { key: 'notice', label: '系统通知' },
   { key: 'fav', label: '我的收藏' },
   { key: 'verify', label: '学号认证' }
 ]
@@ -72,6 +73,10 @@ function open(e: { key: string; label: string }): void {
   }
   if (e.key === 'plaza') {
     void uni.navigateTo({ url: '/pages/moments/index' })
+    return
+  }
+  if (e.key === 'notice') {
+    void uni.navigateTo({ url: '/pages/notice/index' })
     return
   }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })

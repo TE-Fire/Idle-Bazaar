@@ -14,10 +14,18 @@
 
 import { computed } from 'vue'
 import { formatRelativeTime } from '@campus/shared'
+import { REPORT_TARGET, reportTarget } from '@/utils/report'
+import { getSession } from '@/utils/session'
 import type { MomentVO } from '@/api/moment'
 
 const props = withDefaults(defineProps<{ moment: MomentVO; inDetail?: boolean }>(), { inDetail: false })
 const emit = defineEmits<{ (e: 'toggle-like', m: MomentVO): void }>()
+
+/** 自己的动态不给举报入口（后端也会拒 3006，但按钮不该先给出来） */
+const isMine = computed(() => {
+  const me = getSession().userId
+  return Boolean(me) && me === props.moment.userId
+})
 
 const author = computed(() => props.moment.author)
 const nickname = computed(() => author.value?.nickname || '校园用户')
@@ -96,6 +104,15 @@ function previewImage(i: number): void {
       <view class="act" hover-class="act--active" @click="goDetail">
         <text class="act__ico">💬</text>
         <text class="act__n">{{ Number(moment.commentCount) > 0 ? moment.commentCount : '评论' }}</text>
+      </view>
+      <view
+        v-if="!isMine"
+        class="act act--right"
+        hover-class="act--active"
+        @click="reportTarget(REPORT_TARGET.MOMENT, moment.id)"
+      >
+        <text class="act__ico">⚑</text>
+        <text class="act__n">举报</text>
       </view>
     </view>
   </view>
@@ -296,6 +313,10 @@ function previewImage(i: number): void {
 
 .act--active {
   opacity: 0.6;
+}
+
+.act--right {
+  margin-left: auto;
 }
 
 .act__ico {

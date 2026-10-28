@@ -15,7 +15,7 @@
 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, Compass, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
+import { Bell, ChatDotRound, Compass, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
 import { userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
@@ -78,6 +78,11 @@ function goMyItems(): void {
 }
 function goFollow(): void {
   void router.push({ name: 'follow' })
+}
+
+/** 系统通知：平台广播（举报处置结果等），与私信两个入口分开 */
+function goNotices(): void {
+  void router.push({ name: 'notices' })
 }
 
 function onSearch(): void {
@@ -168,6 +173,9 @@ async function logout(): Promise<void> {
                   </el-dropdown-item>
                   <el-dropdown-item @click="goFollow">
                     <el-icon><Star /></el-icon>我的关注
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="goNotices">
+                    <el-icon><Bell /></el-icon>系统通知
                   </el-dropdown-item>
                   <el-dropdown-item @click="openEdit">
                     <el-icon><Edit /></el-icon>编辑资料
