@@ -34,6 +34,8 @@ const orderEntries: OrderEntry[] = [
 
 /** 我的服务：分组平铺（关注 / 粉丝收进头部，不单列） */
 const serviceEntries: ServiceEntry[] = [
+  { key: 'moments', label: '我的动态' },
+  { key: 'plaza', label: '逛广场' },
   { key: 'fav', label: '我的收藏' },
   { key: 'verify', label: '学号认证' }
 ]
@@ -56,6 +58,20 @@ function open(e: { key: string; label: string }): void {
   }
   if (e.key === 'sold') {
     void uni.navigateTo({ url: '/pages/transactions/index?tab=2' })
+    return
+  }
+  if (e.key === 'moments') {
+    // 自己的主页 → 动态 Tab；未登录先登录，否则主页会提示「用户不存在」
+    const me = getSession().userId
+    if (!me) {
+      goLogin()
+      return
+    }
+    void uni.navigateTo({ url: `/pages/user/index?userId=${me}&tab=moments` })
+    return
+  }
+  if (e.key === 'plaza') {
+    void uni.navigateTo({ url: '/pages/moments/index' })
     return
   }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })

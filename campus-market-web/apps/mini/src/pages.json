@@ -21,6 +21,20 @@
       }
     },
     {
+      "path": "pages/moments/index",
+      "style": {
+        "navigationBarTitleText": "广场",
+        "enablePullDownRefresh": true,
+        "onReachBottomDistance": 50
+      }
+    },
+    {
+      "path": "pages/moment/detail",
+      "style": {
+        "navigationBarTitleText": "动态详情"
+      }
+    },
+    {
       "path": "pages/transactions/index",
       "style": {
         "navigationBarTitleText": "我的交易"

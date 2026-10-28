@@ -13,11 +13,14 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
 import { userItemApi, userOrderApi, type ApiItemVO } from '@/api/user'
+import { momentApi } from '@/api/moment'
 import { getSession } from '@/utils/session'
 import ConditionTag from '@/components/ConditionTag.vue'
 
 const id = ref('')
 const item = ref<ApiItemVO | null>(null)
+/** 分享到广场在途：防止连点重复发动态 */
+const sharing = ref(false)
 
 onLoad((query) => {
   id.value = (query as { id?: string })?.id ?? ''
@@ -85,6 +88,36 @@ function goSeller(): void {
   if (!item.value) return
   void uni.navigateTo({ url: `/pages/user/index?userId=${item.value.sellerId}` })
 }
+
+/**
+ * 分享到广场（动态 type=2）。
+ *
+ * <p>正文给一句默认推荐语，不让用户先写再发——分享动作要一步完成才有转化。
+ * 商品必须仍在售，非在售服务端返回 4023，这里由请求层提示。
+ */
+async function onShare(): Promise<void> {
+  if (!item.value || sharing.value) return
+  if (!getSession().tokenValue) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    void uni.navigateTo({ url: '/pages/login/index' })
+    return
+  }
+  sharing.value = true
+  uni.showLoading({ title: '分享中…', mask: true })
+  try {
+    await momentApi.publish({
+      type: 2,
+      content: `推荐一件好物：${item.value.title}`,
+      itemId: item.value.id
+    })
+    uni.hideLoading()
+    uni.showToast({ title: '已分享到广场', icon: 'success' })
+  } catch {
+    uni.hideLoading()
+  } finally {
+    sharing.value = false
+  }
+}
 </script>
 
 <template>
@@ -130,6 +163,10 @@ function goSeller(): void {
     <view class="box">
       <text class="desc__t">商品描述</text>
       <text class="desc">{{ item.description || '卖家没有填写描述。' }}</text>
+      <view class="share-row" hover-class="share-row--active" @click="onShare">
+        <text class="share-row__t">{{ sharing ? '分享中…' : '分享到广场，让更多同学看到' }}</text>
+        <text class="share-row__arrow">›</text>
+      </view>
     </view>
 
     <!-- 底部固定操作条：50pt + 安全区，主行动占 60% -->
@@ -268,6 +305,31 @@ function goSeller(): void {
   font-size: $cm-font-size-sm;
   line-height: 1.7;
   color: $cm-color-text-2;
+}
+
+/* 分享到广场：描述卡内的次级动作行，不抢底部主行动 */
+.share-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: $cm-space-2;
+  padding: $cm-space-3;
+  background: $cm-color-bg;
+  border-radius: $cm-radius-md;
+}
+
+.share-row--active {
+  opacity: 0.8;
+}
+
+.share-row__t {
+  font-size: $cm-font-size-sm;
+  color: $cm-color-brand-text;
+}
+
+.share-row__arrow {
+  font-size: $cm-font-size-md;
+  color: $cm-color-text-3;
 }
 
 .actionbar {

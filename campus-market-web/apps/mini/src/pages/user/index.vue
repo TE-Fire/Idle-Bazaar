@@ -1,19 +1,23 @@
 <script setup lang="ts">
 /**
- * 个人主页（notes/22 S2 的宿主页面）
+ * 个人主页（notes/22 S2 的宿主页面，S4 动态 Tab 在此落地）
  *
- * <p>资料头 + 关注按钮 + TA 的在售商品（双列瀑布流，复用首页的 GoodsCard）。
- * 动态 Tab（S4）未实现，先不做占位——小程序屏窄，空 tab 只会添乱，S4 落地时一起加。
+ * <p>资料头 + 关注按钮 + 两个 tab：TA 的闲置（双列瀑布流，复用首页 GoodsCard）/ TA 的动态。
+ * 动态 tab 懒加载：首屏只拉商品，点开才请求动态，进主页不会一次发两串请求。
  *
- * <p>触底加载与首页同口径：`finished` 由「已加载条数 >= total」判定。
- * 关注按钮乐观更新，失败不动界面，下次进页回到服务端真值。
+ * <p>触底加载按当前 tab 分派，`finished` 各自独立——两个 tab 的分页游标不能共用，
+ * 否则切 tab 后会跳页或漏页。
+ *
+ * <p>关注按钮与点赞都乐观更新，失败不动界面，下次进页回到服务端真值。
  */
 
 import { onLoad, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import GoodsCard from '@/components/GoodsCard.vue'
+import MomentCard from '@/components/MomentCard.vue'
 import { userItemApi, type ApiItemVO } from '@/api/user'
 import { userSocialApi as socialApi, type UserProfileVO } from '@/api/social'
+import { momentApi, type MomentVO } from '@/api/moment'
 import { toGoodsItem } from '@/utils/item-map'
 import type { GoodsItem } from '@campus/shared'
 import { getSession } from '@/utils/session'
@@ -34,6 +38,67 @@ const isSelf = computed(() => !!profile.value?.self)
 
 const leftColumn = computed(() => goods.value.filter((_, i) => i % 2 === 0))
 const rightColumn = computed(() => goods.value.filter((_, i) => i % 2 === 1))
+
+/* ── Tab 与动态 ────────────────────────────────────────── */
+
+const tab = ref<'items' | 'moments'>('items')
+
+const moments = ref<MomentVO[]>([])
+const momentPage = ref(1)
+const momentTotal = ref(0)
+const momentLoading = ref(false)
+const momentsLoaded = ref(false)
+const likePend = ref('')
+
+async function fetchMomentPage(reset: boolean): Promise<void> {
+  if (momentLoading.value) return
+  if (!reset && moments.value.length >= momentTotal.value) return
+  momentLoading.value = true
+  const p = reset ? 1 : momentPage.value + 1
+  try {
+    const res = await momentApi.userMoments(userId.value, p, PAGE)
+    const rows = res.list ?? []
+    moments.value = reset ? rows : [...moments.value, ...rows]
+    momentPage.value = p
+    momentTotal.value = rows.length < PAGE ? moments.value.length : Number(res.total)
+    momentsLoaded.value = true
+  } catch {
+    if (reset) {
+      moments.value = []
+      momentTotal.value = 0
+    }
+  } finally {
+    momentLoading.value = false
+  }
+}
+
+function switchTab(next: 'items' | 'moments'): void {
+  if (tab.value === next) return
+  tab.value = next
+  if (next === 'moments' && !momentsLoaded.value) void fetchMomentPage(true)
+}
+
+async function toggleLike(m: MomentVO): Promise<void> {
+  if (likePend.value === m.id) return
+  likePend.value = m.id
+  const wasLiked = m.liked
+  const before = Number(m.likeCount)
+  m.liked = !wasLiked
+  m.likeCount = String(Math.max(before + (wasLiked ? -1 : 1), 0))
+  try {
+    if (wasLiked) {
+      await momentApi.unlike(m.id)
+    } else {
+      await momentApi.like(m.id)
+    }
+  } catch {
+    m.liked = wasLiked
+    m.likeCount = String(before)
+    uni.showToast({ title: '操作失败', icon: 'none' })
+  } finally {
+    likePend.value = ''
+  }
+}
 
 async function loadProfile(): Promise<void> {
   try {
@@ -69,6 +134,12 @@ function reload(): void {
   pageNum.value = 1
   finished.value = false
   void fetchPage(true)
+  // 换人或重进：动态全部作废，回到「未加载」按需再拉
+  moments.value = []
+  momentPage.value = 1
+  momentTotal.value = 0
+  momentsLoaded.value = false
+  if (tab.value === 'moments') void fetchMomentPage(true)
 }
 
 async function toggleFollow(): Promise<void> {
@@ -101,9 +172,13 @@ function initial(nick?: string): string {
 }
 
 onLoad((query) => {
-  const q = query as { userId?: string }
+  const q = query as { userId?: string; tab?: string }
   if (q.userId) {
     userId.value = q.userId
+  }
+  // ?tab=moments 直接落在动态 Tab（「我的 → 我的动态」这么进）
+  if (q.tab === 'moments') {
+    tab.value = 'moments'
   }
   myId.value = getSession().userId
 })
@@ -124,7 +199,11 @@ onShow(() => {
 })
 
 onReachBottom(() => {
-  void fetchPage(false)
+  if (tab.value === 'items') {
+    void fetchPage(false)
+  } else {
+    void fetchMomentPage(false)
+  }
 })
 </script>
 
@@ -173,22 +252,49 @@ onReachBottom(() => {
         </view>
       </view>
 
-      <!-- 在售商品：双列瀑布流，复用首页卡片 -->
-      <view v-if="!goods.length && loading" class="state"><text class="state__t">加载中…</text></view>
-      <view v-else-if="!goods.length" class="state"><text class="state__t">TA 还没有在售的闲置</text></view>
-
-      <view v-else class="falls">
-        <view class="col">
-          <GoodsCard v-for="it in leftColumn" :key="it.id" :item="it" />
+      <!-- Tab：闲置 / 动态（动态懒加载） -->
+      <view class="tabs">
+        <view class="tab" :class="{ 'tab--on': tab === 'items' }" @click="switchTab('items')">
+          <text class="tab__t">TA 的闲置</text>
+          <view class="tab__ink" />
         </view>
-        <view class="col">
-          <GoodsCard v-for="it in rightColumn" :key="it.id" :item="it" />
+        <view class="tab" :class="{ 'tab--on': tab === 'moments' }" @click="switchTab('moments')">
+          <text class="tab__t">动态</text>
+          <view class="tab__ink" />
         </view>
       </view>
 
-      <view v-if="goods.length" class="loadmore">
-        <text>{{ loading ? '加载中…' : finished ? '没有更多了' : '上拉加载更多' }}</text>
-      </view>
+      <block v-if="tab === 'items'">
+        <!-- 在售商品：双列瀑布流，复用首页卡片 -->
+        <view v-if="!goods.length && loading" class="state"><text class="state__t">加载中…</text></view>
+        <view v-else-if="!goods.length" class="state"><text class="state__t">TA 还没有在售的闲置</text></view>
+
+        <view v-else class="falls">
+          <view class="col">
+            <GoodsCard v-for="it in leftColumn" :key="it.id" :item="it" />
+          </view>
+          <view class="col">
+            <GoodsCard v-for="it in rightColumn" :key="it.id" :item="it" />
+          </view>
+        </view>
+
+        <view v-if="goods.length" class="loadmore">
+          <text>{{ loading ? '加载中…' : finished ? '没有更多了' : '上拉加载更多' }}</text>
+        </view>
+      </block>
+
+      <block v-else>
+        <view v-if="!moments.length && momentLoading" class="state"><text class="state__t">加载中…</text></view>
+        <view v-else-if="!moments.length" class="state"><text class="state__t">TA 还没发过动态</text></view>
+
+        <view v-else class="feed">
+          <MomentCard v-for="m in moments" :key="m.id" :moment="m" @toggle-like="toggleLike" />
+        </view>
+
+        <view v-if="moments.length" class="loadmore">
+          <text>{{ momentLoading ? '加载中…' : moments.length >= momentTotal ? '没有更多了' : '上拉加载更多' }}</text>
+        </view>
+      </block>
     </template>
 
     <view v-else class="state"><text class="state__t">加载中…</text></view>
@@ -332,6 +438,56 @@ onReachBottom(() => {
 .counts__label {
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
+}
+
+/* ── Tab 条：闲置 / 动态 ───────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: $cm-space-8;
+  margin-bottom: $cm-space-3;
+  padding: 0 $cm-space-5;
+  background: $cm-color-surface;
+}
+
+.tab {
+  position: relative;
+  height: 84rpx;
+  display: flex;
+  align-items: center;
+}
+
+.tab__t {
+  font-size: $cm-font-size-base;
+  color: $cm-color-text-2;
+}
+
+.tab--on .tab__t {
+  font-weight: 700;
+  color: $cm-color-text-1;
+}
+
+.tab__ink {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 44rpx;
+  height: 6rpx;
+  border-radius: 3rpx;
+  background: transparent;
+  transform: translateX(-50%);
+}
+
+.tab--on .tab__ink {
+  background: $cm-color-brand;
+}
+
+/* 动态流：单列，与广场同节奏 */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: $cm-space-3;
+  padding: 0 $cm-space-4;
 }
 
 /* ── 商品瀑布流：与首页同款容器 ────────────────────────── */

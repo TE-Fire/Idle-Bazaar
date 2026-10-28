@@ -165,6 +165,11 @@ function openChat(): void {
   uni.switchTab({ url: '/pages/chat/list' })
 }
 
+/** 广场是普通页面（非 tabBar），用 navigateTo 保留首页返回栈 */
+function openMoments(): void {
+  void uni.navigateTo({ url: '/pages/moments/index' })
+}
+
 function goPublish(): void {
   // 发布是 tabBar 页，必须用 switchTab
   uni.switchTab({ url: '/pages/publish/index' })
@@ -181,6 +186,9 @@ void fetchCats()
       <view class="searchbar__box" hover-class="searchbar__box--active" @click="openSearch">
         <view class="searchbar__icon" />
         <text class="searchbar__ph">搜闲置、教材、数码…</text>
+      </view>
+      <view class="searchbar__msg" hover-class="searchbar__msg--active" @click="openMoments">
+        <text>广场</text>
       </view>
       <view class="searchbar__msg" hover-class="searchbar__msg--active" @click="openChat">
         <text>消息</text>
