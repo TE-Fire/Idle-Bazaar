@@ -13,7 +13,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
 import { userItemApi, userOrderApi, type ApiItemVO } from '@/api/user'
-import { momentApi } from '@/api/moment'
+import { itemCommentApi, momentApi, type ItemCommentVO } from '@/api/moment'
 import { getSession } from '@/utils/session'
 import ConditionTag from '@/components/ConditionTag.vue'
 
@@ -22,12 +22,28 @@ const item = ref<ApiItemVO | null>(null)
 /** 分享到广场在途：防止连点重复发动态 */
 const sharing = ref(false)
 
+/** 商品评论（notes/22 S7）：仅 ON_SALE 可发，下架后仍可读历史 */
+const comments = ref<ItemCommentVO[]>([])
+const commentTotal = ref('0')
+const draft = ref('')
+const sending = ref(false)
+const replyTarget = ref<{ userId: string; nick: string } | null>(null)
+const canComment = computed(() => item.value?.status === 'ON_SALE')
+const replyHint = computed(() =>
+  canComment.value
+    ? replyTarget.value
+      ? `回复 @${replyTarget.value.nick}`
+      : '问问成色、配件或交易方式'
+    : '商品已下架，暂不可评论'
+)
+
 onLoad((query) => {
   id.value = (query as { id?: string })?.id ?? ''
   void userItemApi
     .detail(id.value)
     .then((vo) => {
       item.value = vo
+      loadComments()
     })
     .catch(() => {
       // 不存在 / 已下架：request 层已提示，落空态
@@ -118,6 +134,83 @@ async function onShare(): Promise<void> {
     sharing.value = false
   }
 }
+
+/** 生成分享海报：关键字段随 query 带到海报页，省一次详情请求 */
+function onPoster(): void {
+  if (!item.value) return
+  const it = item.value
+  const meta = [
+    it.grade ? `${it.grade} 级` : '',
+    it.campusName ?? '',
+    it.meetPointName ?? ''
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  const q = [
+    `title=${encodeURIComponent(it.title)}`,
+    `price=${encodeURIComponent(formatPrice(Number(it.price)))}`,
+    `meta=${encodeURIComponent(meta)}`,
+    `image=${it.mainImage ? encodeURIComponent(it.mainImage) : ''}`
+  ].join('&')
+  void uni.navigateTo({ url: `/pages/poster/index?${q}` })
+}
+
+/** 评论头像 → TA 的主页 */function goProfile(userId: string): void {
+  void uni.navigateTo({ url: `/pages/user/index?userId=${userId}` })
+}
+
+/** 拉评论：一次 50 条，商品评论量小不分页 */
+function loadComments(): void {
+  if (!id.value) return
+  itemCommentApi
+    .list(id.value)
+    .then((p) => {
+      comments.value = p.list
+      commentTotal.value = p.total
+    })
+    .catch(() => undefined)
+}
+
+/** 头像占位：取昵称首字 */
+function initial(nick?: string): string {
+  return (nick ?? '同').slice(0, 1)
+}
+
+function needLogin(): boolean {
+  if (getSession().tokenValue) return false
+  uni.showToast({ title: '请先登录', icon: 'none' })
+  void uni.navigateTo({ url: '/pages/login/index' })
+  return true
+}
+
+function setReply(c: ItemCommentVO): void {
+  if (needLogin()) return
+  replyTarget.value = { userId: c.userId, nick: c.author?.nickname || 'TA' }
+}
+
+function clearReply(): void {
+  replyTarget.value = null
+}
+
+/** 发评论：正文由服务端过敏感词（低危词变 *），发完重拉而不是本地插 */
+async function send(): Promise<void> {
+  if (!item.value || sending.value) return
+  const text = draft.value.trim()
+  if (!text) return
+  if (needLogin()) return
+  sending.value = true
+  try {
+    await itemCommentApi.publish(item.value.id, text, replyTarget.value?.userId)
+    draft.value = ''
+    replyTarget.value = null
+    uni.showToast({ title: '评论已发布', icon: 'success' })
+    loadComments()
+  } catch {
+    // 请求层已提示（4024 敏感词 / 4025 商品不在售）
+  } finally {
+    sending.value = false
+  }
+}
 </script>
 
 <template>
@@ -166,6 +259,63 @@ async function onShare(): Promise<void> {
       <view class="share-row" hover-class="share-row--active" @click="onShare">
         <text class="share-row__t">{{ sharing ? '分享中…' : '分享到广场，让更多同学看到' }}</text>
         <text class="share-row__arrow">›</text>
+      </view>
+      <view class="share-row" hover-class="share-row--active" @click="onPoster">
+        <text class="share-row__t">生成分享海报</text>
+        <text class="share-row__arrow">›</text>
+      </view>
+    </view>
+
+    <!-- 商品评论（notes/22 S7）：售前问答，扁平一层 -->
+    <view class="box">
+      <view class="cmt__hd">
+        <text class="desc__t">商品评论</text>
+        <text class="cmt__n">{{ commentTotal }} 条</text>
+      </view>
+
+      <text v-if="!comments.length" class="cmt__empty">还没有人评论，来问两句</text>
+
+      <view v-for="c in comments" :key="c.id" class="row">
+        <view class="row__ava" @click="goProfile(c.userId)">
+          <image v-if="c.author?.avatarUrl" class="row__ava-img" :src="c.author.avatarUrl" mode="aspectFill" />
+          <text v-else class="row__ava-t">{{ initial(c.author?.nickname) }}</text>
+        </view>
+        <view class="row__body">
+          <view class="row__top">
+            <text class="row__nick">{{ c.author?.nickname || '校园用户' }}</text>
+            <text class="row__time">{{ formatRelativeTime(c.createTime) }}</text>
+          </view>
+          <text class="row__text">
+            <text v-if="c.replyTo" class="row__reply">回复 @{{ c.replyToNick || 'TA' }}：</text>{{ c.content }}
+          </text>
+          <text class="row__act" @click="setReply(c)">回复</text>
+        </view>
+      </view>
+
+      <view class="cmt__editor">
+        <view v-if="replyTarget" class="cmt__to">
+          <text class="cmt__to-t">回复 @{{ replyTarget.nick }}</text>
+          <text class="cmt__cancel" @click="clearReply">取消</text>
+        </view>
+        <view class="cmt__row">
+          <input
+            v-model="draft"
+            class="cmt__input"
+            :maxlength="500"
+            :disabled="!canComment"
+            :placeholder="replyHint"
+            placeholder-class="cmt__ph"
+            confirm-type="send"
+            @confirm="send"
+          />
+          <view
+            class="cmt__send"
+            :class="{ 'cmt__send--off': !canComment || !draft.trim() || sending }"
+            @click="send"
+          >
+            <text>{{ sending ? '发送中' : '发送' }}</text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -330,6 +480,157 @@ async function onShare(): Promise<void> {
 .share-row__arrow {
   font-size: $cm-font-size-md;
   color: $cm-color-text-3;
+}
+
+/* ── 商品评论 ── */
+.cmt__hd {
+  display: flex;
+  align-items: baseline;
+  gap: $cm-space-2;
+}
+
+.cmt__n {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.cmt__empty {
+  padding: $cm-space-3 0;
+  font-size: $cm-font-size-sm;
+  color: $cm-color-text-3;
+}
+
+.row {
+  display: flex;
+  gap: $cm-space-3;
+  padding: $cm-space-3 0;
+  border-top: 1rpx solid $cm-color-border;
+}
+
+.row__ava {
+  width: 60rpx;
+  height: 60rpx;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: $cm-color-brand-bg;
+  border-radius: 50%;
+}
+
+.row__ava-img {
+  width: 100%;
+  height: 100%;
+}
+
+.row__ava-t {
+  font-size: 24rpx;
+  font-weight: 700;
+  color: $cm-color-brand-text;
+}
+
+.row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.row__top {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+}
+
+.row__nick {
+  font-size: $cm-font-size-sm;
+  font-weight: 700;
+  color: $cm-color-text-1;
+}
+
+.row__time {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.row__text {
+  font-size: $cm-font-size-sm;
+  line-height: 1.6;
+  color: $cm-color-text-2;
+  word-break: break-all;
+}
+
+.row__reply {
+  color: $cm-color-brand-text;
+}
+
+.row__act {
+  align-self: flex-start;
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.cmt__editor {
+  padding-top: $cm-space-3;
+  border-top: 1rpx solid $cm-color-border;
+}
+
+.cmt__to {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: $cm-space-2;
+}
+
+.cmt__to-t {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-brand-text;
+}
+
+.cmt__cancel {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.cmt__row {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+}
+
+.cmt__input {
+  flex: 1;
+  min-width: 0;
+  height: 72rpx;
+  padding: 0 $cm-space-3;
+  font-size: $cm-font-size-sm;
+  color: $cm-color-text-1;
+  background: $cm-color-bg;
+  border-radius: $cm-radius-md;
+}
+
+.cmt__ph {
+  color: $cm-color-text-3;
+}
+
+.cmt__send {
+  flex: none;
+  height: 72rpx;
+  padding: 0 $cm-space-4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $cm-font-size-sm;
+  font-weight: 700;
+  color: $cm-color-text-1;
+  background: $cm-color-brand;
+  border-radius: $cm-radius-md;
+}
+
+.cmt__send--off {
+  opacity: 0.45;
 }
 
 .actionbar {

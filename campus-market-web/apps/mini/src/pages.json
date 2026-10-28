@@ -15,6 +15,12 @@
       }
     },
     {
+      "path": "pages/poster/index",
+      "style": {
+        "navigationBarTitleText": "分享海报"
+      }
+    },
+    {
       "path": "pages/publish/index",
       "style": {
         "navigationBarTitleText": "发布闲置"

@@ -95,3 +95,40 @@ export const momentApi = {
       data: replyTo ? { content, replyTo } : { content }
     })
 }
+
+/** 商品评论一行（后端 `ItemCommentVO`，形状与动态评论一致） */
+export interface ItemCommentVO {
+  id: string
+  itemId: string
+  userId: string
+  author?: MomentAuthorVO
+  /** 回复目标**用户** id */
+  replyTo?: string
+  replyToNick?: string
+  content: string
+  createTime: string
+}
+
+export interface ItemCommentPageVO {
+  list: ItemCommentVO[]
+  total: string
+  pageNum: string
+  pageSize: string
+}
+
+/** 商品评论（notes/22 S7）：不限买家、可多次发，仅 ON_SALE 可发 */
+export const itemCommentApi = {
+  list: (itemId: string, pageNum = 1, pageSize = 50) =>
+    request<ItemCommentPageVO>({
+      url: `/api/item/${itemId}/comments`,
+      data: { pageNum, pageSize }
+    }),
+
+  /** replyTo 是目标**用户** id */
+  publish: (itemId: string, content: string, replyTo?: string) =>
+    request<void>({
+      url: `/api/item/${itemId}/comment`,
+      method: 'POST',
+      data: replyTo ? { content, replyTo } : { content }
+    })
+}
