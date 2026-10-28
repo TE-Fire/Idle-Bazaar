@@ -102,12 +102,13 @@ function logout(): void {
 .dev-sw {
   position: fixed;
   right: 16rpx;
-  bottom: 16rpx;
+  /* 抬起到底部导航之上：自绘 dock 高 116rpx，压住会点不到 */
+  bottom: calc(#{$cm-layout-tabbar-h} + 24rpx + env(safe-area-inset-bottom));
   z-index: 9999;
   font-size: 22rpx;
 }
 
-/* 停靠左侧：避开首页右下角的发布 FAB */
+/* 停靠左侧：避开右下角的悬浮元素 */
 .dev-sw--left {
   right: auto;
   left: 16rpx;

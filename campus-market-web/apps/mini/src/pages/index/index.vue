@@ -3,7 +3,7 @@
  * M1 首页信息流（design/02 §4.1，本端最重要的一页）
  *
  * <p>原则 1「逛得下去」：用户第 3 秒内要看到至少 4 件商品，不能先看到搜索框和分类。
- * 所以瀑布流一上来就有数据，金刚区只占一屏的头部，不做开屏弹窗。
+ * 所以瀑布流一上来就有数据，头部只占一屏的一小块，不做开屏弹窗。
  *
  * <p>瀑布流双列：左右两列**不等高是允许的**，但同一列内必须对齐——所以按索引奇偶
  * 静态分列（而不是按高度动态插入），否则上拉加载时已有卡片会跳列。
@@ -11,20 +11,25 @@
  * <p>数据来自 `/api/item/list`（免登录，在售按发布时间倒序）。服务端分页 + 上拉加载；
  * 后端列表只支持 keyword/categoryId/campusId，价格与成色筛选未参数化之前不做（web 端同边界）。
  *
- * <p>金刚区（2026-10-24 参考美团重做，design/02 §5.3 已同步）：分类走字典接口不硬编码
- * （tech/02 §七），实色图标 + 白字，点击带意图跳分类页并选中。
+ * <p>2026-10-28 视觉改版：顶部改成「暖色渐变 + 问候」的完整头部，白色搜索框与金刚区
+ * 各自成层压在渐变上；删掉右下发布 FAB（底部导航中间已有发布钮），改为滚动后浮现的
+ * 「回到顶部」胶囊，避免两个发布入口打架。
  */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onPageScroll, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import type { GoodsItem } from '@campus/shared'
 import { userDictApi, userItemApi } from '@/api/user'
 import { toGoodsItem } from '@/utils/item-map'
+import { getSession } from '@/utils/session'
+import { goTab } from '@/utils/tab-nav'
 import GoodsCard from '@/components/GoodsCard.vue'
+import CmIcon from '@/components/CmIcon.vue'
+import TabBar from '@/components/TabBar.vue'
 import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
 import { pendingCategoryId } from '@/utils/nav-intent'
 
-/** dev 构建才挂载测试账号切换器（左侧停靠，避开右下发布 FAB） */
+/** dev 构建才挂载测试账号切换器（左侧停靠，避开底部导航） */
 const isDev = import.meta.env.DEV
 
 /** 频道 chips：原型给的兴趣频道，前端本地过滤标题（服务端无此维度） */
@@ -83,12 +88,12 @@ async function fetchCats(): Promise<void> {
 
 function onKk(e: KkEntry): void {
   if (e.kind === 'publish') {
-    uni.switchTab({ url: '/pages/publish/index' })
+    goTab('publish')
     return
   }
-  // switchTab 不能带参，意图走模块级引用，分类页 onShow 消费后清空
+  // reLaunch 不能带参，意图走模块级引用，分类页 onShow 消费后清空
   pendingCategoryId.value = e.kind === 'cat' ? (e.id ?? '') : ''
-  uni.switchTab({ url: '/pages/category/index' })
+  goTab('category')
 }
 
 const channel = ref(CHANNELS[0])
@@ -100,21 +105,23 @@ const loading = ref(false)
 const loaded = ref(false)
 const loadError = ref(false)
 
-/** 顶栏吸留分隔线 + FAB 显隐：滚动即隐、停 300ms 淡入（design/02 §5.5） */
-const stuck = ref(false)
-const fabShown = ref(true)
-let fabTimer: ReturnType<typeof setTimeout> | undefined
+/** 滚动深度：只用来显隐「回到顶部」，不再驱动吸顶（顶部已无吸顶栏） */
+const scrollTop = ref(0)
 
 onPageScroll((e: { scrollTop: number }) => {
-  stuck.value = e.scrollTop > 4
-  fabShown.value = false
-  clearTimeout(fabTimer)
-  fabTimer = setTimeout(() => {
-    fabShown.value = true
-  }, 300)
+  scrollTop.value = e.scrollTop
 })
 
+const showTop = computed(() => scrollTop.value > 800)
 const hasMore = computed(() => items.value.length < total.value)
+
+/** 问候语按时段切换，让首屏有一点「今天」的现场感 */
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  const who = getSession().nickname
+  const hi = h < 6 ? '夜深了' : h < 11 ? '早上好' : h < 14 ? '中午好' : h < 18 ? '下午好' : '晚上好'
+  return who ? `${hi}，${who}` : `${hi}，同学`
+})
 
 /** 频道是前端本地过滤（标题关键词），命中为空时回落全量提示 */
 const filtered = computed(() => {
@@ -160,19 +167,22 @@ function openSearch(): void {
   uni.showToast({ title: '搜索页待建（M7）', icon: 'none' })
 }
 
-/** 顶栏「消息」进会话列表（tabBar 页用 switchTab） */
+/** 顶栏「消息」进会话列表 */
 function openChat(): void {
-  uni.switchTab({ url: '/pages/chat/list' })
+  goTab('chat')
 }
 
-/** 广场是普通页面（非 tabBar），用 navigateTo 保留首页返回栈 */
+/** 广场是普通页面（非 tab），用 navigateTo 保留首页返回栈 */
 function openMoments(): void {
   void uni.navigateTo({ url: '/pages/moments/index' })
 }
 
 function goPublish(): void {
-  // 发布是 tabBar 页，必须用 switchTab
-  uni.switchTab({ url: '/pages/publish/index' })
+  goTab('publish')
+}
+
+function goTop(): void {
+  void uni.pageScrollTo({ scrollTop: 0, duration: 320 })
 }
 
 void fetchPage(true)
@@ -180,72 +190,112 @@ void fetchCats()
 </script>
 
 <template>
-  <view class="page">
-    <!-- 吸顶搜索栏：滚过阈值后出 hairline，与下方灰色内容区分割 -->
-    <view class="searchbar" :class="{ 'searchbar--stuck': stuck }">
-      <view class="searchbar__box" hover-class="searchbar__box--active" @click="openSearch">
-        <view class="searchbar__icon" />
-        <text class="searchbar__ph">搜闲置、教材、数码…</text>
-      </view>
-      <view class="searchbar__msg" hover-class="searchbar__msg--active" @click="openMoments">
-        <text>广场</text>
-      </view>
-      <view class="searchbar__msg" hover-class="searchbar__msg--active" @click="openChat">
-        <text>消息</text>
-      </view>
-    </view>
-
-    <!-- 金刚区：2×5 = 8 个字典分类 + 全部分类 + 发布（design/02 §5.3） -->
-    <view v-if="catsReady" class="kingkong">
-      <view class="kingkong__in">
-        <view
-          v-for="(e, i) in kkEntries"
-          :key="e.key"
-          class="kk"
-          hover-class="kk--press"
-          :hover-stay-time="60"
-          :style="{ animationDelay: i * 40 + 'ms' }"
-          @click="onKk(e)"
-        >
-          <view class="kk__icon" :class="'kk__icon--' + e.hue">
-            <text class="kk__char">{{ e.char }}</text>
+  <view class="cm-page cm-page--tab">
+    <!-- ① 暖色渐变头部：问候 + 搜索，白色搜索框是这一层唯一的高光 -->
+    <view class="hero">
+      <view class="hero__deco" />
+      <view class="hero__row">
+        <view class="hero__hi">
+          <text class="hero__title">{{ greeting }}</text>
+          <text class="hero__sub">校园里 {{ total }} 件闲置正在等新主人</text>
+        </view>
+        <view class="hero__acts">
+          <view class="hero__act" hover-class="hero__act--on" @click="openMoments">
+            <CmIcon name="chat" size="sm" tone="ink" />
+            <text>广场</text>
           </view>
-          <text class="kk__label">{{ e.name }}</text>
+          <view class="hero__act" hover-class="hero__act--on" @click="openChat">
+            <CmIcon name="bell" size="sm" tone="ink" />
+            <text>消息</text>
+          </view>
         </view>
       </view>
+
+      <view class="search" hover-class="search--on" @click="openSearch">
+        <CmIcon name="search" size="sm" tone="muted" />
+        <text class="search__ph">搜教材、耳机、自行车…</text>
+        <view class="search__go">搜索</view>
+      </view>
     </view>
 
-    <!-- 兴趣频道 chips：横向滑动，不吸顶 -->
-    <scroll-view class="chips" scroll-x>
+    <!-- ② 金刚区：白色圆角卡压在渐变上，形成第一层浮起 -->
+    <view v-if="catsReady" class="kk cm-card cm-in">
+      <view
+        v-for="(e, i) in kkEntries"
+        :key="e.key"
+        class="kk__item"
+        hover-class="kk__item--press"
+        :hover-stay-time="60"
+        :style="{ animationDelay: 60 + i * 35 + 'ms' }"
+        @click="onKk(e)"
+      >
+        <view class="kk__tile" :class="'kk__tile--' + e.hue">
+          <text class="kk__char">{{ e.char }}</text>
+        </view>
+        <text class="kk__label">{{ e.name }}</text>
+      </view>
+    </view>
+
+    <!-- ③ 面交保障位：给「一屏全是商品」的单调加一段节奏 -->
+    <view class="promo cm-card cm-in" style="animation-delay: 220ms">
+      <view class="promo__main">
+        <text class="promo__t">面交更安心</text>
+        <view class="promo__tags">
+          <text class="promo__tag">当面验货</text>
+          <text class="promo__tag">免邮费</text>
+          <text class="promo__tag">校内自提</text>
+        </view>
+      </view>
+      <view class="promo__cta" hover-class="promo__cta--on" @click="goPublish">
+        <text>去发布</text>
+        <CmIcon name="arrow" size="sm" tone="white" />
+      </view>
+      <view class="promo__blur promo__blur--a" />
+      <view class="promo__blur promo__blur--b" />
+    </view>
+
+    <!-- ④ 频道 chips：横向滑动，选中态渐变填充 -->
+    <scroll-view class="chips" scroll-x :show-scrollbar="false">
       <view class="chips__in">
-        <text
+        <view
           v-for="ch in CHANNELS"
           :key="ch"
           class="chip"
           :class="{ 'chip--on': channel === ch }"
+          hover-class="chip--press"
           @click="channel = ch"
         >
-          {{ ch }}
-        </text>
+          <text>{{ ch }}</text>
+        </view>
       </view>
     </scroll-view>
 
-    <!-- 双列瀑布流 -->
+    <!-- ⑤ 推荐区标题 -->
+    <view class="cm-sect">
+      <view class="cm-sect__bar" />
+      <text class="cm-sect__t">为你推荐</text>
+      <text class="cm-sect__sub">{{ channel === CHANNELS[0] ? '按发布时间排序' : channel }}</text>
+    </view>
+
+    <!-- ⑥ 双列瀑布流 -->
     <view v-if="!loaded && loading" class="falls">
       <view class="col">
-        <view v-for="n in 3" :key="'ls' + n" class="skel" />
+        <view v-for="n in 3" :key="'ls' + n" class="cm-skel skel" />
       </view>
       <view class="col">
-        <view v-for="n in 3" :key="'rs' + n" class="skel" />
+        <view v-for="n in 3" :key="'rs' + n" class="cm-skel skel" />
       </view>
     </view>
 
-    <view v-else-if="loadError" class="state">
-      <text class="state__t">加载失败，拉一下试试</text>
+    <view v-else-if="loadError" class="cm-state">
+      <CmIcon name="clock" size="lg" tone="muted" />
+      <text class="cm-state__t">加载失败，拉一下试试</text>
     </view>
 
-    <view v-else-if="!filtered.length" class="state">
-      <text class="state__t">{{ channel === CHANNELS[0] ? '暂时没有在售商品' : '这个频道还没有商品' }}</text>
+    <view v-else-if="!filtered.length" class="cm-state">
+      <CmIcon name="box" size="lg" tone="muted" />
+      <text class="cm-state__t">{{ channel === CHANNELS[0] ? '暂时没有在售商品' : '这个频道还没有商品' }}</text>
+      <text class="cm-state__s">换个频道看看，或者自己发一件</text>
     </view>
 
     <view v-else class="falls">
@@ -258,186 +308,187 @@ void fetchCats()
     </view>
 
     <view class="loadmore">
-      <text>{{ loading ? '加载中…' : hasMore ? '上拉加载更多' : '没有更多了' }}</text>
+      <view v-if="loading" class="loadmore__dots">
+        <view class="loadmore__dot" />
+        <view class="loadmore__dot" />
+        <view class="loadmore__dot" />
+      </view>
+      <text v-else class="loadmore__t">{{ hasMore ? '上拉加载更多' : '没有更多了' }}</text>
     </view>
 
-    <!-- 悬浮发布按钮：56pt=112rpx，右下，避开安全区；滚动隐藏、停 300ms 淡入 -->
-    <view class="fab" :class="{ 'fab--hide': !fabShown }" hover-class="fab--active" @click="goPublish">⊕</view>
+    <!-- 回到顶部：滚动 800rpx 后才浮现，缩放入场 -->
+    <view class="totop" :class="{ 'totop--on': showTop }" @click="goTop">
+      <CmIcon name="arrow" size="sm" tone="ink" />
+    </view>
 
     <DevLoginSwitcher v-if="isDev" position="left" />
+    <TabBar active="home" />
   </view>
 </template>
 
 <style scoped lang="scss">
-.page {
-  padding-bottom: 120rpx;
-}
-
-/* ── 吸顶搜索 ───────────────────────────────────────────── */
-
-.searchbar {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: $cm-space-3;
-  padding: $cm-space-2 $cm-space-4;
-  background: $cm-color-surface;
-}
-
-.searchbar__box {
-  flex: 1;
-  height: 72rpx;
-  display: flex;
-  align-items: center;
-  gap: $cm-space-2;
-  padding: 0 $cm-space-4;
-  background: $cm-color-bg;
-  border-radius: $cm-radius-pill;
-  transition: transform 120ms ease-out;
-}
-
-.searchbar__box--active {
-  transform: scale(0.99);
-}
-
-/* 放大镜图标：纯 CSS 两笔画（圆 + 斜柄），不引图标库 */
-.searchbar__icon {
-  width: 26rpx;
-  height: 26rpx;
-  border: 3rpx solid $cm-color-text-3;
-  border-radius: 50%;
+/* ── ① 渐变头部 ─────────────────────────────────────────── */
+.hero {
   position: relative;
+  padding: $cm-space-5 $cm-space-4 $cm-space-6;
+  background-image: linear-gradient(165deg, #FFE3C9 0%, #FFF3E8 46%, $cm-color-bg 100%);
+  overflow: hidden;
+}
+
+/* 右上角暖色光斑：纯装饰，让渐变不是一条直直的灰白 */
+.hero__deco {
+  position: absolute;
+  right: -120rpx;
+  top: -140rpx;
+  width: 380rpx;
+  height: 380rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 138, 61, 0.32), rgba(255, 138, 61, 0));
+}
+
+.hero__row {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: $cm-space-3;
+}
+
+.hero__hi {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.hero__title {
+  font-size: $cm-font-size-xl;
+  font-weight: $cm-font-weight-heavy;
+  color: $cm-color-text-1;
+  letter-spacing: 0.6rpx;
+}
+
+.hero__sub {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-brand-text;
+}
+
+.hero__acts {
+  display: flex;
+  gap: $cm-space-2;
   flex: none;
 }
 
-.searchbar__icon::after {
-  content: '';
-  position: absolute;
-  right: -10rpx;
-  bottom: -6rpx;
-  width: 12rpx;
-  height: 3rpx;
-  background: $cm-color-text-3;
-  border-radius: 2rpx;
-  transform: rotate(45deg);
+.hero__act {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rpx;
+  width: 76rpx;
+  padding: 8rpx 0;
+  border-radius: $cm-radius-lg;
+  font-size: 20rpx;
+  color: $cm-color-text-2;
+  background: rgba(255, 255, 255, 0.55);
+  transition: transform 140ms ease-out, background 140ms ease-out;
 }
 
-.searchbar__ph {
+.hero__act--on {
+  transform: scale(0.92);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+/* 搜索框：白底 + 软阴影，头部唯一的实心亮面 */
+.search {
+  position: relative;
+  margin-top: $cm-space-4;
+  height: 84rpx;
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+  padding: 0 $cm-space-2 0 $cm-space-4;
+  background: $cm-color-surface;
+  border-radius: $cm-radius-pill;
+  box-shadow: $cm-shadow-md;
+  transition: transform 140ms ease-out;
+}
+
+.search--on {
+  transform: scale(0.985);
+}
+
+.search__ph {
+  flex: 1;
   font-size: $cm-font-size-sm;
   color: $cm-color-text-3;
 }
 
-.searchbar__msg {
+.search__go {
+  height: 60rpx;
+  padding: 0 $cm-space-4;
+  border-radius: $cm-radius-pill;
+  display: flex;
+  align-items: center;
   font-size: $cm-font-size-sm;
-  color: $cm-color-text-1;
-  padding: $cm-space-1 $cm-space-2;
+  font-weight: $cm-font-weight-bold;
+  color: #fff;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
 }
 
-.searchbar__msg--active {
-  opacity: 0.6;
-}
-
-/* 滚过阈值：白底搜索栏压在灰色内容上时需要一条 hairline 交代边界 */
-.searchbar--stuck {
-  border-bottom: 1rpx solid $cm-color-border;
-}
-
-/* ── 金刚区（美团式：实色圆角方 + 白字，色相按分类走令牌） ───── */
-
-.kingkong {
-  background: $cm-color-surface;
-  padding: $cm-space-5 $cm-space-4 $cm-space-2;
-}
-
-.kingkong__in {
+/* ── ② 金刚区 ───────────────────────────────────────────── */
+.kk {
+  position: relative;
+  margin: -$cm-space-4 $cm-space-4 0;
+  padding: $cm-space-4 $cm-space-2 $cm-space-2;
   display: flex;
   flex-wrap: wrap;
 }
 
-/* 入场：错峰上浮 + 淡入，每格晚 40ms。动画挂 .kk、按压 transform 在子节点，互不抢占 */
-.kk {
+.kk__item {
   width: 20%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $cm-space-2;
-  padding-bottom: $cm-space-4;
-  animation: kkIn 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  gap: 10rpx;
+  padding-bottom: $cm-space-3;
+  animation: cmInUp 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-@keyframes kkIn {
-  from {
-    opacity: 0;
-    transform: translateY(24rpx);
-  }
-}
-
-.kk__icon {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: $cm-radius-xl;
+/* 图标块：渐变底 + 顶部高光，避免纯色块太平 */
+.kk__tile {
+  position: relative;
+  width: 92rpx;
+  height: 92rpx;
+  border-radius: $cm-radius-2xl;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 120ms ease-out;
+  overflow: hidden;
+  transition: transform 140ms ease-out;
 }
 
-/* 按下反馈：图标缩到 0.9 快速回弹（整格可点，label 不参与缩放） */
-.kk--press .kk__icon {
-  transform: scale(0.9);
+.kk__tile::after {
+  content: '';
+  position: absolute;
+  left: -20%;
+  top: -40%;
+  width: 90%;
+  height: 90%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.kk__item--press .kk__tile {
+  transform: scale(0.88);
 }
 
 .kk__char {
-  font-size: $cm-font-size-lg;
-  font-weight: 600;
+  position: relative;
+  z-index: 1;
+  font-size: $cm-font-size-md;
+  font-weight: $cm-font-weight-heavy;
   color: #fff;
   line-height: 1;
-}
-
-/* 色相：值全部取自设计令牌（编译期解析，mp-weixin 无运行时 var() 风险）；
-   未登记分类在脚本层已回落 gray */
-.kk__icon--blue {
-  background: $cm-color-blue-500;
-}
-
-.kk__icon--purple {
-  background: $cm-color-purple-500;
-}
-
-.kk__icon--green {
-  background: $cm-color-green-500;
-}
-
-.kk__icon--orange {
-  background: $cm-color-orange-500;
-}
-
-.kk__icon--red {
-  background: $cm-color-red-500;
-}
-
-.kk__icon--rose {
-  background: $cm-color-price;
-}
-
-.kk__icon--gray {
-  background: $cm-color-gray-600;
-}
-
-.kk__icon--brand {
-  background: $cm-color-brand;
-}
-
-/* 全部分类：白底描边，与实色分类拉开层级；发布走 brand 实色做终点强调 */
-.kk__icon--outline {
-  background: $cm-color-surface;
-  border: 1rpx solid $cm-color-gray-300;
-}
-
-.kk__icon--outline .kk__char {
-  color: $cm-color-gray-600;
 }
 
 .kk__label {
@@ -449,11 +500,153 @@ void fetchCats()
   text-overflow: ellipsis;
 }
 
-/* ── chips ──────────────────────────────────────────────── */
+/* 色相：渐变两停 + 同色投影；值全部落在令牌或主色衍生里 */
+.kk__tile--blue {
+  background-image: linear-gradient(135deg, #6FB2FF, $cm-color-blue-500);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(22, 119, 255, 0.6);
+}
 
-.chips {
-  padding: $cm-space-3 0;
+.kk__tile--purple {
+  background-image: linear-gradient(135deg, #A98BFF, $cm-color-purple-500);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(124, 77, 255, 0.6);
+}
+
+.kk__tile--green {
+  background-image: linear-gradient(135deg, #4FD6A3, $cm-color-green-500);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(15, 169, 104, 0.55);
+}
+
+.kk__tile--orange {
+  background-image: linear-gradient(135deg, #FFB877, $cm-color-orange-500);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(255, 143, 31, 0.55);
+}
+
+.kk__tile--red {
+  background-image: linear-gradient(135deg, #FF8F8F, $cm-color-red-500);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(229, 72, 77, 0.5);
+}
+
+.kk__tile--rose {
+  background-image: linear-gradient(135deg, #FFA6BE, $cm-color-brand-2);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(255, 77, 109, 0.5);
+}
+
+.kk__tile--gray {
+  background-image: linear-gradient(135deg, #C3C5CF, #8A8C99);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(138, 140, 153, 0.5);
+}
+
+.kk__tile--brand {
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: 0 10rpx 18rpx -8rpx rgba(255, 106, 0, 0.6);
+}
+
+/* 全部分类：白底描边，与实色分类拉开层级 */
+.kk__tile--outline {
   background: $cm-color-bg;
+  border: 1rpx solid $cm-color-gray-200;
+}
+
+.kk__tile--outline::after {
+  background: transparent;
+}
+
+.kk__tile--outline .kk__char {
+  color: $cm-color-text-2;
+}
+
+/* ── ③ 面交保障位 ───────────────────────────────────────── */
+.promo {
+  position: relative;
+  margin: $cm-space-3 $cm-space-4 0;
+  padding: $cm-space-4;
+  display: flex;
+  align-items: center;
+  gap: $cm-space-3;
+  background-image: linear-gradient(120deg, #FFF4EA 0%, #FFECF0 100%);
+  overflow: hidden;
+}
+
+.promo__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10rpx;
+  position: relative;
+  z-index: 1;
+}
+
+.promo__t {
+  font-size: $cm-font-size-base;
+  font-weight: $cm-font-weight-heavy;
+  color: #7A3B12;
+}
+
+.promo__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+}
+
+.promo__tag {
+  height: 36rpx;
+  line-height: 36rpx;
+  padding: 0 12rpx;
+  border-radius: $cm-radius-pill;
+  font-size: 20rpx;
+  color: $cm-color-brand-text;
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.promo__cta {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  height: 62rpx;
+  padding: 0 $cm-space-3 0 $cm-space-4;
+  border-radius: $cm-radius-pill;
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  font-size: $cm-font-size-sm;
+  font-weight: $cm-font-weight-bold;
+  color: #fff;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: 0 6rpx 14rpx rgba(255, 106, 0, 0.28);
+  transition: transform 140ms ease-out;
+}
+
+.promo__cta--on {
+  transform: scale(0.95);
+}
+
+/* 两个虚化光斑：纯装饰，给浅色卡一点纵深 */
+.promo__blur {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.55;
+}
+
+.promo__blur--a {
+  right: -60rpx;
+  top: -70rpx;
+  width: 220rpx;
+  height: 220rpx;
+  background: radial-gradient(circle, rgba(255, 154, 77, 0.5), rgba(255, 154, 77, 0));
+}
+
+.promo__blur--b {
+  right: 120rpx;
+  bottom: -90rpx;
+  width: 180rpx;
+  height: 180rpx;
+  background: radial-gradient(circle, rgba(255, 77, 109, 0.35), rgba(255, 77, 109, 0));
+}
+
+/* ── ④ chips ────────────────────────────────────────────── */
+.chips {
+  padding: $cm-space-4 0 $cm-space-1;
   white-space: nowrap;
 }
 
@@ -464,31 +657,40 @@ void fetchCats()
 }
 
 .chip {
+  flex: none;
+  white-space: nowrap;
   padding: 0 $cm-space-4;
-  height: 56rpx;
-  line-height: 54rpx;
+  height: 60rpx;
+  display: flex;
+  align-items: center;
   font-size: $cm-font-size-sm;
   color: $cm-color-text-2;
   background: $cm-color-surface;
   border-radius: $cm-radius-pill;
-  /* 透明边框占位：选中态加 1rpx 实线时不再撑动布局（以前选中会跳 2rpx） */
-  border: 1rpx solid transparent;
-  transition: background 160ms ease-out, color 160ms ease-out, border-color 160ms ease-out;
+  border: 1rpx solid $cm-color-border;
+  transition: background 180ms ease-out, color 180ms ease-out, border-color 180ms ease-out,
+    transform 140ms ease-out, box-shadow 180ms ease-out;
 }
 
+.chip--press {
+  transform: scale(0.95);
+}
+
+/* 选中：渐变填充 + 轻微上浮 + 同色投影，是页面上第二个「亮起来」的元素 */
 .chip--on {
-  color: $cm-color-brand-text;
-  background: $cm-color-brand-bg;
-  border-color: $cm-color-brand;
-  font-weight: 600;
+  color: #fff;
+  font-weight: $cm-font-weight-bold;
+  border-color: transparent;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: 0 8rpx 16rpx -8rpx rgba(255, 106, 0, 0.8);
+  transform: translateY(-2rpx);
 }
 
-/* ── 瀑布流 ─────────────────────────────────────────────── */
-
+/* ── ⑥ 瀑布流 ───────────────────────────────────────────── */
 .falls {
   display: flex;
   gap: $cm-space-3;
-  padding: $cm-space-3 $cm-space-4;
+  padding: $cm-space-3 $cm-space-4 $cm-space-1;
   align-items: flex-start;
 }
 
@@ -500,82 +702,91 @@ void fetchCats()
   gap: $cm-space-3;
 }
 
-/* 新加载卡片淡入：只动 opacity——transform 会与 .card--active 的按压缩放抢占层叠 */
+/* 新加载卡片淡入：只动 opacity——transform 会与卡片按压缩放抢占层叠 */
 .falls .card {
-  animation: cardIn 240ms ease-out both;
+  animation: cmInUp 300ms ease-out both;
 }
 
-@keyframes cardIn {
-  from {
-    opacity: 0;
-  }
-}
-
-/* 骨架卡：图片区 + 两行文字的占位块 */
 .skel {
-  height: 480rpx;
-  border-radius: $cm-radius-xl;
-  background: linear-gradient(90deg, $cm-color-bg 25%, #fff 50%, $cm-color-bg 75%);
-  background-size: 200% 100%;
-  animation: skel 1.2s ease-in-out infinite;
+  height: 470rpx;
 }
 
-@keyframes skel {
-  0% {
-    background-position: 200% 0;
-  }
-
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-.state {
-  padding: 120rpx $cm-space-6;
-  text-align: center;
-}
-
-.state__t {
-  font-size: $cm-font-size-sm;
-  color: $cm-color-text-3;
-}
-
+/* ── 加载更多 ───────────────────────────────────────────── */
 .loadmore {
-  padding: $cm-space-5 0;
-  text-align: center;
+  padding: $cm-space-5 0 $cm-space-3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadmore__t {
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
 }
 
-/* ── 悬浮发布按钮 ───────────────────────────────────────── */
+.loadmore__dots {
+  display: flex;
+  gap: 8rpx;
+}
 
-.fab {
-  position: fixed;
-  right: $cm-space-5;
-  /* 20pt + 安全区（design/02 §5.5） */
-  bottom: calc(48rpx + env(safe-area-inset-bottom));
-  width: 112rpx;
-  height: 112rpx;
+/* 三点呼吸：比「加载中…」更轻，不打断浏览 */
+.loadmore__dot {
+  width: 10rpx;
+  height: 10rpx;
   border-radius: 50%;
-  background: $cm-color-brand;
-  color: #fff;
-  font-size: 56rpx;
-  line-height: 108rpx;
-  text-align: center;
-  /* 不用阴影：小程序语义层没有 shadow 令牌（tech/02 §5「小程序不用阴影」），
-     悬浮感靠圆形 + 主色 + 与内容拉开间距来做 */
-  transition: transform 120ms ease-out, opacity 200ms ease-out;
-  pointer-events: auto;
+  background: $cm-color-gray-400;
+  animation: dotPulse 1s ease-in-out infinite;
 }
 
-.fab--active {
-  transform: scale(0.97);
+.loadmore__dot:nth-child(2) {
+  animation-delay: 0.15s;
 }
 
-/* 滚动中隐藏：缩 + 淡出，且不可点（design/02 §5.5） */
-.fab--hide {
+.loadmore__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* ── 回到顶部 ───────────────────────────────────────────── */
+.totop {
+  position: fixed;
+  right: $cm-space-4;
+  /* 底部导航 116rpx + 安全区再往上抬一点，避免压住中央发布钮 */
+  bottom: calc(#{$cm-layout-tabbar-h} + 40rpx + env(safe-area-inset-bottom));
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: $cm-shadow-md;
   opacity: 0;
-  transform: scale(0.6);
+  transform: translateY(24rpx) scale(0.7);
   pointer-events: none;
+  transition: opacity 220ms ease-out, transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 图标本身是朝右的折线，转 -90° 变成朝上 */
+.totop :deep(.i) {
+  transform: rotate(-90deg) scale(0.86);
+}
+
+.totop--on {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 </style>

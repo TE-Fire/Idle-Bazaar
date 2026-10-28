@@ -16,6 +16,7 @@ import { computed } from 'vue'
 import { formatRelativeTime } from '@campus/shared'
 import { REPORT_TARGET, reportTarget } from '@/utils/report'
 import { getSession } from '@/utils/session'
+import CmIcon from './CmIcon.vue'
 import type { MomentVO } from '@/api/moment'
 
 const props = withDefaults(defineProps<{ moment: MomentVO; inDetail?: boolean }>(), { inDetail: false })
@@ -98,11 +99,11 @@ function previewImage(i: number): void {
 
     <view class="mc__act">
       <view class="act" :class="{ 'act--on': moment.liked }" hover-class="act--active" @click="emit('toggle-like', moment)">
-        <text class="act__ico">{{ moment.liked ? '♥' : '♡' }}</text>
+        <CmIcon name="heart" size="sm" :tone="moment.liked ? 'brand' : 'muted'" />
         <text class="act__n">{{ Number(moment.likeCount) > 0 ? moment.likeCount : '赞' }}</text>
       </view>
       <view class="act" hover-class="act--active" @click="goDetail">
-        <text class="act__ico">💬</text>
+        <CmIcon name="chat" size="sm" tone="muted" />
         <text class="act__n">{{ Number(moment.commentCount) > 0 ? moment.commentCount : '评论' }}</text>
       </view>
       <view
@@ -111,8 +112,7 @@ function previewImage(i: number): void {
         hover-class="act--active"
         @click="reportTarget(REPORT_TARGET.MOMENT, moment.id)"
       >
-        <text class="act__ico">⚑</text>
-        <text class="act__n">举报</text>
+        <text class="act__n act__n--quiet">举报</text>
       </view>
     </view>
   </view>
@@ -122,7 +122,8 @@ function previewImage(i: number): void {
 .mc {
   padding: $cm-space-4;
   background: $cm-color-surface;
-  border-radius: $cm-radius-lg;
+  border-radius: $cm-radius-2xl;
+  box-shadow: $cm-shadow-sm;
 }
 
 /* ── 作者行 ─────────────────────────────────────────────── */
@@ -329,9 +330,15 @@ function previewImage(i: number): void {
   color: $cm-color-text-2;
 }
 
+/* 举报是低频负向操作：只留一行灰字，不配图标，避免和点赞抢注意力 */
+.act__n--quiet {
+  color: $cm-color-text-3;
+  font-size: $cm-font-size-xs;
+}
+
 .act--on .act__n {
-  color: $cm-color-err;
-  font-weight: 700;
+  color: $cm-color-brand-2;
+  font-weight: $cm-font-weight-bold;
 }
 
 .act--on .act__ico {

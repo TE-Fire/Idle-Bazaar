@@ -14,6 +14,7 @@
 import { computed, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import MomentCard from '@/components/MomentCard.vue'
+import CmIcon from '@/components/CmIcon.vue'
 import { momentApi, type MomentVO } from '@/api/moment'
 import { uploadImage } from '@/utils/upload'
 import { getSession } from '@/utils/session'
@@ -178,23 +179,52 @@ onReachBottom(() => {
 </script>
 
 <template>
-  <view class="page">
-    <view v-if="!list.length && loading" class="state"><text class="state__t">加载中…</text></view>
-    <view v-else-if="!list.length" class="state"><text class="state__t">还没有人发动态，做第一个吧</text></view>
+  <view class="cm-page">
+    <view class="inner">
+      <!-- 头部：标题 + 发布入口。发布是这一页唯一的重动作，放在首屏可见处 -->
+      <view class="hero">
+        <view class="hero__glow" />
+        <view class="hero__row">
+          <view class="hero__main">
+            <text class="hero__t">广场</text>
+            <text class="hero__s">看看同学们在聊什么</text>
+          </view>
+          <view class="hero__pub" hover-class="hero__pub--on" @click="openComposer">
+            <CmIcon name="plus" tone="white" size="sm" />
+            <text>发动态</text>
+          </view>
+        </view>
+      </view>
 
-    <view class="feed">
-      <MomentCard v-for="m in list" :key="m.id" :moment="m" @toggle-like="toggleLike" />
+      <view v-if="!list.length && loading" class="feed">
+        <view v-for="n in 3" :key="n" class="cm-skel feed-skel" />
+      </view>
+      <view v-else-if="!list.length" class="cm-state">
+        <CmIcon name="heart" size="lg" tone="muted" />
+        <text class="cm-state__t">还没有人发动态</text>
+        <text class="cm-state__s">做第一个分享校园生活的人</text>
+      </view>
+
+      <view v-else class="feed">
+        <view
+          v-for="(m, i) in list"
+          :key="m.id"
+          class="cm-in"
+          :style="{ animationDelay: Math.min(i, 8) * 40 + 'ms' }"
+        >
+          <MomentCard :moment="m" @toggle-like="toggleLike" />
+        </view>
+      </view>
+
+      <view v-if="list.length" class="loadmore">
+        <view v-if="loading" class="loadmore__dots">
+          <view class="loadmore__dot" />
+          <view class="loadmore__dot" />
+          <view class="loadmore__dot" />
+        </view>
+        <text v-else class="loadmore__t">{{ finished ? '没有更多了' : '上拉加载更多' }}</text>
+      </view>
     </view>
-
-    <view v-if="list.length" class="loadmore">
-      <text>{{ loading ? '加载中…' : finished ? '没有更多了' : '上拉加载更多' }}</text>
-    </view>
-
-    <!-- 发布浮动按钮：抬到 tabBar 之上 -->
-    <view class="fab" hover-class="fab--active" @click="openComposer">
-      <text class="fab__plus">＋</text>
-    </view>
-
     <!-- 发布面板：常驻 DOM 只切 class，否则首次渲染就是终态、过渡放不出来 -->
     <view class="mask" :class="{ 'mask--on': composerOpen }" @click="closeComposer" />
     <view class="sheet" :class="{ 'sheet--on': composerOpen }">
@@ -234,11 +264,74 @@ onReachBottom(() => {
 </template>
 
 <style scoped lang="scss">
-.page {
-  min-height: 100vh;
-  padding: $cm-space-3 $cm-space-3 160rpx;
-  background: $cm-color-bg;
-  box-sizing: border-box;
+.inner {
+  padding: 0 $cm-space-3 $cm-space-6;
+}
+
+/* ── 头部 ───────────────────────────────────────────────── */
+.hero {
+  position: relative;
+  margin: 0 (-$cm-space-3);
+  padding: $cm-space-4 $cm-space-4 $cm-space-5;
+  background-image: linear-gradient(180deg, #FFEDDD 0%, $cm-color-bg 100%);
+  overflow: hidden;
+}
+
+.hero__glow {
+  position: absolute;
+  right: -80rpx;
+  top: -120rpx;
+  width: 300rpx;
+  height: 300rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 138, 61, 0.3), rgba(255, 138, 61, 0));
+}
+
+.hero__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: $cm-space-3;
+}
+
+.hero__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.hero__t {
+  font-size: $cm-font-size-2xl;
+  font-weight: $cm-font-weight-heavy;
+  color: $cm-color-text-1;
+  letter-spacing: 0.8rpx;
+}
+
+.hero__s {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-2;
+}
+
+.hero__pub {
+  flex: none;
+  height: 68rpx;
+  padding: 0 $cm-space-4 0 $cm-space-3;
+  border-radius: $cm-radius-pill;
+  display: flex;
+  align-items: center;
+  gap: 6rpx;
+  font-size: $cm-font-size-sm;
+  font-weight: $cm-font-weight-bold;
+  color: #fff;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: $cm-shadow-brand;
+  transition: transform 140ms ease-out;
+}
+
+.hero__pub--on {
+  transform: scale(0.95);
 }
 
 .feed {
@@ -247,51 +340,54 @@ onReachBottom(() => {
   gap: $cm-space-3;
 }
 
-.state {
-  padding: 200rpx $cm-space-6;
-  text-align: center;
-}
-
-.state__t {
-  font-size: $cm-font-size-sm;
-  color: $cm-color-text-3;
+.feed-skel {
+  height: 460rpx;
 }
 
 .loadmore {
-  padding: $cm-space-4;
-  text-align: center;
+  padding: $cm-space-4 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.loadmore text {
+.loadmore__t {
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
 }
 
-/* ── 发布 FAB ───────────────────────────────────────────── */
-
-.fab {
-  position: fixed;
-  right: $cm-space-4;
-  bottom: 40rpx;
-  width: 104rpx;
-  height: 104rpx;
+.loadmore__dots {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  background: $cm-color-brand;
+  gap: 8rpx;
+}
+
+.loadmore__dot {
+  width: 10rpx;
+  height: 10rpx;
   border-radius: 50%;
-  box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.16);
-  z-index: 20;
+  background: $cm-color-gray-400;
+  animation: dotPulse 1s ease-in-out infinite;
 }
 
-.fab--active {
-  transform: scale(0.94);
+.loadmore__dot:nth-child(2) {
+  animation-delay: 0.15s;
 }
 
-.fab__plus {
-  font-size: 48rpx;
-  color: $cm-color-text-1;
-  line-height: 1;
+.loadmore__dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes dotPulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 
 /* ── 发布面板 ───────────────────────────────────────────── */
@@ -320,12 +416,13 @@ onReachBottom(() => {
   right: 0;
   bottom: 0;
   z-index: 31;
-  padding: $cm-space-4 $cm-space-4 $cm-space-6;
+  padding: $cm-space-4 $cm-space-4 calc(#{$cm-space-6} + env(safe-area-inset-bottom));
   background: $cm-color-surface;
-  border-radius: $cm-radius-lg $cm-radius-lg 0 0;
+  border-radius: $cm-radius-3xl $cm-radius-3xl 0 0;
+  box-shadow: 0 -8rpx 32rpx rgba(27, 27, 33, 0.12);
   transform: translateY(100%);
   pointer-events: none;
-  transition: transform 0.24s ease;
+  transition: transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .sheet--on {
@@ -342,25 +439,31 @@ onReachBottom(() => {
 
 .sheet__title {
   font-size: $cm-font-size-md;
-  font-weight: 700;
+  font-weight: $cm-font-weight-heavy;
   color: $cm-color-text-1;
 }
 
 .sheet__close {
-  padding: 0 $cm-space-2;
-  font-size: $cm-font-size-md;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $cm-font-size-sm;
   color: $cm-color-text-3;
+  background: $cm-color-gray-100;
 }
 
 .sheet__input {
   width: 100%;
-  height: 200rpx;
+  height: 220rpx;
   padding: $cm-space-3;
   font-size: $cm-font-size-base;
   line-height: 1.6;
   color: $cm-color-text-1;
   background: $cm-color-bg;
-  border-radius: $cm-radius-md;
+  border-radius: $cm-radius-2xl;
   box-sizing: border-box;
 }
 
@@ -454,22 +557,25 @@ onReachBottom(() => {
 }
 
 .sheet__btn {
-  min-width: 160rpx;
-  height: 68rpx;
-  line-height: 68rpx;
+  min-width: 180rpx;
+  height: 76rpx;
+  line-height: 76rpx;
   text-align: center;
   font-size: $cm-font-size-sm;
-  font-weight: 600;
-  color: $cm-color-text-1;
-  background: $cm-color-brand;
-  border-radius: 34rpx;
+  font-weight: $cm-font-weight-bold;
+  color: #fff;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  border-radius: $cm-radius-pill;
+  box-shadow: $cm-shadow-brand;
+  transition: transform 140ms ease-out, opacity 160ms ease-out;
 }
 
 .sheet__btn--off {
-  opacity: 0.5;
+  opacity: 0.45;
+  box-shadow: none;
 }
 
 .sheet__btn--active {
-  opacity: 0.85;
+  transform: scale(0.96);
 }
 </style>

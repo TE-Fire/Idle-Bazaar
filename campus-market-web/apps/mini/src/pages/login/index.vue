@@ -10,6 +10,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userAuthApi } from '@/api/user'
 import { saveSession } from '@/utils/session'
+import { goTab } from '@/utils/tab-nav'
 import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
 
 /** dev 构建才挂载测试账号切换器 */
@@ -88,7 +89,7 @@ async function submit(): Promise<void> {
       if (redirect.value) {
         uni.redirectTo({ url: redirect.value })
       } else {
-        uni.switchTab({ url: '/pages/index/index' })
+        goTab('home')
       }
     }, 800)
   } catch {
@@ -98,103 +99,203 @@ async function submit(): Promise<void> {
 </script>
 
 <template>
-  <view class="page">
-    <view class="topbar">
-      <text class="topbar__back" @click="goBack">‹ 返回</text>
-    </view>
+  <view class="page cm-page">
+    <!-- 品牌头：渐变满铺到左右边，表单卡压在它下沿 -->
+    <view class="brand">
+      <view class="brand__glow" />
+      <view class="brand__glow brand__glow--b" />
 
-    <DevLoginSwitcher v-if="isDev" />
+      <view class="topbar">
+        <view class="back" hover-class="back--on" @click="goBack">‹</view>
+      </view>
 
-    <view class="hero">
-      <text class="hero__t">登录</text>
-      <text class="hero__sub">手机号 + 短信验证码，校园二手账号通用</text>
-    </view>
-
-    <view class="sec">
-      <text class="sec__t">手机号</text>
-      <input v-model="phone" class="input" type="number" maxlength="11" placeholder="请输入手机号" />
-    </view>
-
-    <view class="sec">
-      <text class="sec__t">验证码</text>
-      <view class="row">
-        <input v-model="code" class="input" type="number" maxlength="6" placeholder="6 位验证码" />
-        <text class="code-btn" :class="{ 'code-btn--off': !canGetCode() }" @click="sendCode">
-          {{ cooldown > 0 ? `${cooldown}s 后重发` : '获取验证码' }}
-        </text>
+      <view class="brand__row">
+        <view class="brand__mark">校</view>
+        <view class="brand__meta">
+          <text class="brand__t">校园二手</text>
+          <text class="brand__s">同学们都在用的闲置交易</text>
+        </view>
       </view>
     </view>
 
-    <view class="submit" hover-class="submit--active" @click="submit">
-      <text class="submit__t">登录</text>
+    <view class="card cm-card">
+      <text class="card__t">手机号登录</text>
+      <text class="card__s">未注册的手机号将自动创建账号</text>
+
+      <view class="field">
+        <text class="field__k">手机号</text>
+        <input v-model="phone" class="input" type="number" maxlength="11" placeholder="请输入手机号" />
+      </view>
+
+      <view class="field">
+        <text class="field__k">验证码</text>
+        <view class="row">
+          <input v-model="code" class="input" type="number" maxlength="6" placeholder="6 位验证码" />
+          <text class="code-btn" :class="{ 'code-btn--off': !canGetCode() }" @click="sendCode">
+            {{ cooldown > 0 ? `${cooldown}s 后重发` : '获取验证码' }}
+          </text>
+        </view>
+      </view>
+
+      <view class="submit cm-btn cm-btn--primary" hover-class="cm-btn--on" @click="submit">
+        <text>登录</text>
+      </view>
+
+      <text class="foot">演示环境：验证码为演示回显，非真实短信</text>
     </view>
 
-    <text class="foot">演示环境：验证码为演示回显，非真实短信</text>
+    <DevLoginSwitcher v-if="isDev" />
   </view>
 </template>
 
 <style scoped lang="scss">
 .page {
-  padding: $cm-space-6 $cm-space-4;
-  background: $cm-color-bg;
   min-height: 100vh;
+}
+
+/* ── 品牌头 ─────────────────────────────────────────────── */
+.brand {
+  position: relative;
+  /* 自定义导航（pages.json 已置 navigationStyle: custom）：自己让出状态栏高度，
+     H5 下该变量为 0，小程序下由 uni 注入真实值 */
+  padding: calc(var(--status-bar-height, 0px) + #{$cm-space-2}) $cm-space-4 $cm-space-8;
+  background-image: linear-gradient(140deg, #FFA05A 0%, $cm-color-brand 58%, $cm-color-brand-2 100%);
+  overflow: hidden;
+}
+
+.brand__glow {
+  position: absolute;
+  right: -100rpx;
+  top: -140rpx;
+  width: 340rpx;
+  height: 340rpx;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0));
+}
+
+.brand__glow--b {
+  right: auto;
+  left: -80rpx;
+  top: auto;
+  bottom: -160rpx;
+  width: 280rpx;
+  height: 280rpx;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
 }
 
 /* 顶部返回条：uni 默认导航栏在 H5/小程序下无浏览器返回键心智，这里补一个明确的「返回」 */
 .topbar {
+  position: relative;
   display: flex;
   align-items: center;
-  height: 56rpx;
-  margin-bottom: $cm-space-2;
+  height: 64rpx;
 }
 
-.topbar__back {
-  font-size: $cm-font-size-md;
-  font-weight: 600;
-  color: $cm-color-text-1;
-  padding: $cm-space-1 $cm-space-2;
+.back {
+  width: 60rpx;
+  height: 60rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 4rpx;
+  font-size: 40rpx;
+  line-height: 1;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1rpx solid rgba(255, 255, 255, 0.4);
+  transition: transform 140ms ease-out;
 }
 
-.hero {
-  margin-bottom: $cm-space-6;
+.back--on {
+  transform: scale(0.92);
 }
 
-.hero__t {
+.brand__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: $cm-space-3;
+  margin-top: $cm-space-4;
+}
+
+.brand__mark {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: $cm-radius-2xl;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40rpx;
+  font-weight: $cm-font-weight-heavy;
+  color: $cm-color-brand;
+  background: $cm-color-surface;
+  box-shadow: 0 8rpx 20rpx rgba(120, 40, 0, 0.18);
+}
+
+.brand__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.brand__t {
+  font-size: $cm-font-size-xl;
+  font-weight: $cm-font-weight-heavy;
+  color: #fff;
+  letter-spacing: 1rpx;
+}
+
+.brand__s {
+  font-size: $cm-font-size-xs;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+/* ── 表单卡 ─────────────────────────────────────────────── */
+.card {
+  position: relative;
+  margin: -$cm-space-6 $cm-space-4 0;
+  padding: $cm-space-5;
+  border-radius: $cm-radius-3xl;
+  box-shadow: $cm-shadow-md;
+}
+
+.card__t {
   display: block;
-  font-size: 56rpx;
-  font-weight: 800;
+  font-size: $cm-font-size-lg;
+  font-weight: $cm-font-weight-heavy;
   color: $cm-color-text-1;
 }
 
-.hero__sub {
+.card__s {
   display: block;
-  margin-top: $cm-space-2;
-  font-size: $cm-font-size-sm;
+  margin-top: 6rpx;
+  margin-bottom: $cm-space-5;
+  font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
 }
 
-.sec {
+.field {
   margin-bottom: $cm-space-3;
-  padding: $cm-space-4;
-  background: $cm-color-surface;
-  border-radius: $cm-radius-lg;
 }
 
-.sec__t {
+.field__k {
   display: block;
-  margin-bottom: $cm-space-3;
-  font-size: $cm-font-size-sm;
-  font-weight: 600;
-  color: $cm-color-text-1;
+  margin-bottom: $cm-space-2;
+  font-size: $cm-font-size-xs;
+  font-weight: $cm-font-weight-bold;
+  color: $cm-color-text-2;
 }
 
 .input {
-  height: 72rpx;
+  height: 88rpx;
   padding: 0 $cm-space-3;
   font-size: $cm-font-size-base;
   color: $cm-color-text-1;
   background: $cm-color-bg;
-  border-radius: $cm-radius-md;
+  border-radius: $cm-radius-xl;
+  border: 1rpx solid transparent;
+  transition: border-color 180ms ease-out, background 180ms ease-out;
 }
 
 .row {
@@ -210,38 +311,26 @@ async function submit(): Promise<void> {
 
 .code-btn {
   flex: none;
-  height: 72rpx;
-  line-height: 72rpx;
-  padding: 0 $cm-space-3;
+  height: 88rpx;
+  line-height: 88rpx;
+  padding: 0 $cm-space-4;
   font-size: $cm-font-size-sm;
-  font-weight: 600;
+  font-weight: $cm-font-weight-bold;
   color: $cm-color-brand-text;
   background: $cm-color-brand-bg;
-  border-radius: $cm-radius-md;
+  border-radius: $cm-radius-xl;
+  transition: opacity 180ms ease-out, transform 140ms ease-out;
 }
 
 .code-btn--off {
   color: $cm-color-text-3;
+  background: $cm-color-gray-100;
 }
 
 .submit {
-  height: 88rpx;
-  line-height: 88rpx;
-  text-align: center;
-  margin-top: $cm-space-4;
-  background: $cm-color-brand;
-  border-radius: $cm-radius-md;
-  transition: transform 120ms ease-out;
-}
-
-.submit__t {
+  margin-top: $cm-space-5;
+  height: 92rpx;
   font-size: $cm-font-size-md;
-  font-weight: 600;
-  color: #fff;
-}
-
-.submit--active {
-  transform: scale(0.98);
 }
 
 .foot {

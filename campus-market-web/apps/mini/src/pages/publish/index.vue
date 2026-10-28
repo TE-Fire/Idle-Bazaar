@@ -15,6 +15,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
+import TabBar from '@/components/TabBar.vue'
 import { uploadImage } from '@/utils/upload'
 
 const MAX_SHOTS = 9
@@ -241,7 +242,7 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 </script>
 
 <template>
-  <view class="page">
+  <view class="page cm-page cm-page--tab">
     <!-- 选图 -->
     <view class="sec">
       <text class="sec__t">图片（{{ shots.length }}/{{ MAX_SHOTS }}，第一张为封面）</text>
@@ -338,26 +339,30 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
         </view>
       </view>
     </template>
+
+    <TabBar active="publish" />
   </view>
 </template>
 
 <style scoped lang="scss">
 .page {
-  padding: $cm-space-4 $cm-space-4 180rpx;
+  /* 底部导航由 TabBar 占位，这里只留卡片自身的呼吸 */
+  padding: $cm-space-4 $cm-space-4 $cm-space-5;
 }
 
 .sec {
   margin-bottom: $cm-space-4;
   padding: $cm-space-5;
   background: $cm-color-surface;
-  border-radius: $cm-radius-xl;
+  border-radius: $cm-radius-2xl;
+  box-shadow: $cm-shadow-xs;
 }
 
 .sec__t {
   display: block;
   margin-bottom: $cm-space-4;
   font-size: $cm-font-size-base;
-  font-weight: 700;
+  font-weight: $cm-font-weight-heavy;
   color: $cm-color-text-1;
 }
 
@@ -505,12 +510,13 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 /* ── 提交 ───────────────────────────────────────────────── */
 
 .submit {
-  height: 88rpx;
-  line-height: 88rpx;
+  height: 92rpx;
+  line-height: 92rpx;
   text-align: center;
-  background: $cm-color-brand;
-  border-radius: $cm-radius-md;
-  transition: transform 120ms ease-out;
+  border-radius: $cm-radius-pill;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: $cm-shadow-brand;
+  transition: transform 140ms ease-out;
 }
 
 .submit__t {
@@ -539,12 +545,13 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 
 .btn {
   flex: 1;
-  height: 88rpx;
-  line-height: 88rpx;
+  height: 92rpx;
+  line-height: 92rpx;
   text-align: center;
-  background: $cm-color-brand;
-  border-radius: $cm-radius-md;
-  transition: transform 120ms ease-out;
+  border-radius: $cm-radius-pill;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: $cm-shadow-brand;
+  transition: transform 140ms ease-out;
 }
 
 .btn--ghost {

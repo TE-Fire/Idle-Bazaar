@@ -1,0 +1,274 @@
+/**
+ * 移动端全局视觉层（只在 App.vue 引一次，全局生效）
+ *
+ * <p>这里放「跨页面复用的规则」，不放变量（变量在 uni.scss，会自动注入每个页面）。
+ * 页面自己只写布局与特有样式，颜色 / 圆角 / 阴影 / 动画一律取这里的类或令牌，
+ * 避免每个页面各写一套导致风格漂移。
+ *
+ * <p>动效统一三条曲线：
+ *   入场 cubic-bezier(.22,1,.36,1)（快进慢出，像被轻轻放上去）
+ *   按压 120–140ms ease-out（手指按下的即时反馈，超过 160ms 会觉得拖）
+ *   强调 cubic-bezier(.34,1.56,.64,1)（回弹，只用于图标 / 角标这类小元素）
+ */
+
+page {
+  background: $cm-color-bg;
+  font-family: -apple-system, 'PingFang SC', 'HarmonyOS Sans', 'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 页面骨架 ───────────────────────────────────────────── */
+
+/* 入场：整页淡入。tab 切换是整页重建，靠它消除「硬切」感。
+   ⚠ 只动 opacity、不动 transform：页面根部一旦带 transform（含 animation-fill 保留），
+   就会成为 fixed 后代的包含块，底部导航会被钉在文档末尾而不是视口底部。
+   要竖向位移请挂在内容块上（.cm-in）。 */
+@keyframes cmPageIn {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 上浮淡入（列表错峰、区块入场） */
+@keyframes cmInUp {
+  from {
+    opacity: 0;
+    transform: translateY(28rpx);
+  }
+}
+
+/* 回弹放大（角标、选中图标） */
+@keyframes cmPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cm-page {
+  min-height: 100vh;
+  animation: cmPageIn 220ms ease-out both;
+}
+
+/* tab 页统一留出 dock 的高度，否则最后一条内容会被底部栏压住 */
+.cm-page--tab {
+  padding-bottom: calc(#{$cm-layout-tabbar-h} + 40rpx + env(safe-area-inset-bottom));
+}
+
+/* 错峰入场：元素上写 :style="{ animationDelay: i*40+'ms' }" */
+.cm-in {
+  animation: cmInUp 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── 卡片 ───────────────────────────────────────────────── */
+
+.cm-card {
+  background: $cm-color-surface;
+  border-radius: $cm-radius-2xl;
+  box-shadow: $cm-shadow-sm;
+  overflow: hidden;
+}
+
+/* 无阴影版：用在白底页面内嵌的分组（如「我的服务」列表） */
+.cm-card--flat {
+  box-shadow: none;
+  border: 1rpx solid $cm-color-border;
+}
+
+/* 按压反馈：直接给可点卡片挂 hover-class */
+.cm-press {
+  transition: transform 140ms ease-out, opacity 140ms ease-out;
+}
+
+.cm-press--on {
+  transform: scale(0.975);
+  opacity: 0.94;
+}
+
+/* ── 区块标题 ───────────────────────────────────────────── */
+
+.cm-sect {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+  padding: $cm-space-5 $cm-space-4 $cm-space-3;
+}
+
+/* 左侧渐变小竖条：替代「一条横线」的旧写法，给标题一个明确起点 */
+.cm-sect__bar {
+  width: 8rpx;
+  height: 30rpx;
+  border-radius: 4rpx;
+  background-image: linear-gradient(180deg, $cm-color-brand-glow, $cm-color-brand);
+  flex: none;
+}
+
+.cm-sect__t {
+  font-size: $cm-font-size-md;
+  font-weight: $cm-font-weight-heavy;
+  color: $cm-color-text-1;
+  letter-spacing: 0.4rpx;
+}
+
+.cm-sect__sub {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.cm-sect__more {
+  margin-left: auto;
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+/* ── 渐变与底色 ─────────────────────────────────────────── */
+
+.cm-grad-brand {
+  background-image: linear-gradient(135deg, $cm-color-brand-glow 0%, $cm-color-brand 58%, $cm-color-brand-dark 100%);
+}
+
+/* 页面顶部的暖色洗底：从暖白过渡到常规背景，交代「内容从上面来」 */
+.cm-wash {
+  background-image: linear-gradient(180deg, $cm-color-bg-warm 0%, $cm-color-bg 100%);
+}
+
+/* ── 按钮 ───────────────────────────────────────────────── */
+
+.cm-btn {
+  height: 88rpx;
+  border-radius: $cm-radius-pill;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $cm-space-1;
+  font-size: $cm-font-size-base;
+  font-weight: $cm-font-weight-bold;
+  transition: transform 140ms ease-out, opacity 140ms ease-out;
+}
+
+.cm-btn--primary {
+  color: #fff;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow 0%, $cm-color-brand 60%, $cm-color-brand-dark 100%);
+  box-shadow: $cm-shadow-brand;
+}
+
+.cm-btn--ghost {
+  color: $cm-color-brand-text;
+  background: $cm-color-brand-bg;
+}
+
+.cm-btn--on {
+  transform: scale(0.97);
+  opacity: 0.92;
+}
+
+.cm-btn--off {
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+/* ── 标签 / 徽标 ────────────────────────────────────────── */
+
+.cm-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 34rpx;
+  padding: 0 10rpx;
+  border-radius: $cm-radius-sm;
+  font-size: $cm-font-size-xs;
+  line-height: 1;
+}
+
+.cm-tag--brand {
+  color: $cm-color-brand-text;
+  background: $cm-color-brand-bg;
+}
+
+.cm-tag--ok {
+  color: $cm-color-ok;
+  background: $cm-color-ok-bg;
+}
+
+.cm-tag--muted {
+  color: $cm-color-text-2;
+  background: $cm-color-gray-100;
+}
+
+/* 未读红点：白描边 + 弹性放大，避免和头像糊在一起 */
+.cm-dot {
+  min-width: 30rpx;
+  height: 30rpx;
+  padding: 0 8rpx;
+  border-radius: $cm-radius-pill;
+  background-image: linear-gradient(135deg, #FF6B6B, $cm-color-brand-2);
+  color: #fff;
+  font-size: 20rpx;
+  line-height: 30rpx;
+  text-align: center;
+  border: 2rpx solid $cm-color-surface;
+  animation: cmPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+/* ── 文本工具 ───────────────────────────────────────────── */
+
+.cm-ell1 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cm-ell2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.cm-muted {
+  color: $cm-color-text-3;
+}
+
+/* ── 骨架屏 ─────────────────────────────────────────────── */
+
+@keyframes cmShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.cm-skel {
+  border-radius: $cm-radius-2xl;
+  background-image: linear-gradient(90deg, $cm-color-gray-100 25%, #fff 50%, $cm-color-gray-100 75%);
+  background-size: 200% 100%;
+  animation: cmShimmer 1.3s ease-in-out infinite;
+}
+
+/* ── 空 / 错状态 ────────────────────────────────────────── */
+
+.cm-state {
+  padding: 140rpx $cm-space-6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $cm-space-2;
+  animation: cmInUp 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.cm-state__t {
+  font-size: $cm-font-size-base;
+  color: $cm-color-text-2;
+}
+
+.cm-state__s {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}

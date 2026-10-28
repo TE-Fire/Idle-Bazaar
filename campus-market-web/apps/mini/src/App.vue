@@ -19,12 +19,7 @@ const isDev = import.meta.env.DEV
 
 <style lang="scss">
 /* 全局基础样式放这里（uni.scss 只放变量），页面样式各自 scoped。
-   必须用 scss：$cm-* 变量由 uni.scss 注入，纯 CSS 块拿不到。 */
-page {
-  background: $cm-color-bg;
-  color: $cm-color-text-1;
-  /* 令牌里的尺寸已被 ×2 转 rpx，这里拿到的是 28rpx */
-  font-size: $cm-font-size-base;
-  font-family: -apple-system, 'PingFang SC', sans-serif;
-}
+   必须用 scss：$cm-* 变量由 uni.scss 注入，纯 CSS 块拿不到。
+   跨页面复用的规则（卡片 / 按钮 / 区块标题 / 动效）统一在 styles/theme.scss。 */
+@import './styles/theme.scss';
 </style>

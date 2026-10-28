@@ -76,7 +76,8 @@
     {
       "path": "pages/login/index",
       "style": {
-        "navigationBarTitleText": "登录"
+        "navigationBarTitleText": "登录",
+        "navigationStyle": "custom"
       }
     },
     {
@@ -101,7 +102,9 @@
     {
       "path": "pages/me/index",
       "style": {
-        "navigationBarTitleText": "我的"
+        "navigationBarTitleText": "我的",
+        "navigationBarBackgroundColor": "#FF8A45",
+        "navigationBarTextStyle": "white"
       }
     },
     {
@@ -115,19 +118,6 @@
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "校园二手",
     "navigationBarBackgroundColor": "#FFFFFF",
-    "backgroundColor": "#F5F5F6"
-  },
-  "tabBar": {
-    "color": "#A0A0A0",
-    "selectedColor": "#FF6A00",
-    "backgroundColor": "#FFFFFF",
-    "borderStyle": "white",
-    "list": [
-      { "pagePath": "pages/index/index", "text": "首页" },
-      { "pagePath": "pages/category/index", "text": "分类" },
-      { "pagePath": "pages/publish/index", "text": "发布" },
-      { "pagePath": "pages/chat/list", "text": "消息" },
-      { "pagePath": "pages/me/index", "text": "我的" }
-    ]
+    "backgroundColor": "#F6F5F7"
   }
 }

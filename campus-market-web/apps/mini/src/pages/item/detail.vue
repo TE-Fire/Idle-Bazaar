@@ -217,7 +217,7 @@ async function send(): Promise<void> {
 </script>
 
 <template>
-  <view v-if="item" class="page">
+  <view v-if="item" class="page cm-page">
     <swiper class="swiper" indicator-dots circular>
       <swiper-item v-for="(s, i) in shots" :key="i">
         <image v-if="s" :src="s" mode="aspectFill" class="shot__img" />
@@ -225,7 +225,7 @@ async function send(): Promise<void> {
       </swiper-item>
     </swiper>
 
-    <view class="box">
+    <view class="box box--hero">
       <text class="price">{{ formatPrice(Number(item.price)) }}</text>
       <text v-if="item.originPrice" class="origin">原价 {{ formatPrice(Number(item.originPrice)) }}</text>
       <text class="title">{{ item.title }}</text>
@@ -345,7 +345,7 @@ async function send(): Promise<void> {
 
 <style scoped lang="scss">
 .page {
-  padding-bottom: calc(140rpx + env(safe-area-inset-bottom));
+  padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
 }
 
 /* 图集通铺到屏幕边（闲鱼口径）：卡片从图下面才开始 */
@@ -369,17 +369,27 @@ async function send(): Promise<void> {
   margin: $cm-space-3 $cm-space-4;
   padding: $cm-space-5;
   background: $cm-color-surface;
-  border-radius: $cm-radius-xl;
+  border-radius: $cm-radius-2xl;
+  box-shadow: $cm-shadow-xs;
   display: flex;
   flex-direction: column;
   gap: $cm-space-3;
 }
 
+/* 价格卡压在图上：给「图 → 信息」一个层次交叠，避免两张白块并排的死板 */
+.box--hero {
+  position: relative;
+  margin-top: -$cm-space-6;
+  border-radius: $cm-radius-3xl $cm-radius-3xl $cm-radius-2xl $cm-radius-2xl;
+  box-shadow: $cm-shadow-md;
+}
+
 .price {
-  font-size: 56rpx;
-  font-weight: 700;
+  font-size: 60rpx;
+  font-weight: $cm-font-weight-heavy;
   line-height: 1;
   color: $cm-color-price;
+  letter-spacing: -1rpx;
 }
 
 .origin {
@@ -655,39 +665,43 @@ async function send(): Promise<void> {
   left: 0;
   right: 0;
   bottom: 0;
-  height: calc(100rpx + env(safe-area-inset-bottom));
+  height: calc(112rpx + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom);
   display: flex;
   align-items: center;
   gap: $cm-space-3;
-  padding-left: $cm-space-3;
-  padding-right: $cm-space-3;
+  padding-left: $cm-space-4;
+  padding-right: $cm-space-4;
   background: $cm-color-surface;
   border-top: 1rpx solid $cm-color-border;
+  box-shadow: 0 -4rpx 20rpx rgba(27, 27, 33, 0.05);
 }
 
+/* 次要动作：描边胶囊，白底不抢主按钮 */
 .actionbar__minor {
-  width: 40%;
-  height: 76rpx;
-  line-height: 76rpx;
+  width: 38%;
+  height: 84rpx;
+  line-height: 84rpx;
   text-align: center;
   font-size: $cm-font-size-base;
-  color: $cm-color-text-2;
-  border: 1rpx solid $cm-color-border-strong;
-  border-radius: $cm-radius-md;
+  font-weight: $cm-font-weight-medium;
+  color: $cm-color-brand-text;
+  background: $cm-color-brand-bg;
+  border-radius: $cm-radius-pill;
 }
 
 .actionbar__main {
   flex: 1;
-  height: 76rpx;
-  line-height: 76rpx;
+  height: 84rpx;
+  line-height: 84rpx;
   text-align: center;
   font-size: $cm-font-size-base;
-  font-weight: 600;
+  font-weight: $cm-font-weight-heavy;
   color: #fff;
-  background: $cm-color-brand;
-  border-radius: $cm-radius-md;
-  transition: transform 120ms ease-out;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: $cm-shadow-brand;
+  border-radius: $cm-radius-pill;
+  transition: transform 140ms ease-out;
 }
 
 .actionbar__main--active {
