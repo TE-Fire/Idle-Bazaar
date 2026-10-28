@@ -2,24 +2,29 @@
 /**
  * 商品分享海报（notes/22 S8）：纯前端 canvas 合成，后端零改动。
  *
- * <p>三个约束：
- *   ① 不含二维码（扫码回链是二期），所以底部只放平台名与一句信任话术；
+ * <p>四个约束：
+ *   ① 底部带二维码回链，指向本商品详情页——扫开即可下单，海报才不只是张图片；
+ *      二维码是纯前端点阵绘制（`@campus/shared` 的 `encodeQr`），不需要后端签小程序码；
  *   ② 主图跨域加载失败、或图片把画布污染导致 toDataURL 抛错时，**降级成渐变色块**照常出图——
  *      海报是分享物料，宁可少一张图也不能让用户点完没反应；
- *   ③ 尺寸固定 750×1000（3:4），微信/小红书都吃这个比例。
+ *   ③ 画布污染时二维码仍要画（它是 fillRect，不涉及跨域图片），否则连回链都没了；
+ *   ④ 尺寸固定 750×1000（3:4），微信/小红书都吃这个比例。
  */
 
 import { onMounted, ref } from 'vue'
-import { CONDITION_LABELS, formatPrice } from '@campus/shared'
+import { CONDITION_LABELS, drawQr, encodeQr, formatPrice } from '@campus/shared'
 import type { ApiItemVO } from '@campus/api'
 
 const props = defineProps<{ item: ApiItemVO }>()
 const emit = defineEmits<{ close: [] }>()
 
 const W = 750
-const H = 1000
+const H = 1100
 const IMG_H = 560
 const PAD = 48
+/** 底栏：二维码 168 + 上方留白 + 下方说明 */
+const QR_BOX = 168
+const BAR_H = 240
 
 const poster = ref('')
 const drawing = ref(true)
@@ -92,31 +97,37 @@ function paintPlaceholder(ctx: CanvasRenderingContext2D): void {
   ctx.textAlign = 'left'
 }
 
-/** 文字区：标题、价格、元信息、底部品牌条 */
+/** 二维码指向的地址：Web 端是 history 路由的商品详情（无 #），扫码即落到当前部署 */
+function shareLink(): string {
+  if (!props.item.id || typeof window === 'undefined') return ''
+  return `${window.location.origin}/item/${props.item.id}`
+}
+
+/** 文字区：标题、价格、元信息、底部品牌条 + 扫码回链 */
 function paintText(ctx: CanvasRenderingContext2D): void {
   const it = props.item
-  let y = IMG_H + 76
+  // 版式自下而上推：先定底栏，再让文案长在底栏之上，二维码与标题不会抢位置
+  const barTop = H - BAR_H
+  const metaY = barTop - 44
+  const priceY = metaY - 64
+  const titleBottom = priceY - 56
 
   ctx.textAlign = 'left'
   ctx.fillStyle = '#1F1F26'
   ctx.font = '600 36px "PingFang SC","Microsoft YaHei",sans-serif'
   const lines = wrap(ctx, it.title || '校园闲置', W - PAD * 2, 2)
-  for (const line of lines) {
-    ctx.fillText(line, PAD, y)
-    y += 50
-  }
+  const titleTop = titleBottom - (lines.length - 1) * 50
+  lines.forEach((line, i) => ctx.fillText(line, PAD, titleTop + i * 50))
 
-  y += 22
   ctx.fillStyle = '#FF5500'
   ctx.font = '700 60px "PingFang SC","Microsoft YaHei",sans-serif'
   const price = formatPrice(Number(it.price))
-  ctx.fillText(price, PAD, y)
+  ctx.fillText(price, PAD, priceY)
   const priceW = ctx.measureText(price).width
   ctx.fillStyle = '#8E8E93'
   ctx.font = '400 26px "PingFang SC","Microsoft YaHei",sans-serif'
-  ctx.fillText('同校面交', PAD + priceW + 20, y - 6)
+  ctx.fillText('同校面交', PAD + priceW + 20, priceY - 6)
 
-  y += 56
   const gradeText = CONDITION_LABELS[it.grade as 'A']
   const meta = [
     it.grade ? `${it.grade} 级${gradeText ? ` · ${gradeText}` : ''}` : '',
@@ -127,25 +138,53 @@ function paintText(ctx: CanvasRenderingContext2D): void {
     .join(' · ')
   ctx.fillStyle = '#6B6B72'
   ctx.font = '400 26px "PingFang SC","Microsoft YaHei",sans-serif'
-  ctx.fillText(meta, PAD, y)
+  ctx.fillText(meta, PAD, metaY)
 
-  // 分隔线
   ctx.strokeStyle = '#EDEDF0'
   ctx.lineWidth = 2
   ctx.beginPath()
-  ctx.moveTo(PAD, H - 150)
-  ctx.lineTo(W - PAD, H - 150)
+  ctx.moveTo(PAD, barTop)
+  ctx.lineTo(W - PAD, barTop)
   ctx.stroke()
 
-  // 底部品牌条
+  const qrX = W - PAD - QR_BOX
+  const qrY = barTop + 24
+  const matrix = encodeQr(shareLink())
+  if (matrix) {
+    drawQr(
+      {
+        fillRect: (x, y, w, h) => ctx.fillRect(x, y, w, h),
+        setFill: (color) => {
+          ctx.fillStyle = color
+        }
+      },
+      matrix,
+      qrX,
+      qrY,
+      QR_BOX
+    )
+    ctx.fillStyle = '#8E8E93'
+    ctx.font = '400 20px "PingFang SC","Microsoft YaHei",sans-serif'
+    ctx.textAlign = 'center'
+    ctx.fillText('扫码查看', qrX + QR_BOX / 2, qrY + QR_BOX + 30)
+    ctx.textAlign = 'left'
+  }
+
+  // 品牌条：有码时收窄到左侧，用裁剪兜住长文案，避免压到二维码
+  const brandW = matrix ? qrX - PAD - 16 : W - PAD * 2
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(PAD, barTop, brandW, 240)
+  ctx.clip()
   ctx.fillStyle = '#FFD100'
-  ctx.fillRect(PAD, H - 112, 8, 44)
+  ctx.fillRect(PAD, barTop + 40, 8, 44)
   ctx.fillStyle = '#1F1F26'
   ctx.font = '700 30px "PingFang SC","Microsoft YaHei",sans-serif'
-  ctx.fillText('校园二手', PAD + 24, H - 78)
+  ctx.fillText('校园二手', PAD + 24, barTop + 74)
   ctx.fillStyle = '#8E8E93'
   ctx.font = '400 24px "PingFang SC","Microsoft YaHei",sans-serif'
-  ctx.fillText('同校面交 · 先验货后付款', PAD + 24, H - 42)
+  ctx.fillText('同校面交 · 先验货后付款', PAD + 24, barTop + 110)
+  ctx.restore()
 }
 
 async function draw(): Promise<void> {

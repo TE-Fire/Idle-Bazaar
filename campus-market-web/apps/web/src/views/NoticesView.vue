@@ -75,6 +75,9 @@ function more(): void {
       <li v-for="n in list" :key="n.id" class="row" :class="{ 'row--new': n.readFlag === 0 }">
         <span class="row__dot" />
         <div class="row__body">
+          <span class="row__tag" :class="{ 'row__tag--i': n.type === 5 }">
+            {{ n.type === 5 ? '互动' : '系统' }}
+          </span>
           <p class="row__text">{{ n.content }}</p>
           <span class="row__time">{{ formatRelativeTime(n.createTime) }}</span>
         </div>
@@ -152,6 +155,23 @@ function more(): void {
 .row__body {
   flex: 1;
   min-width: 0;
+}
+
+/* 类型标：互动用品牌色，系统处置用中性灰 */
+.row__tag {
+  display: inline-block;
+  padding: 0 6px;
+  margin-bottom: 6px;
+  font-size: var(--cm-font-size-xs);
+  line-height: 18px;
+  color: var(--cm-color-text-3);
+  background: var(--cm-color-bg);
+  border-radius: var(--cm-radius-sm);
+}
+
+.row__tag--i {
+  color: var(--cm-color-brand-dark);
+  background: var(--cm-color-brand-bg);
 }
 
 .row__text {

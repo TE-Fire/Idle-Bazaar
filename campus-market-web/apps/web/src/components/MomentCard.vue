@@ -88,6 +88,8 @@ function onComment(): void {
         <button type="button" class="mc__nick" @click="goProfile">{{ nickname }}</button>
         <p class="mc__sub">
           <span v-if="author?.authStatus === 2" class="mc__ok">已认证</span>
+          <!-- 只在看自己的主页时出现：被敏感词屏蔽的动态只有作者可见 -->
+          <span v-if="moment.auditStatus === 1" class="mc__hidden">仅自己可见</span>
           <span>{{ timeText }}</span>
         </p>
       </div>
@@ -206,6 +208,13 @@ function onComment(): void {
   padding: 0 6px;
   color: var(--cm-color-ok);
   background: #f0faf4;
+  border-radius: var(--cm-radius-sm);
+}
+
+.mc__hidden {
+  padding: 0 6px;
+  color: var(--cm-color-brand-dark);
+  background: var(--cm-color-brand-bg);
   border-radius: var(--cm-radius-sm);
 }
 

@@ -39,6 +39,8 @@ export const userReportApi = {
 
 export interface NoticeVO {
   id: string
+  /** 4 系统处置（下架/裁决）/ 5 互动（被赞·被评·被关注） */
+  type: number
   content: string
   /** 0 未读 1 已读 */
   readFlag: number

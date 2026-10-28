@@ -73,6 +73,8 @@ function previewImage(i: number): void {
         <view class="mc__top">
           <text class="mc__nick">{{ nickname }}</text>
           <text v-if="author?.authStatus === 2" class="mc__ok">已认证</text>
+          <!-- 只在看自己的主页时出现：被敏感词屏蔽的动态只有作者可见 -->
+          <text v-if="moment.auditStatus === 1" class="mc__hidden">仅自己可见</text>
         </view>
         <text class="mc__time">{{ timeText }}</text>
       </view>
@@ -190,6 +192,15 @@ function previewImage(i: number): void {
   font-size: 20rpx;
   color: $cm-color-ok;
   background: #f0faf4;
+  border-radius: 6rpx;
+}
+
+.mc__hidden {
+  flex: none;
+  padding: 0 8rpx;
+  font-size: 20rpx;
+  color: $cm-color-brand-text;
+  background: $cm-color-brand-bg;
   border-radius: 6rpx;
 }
 

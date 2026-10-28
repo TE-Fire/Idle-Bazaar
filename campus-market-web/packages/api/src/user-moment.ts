@@ -45,6 +45,11 @@ export interface MomentVO {
   likeCount: string
   liked: boolean
   commentCount: string
+  /**
+   * 0 正常 / 1 敏感词屏蔽 / 2 举报下架。
+   * 只有看自己主页时才会拿到 1（前端要在卡片上标「仅自己可见」），广场与看他人恒为 0。
+   */
+  auditStatus?: number
   createTime: string
 }
 
@@ -93,6 +98,10 @@ export const userMomentApi = {
   /** 广场流：全站正常动态，时间倒序 */
   square: (pageNum = 1, pageSize = 10) =>
     request<MomentPageVO>({ url: '/api/moment/square', params: { pageNum, pageSize } }),
+
+  /** 关注流：只看已关注作者，时间倒序；未关注任何人时返回空页 */
+  following: (pageNum = 1, pageSize = 10) =>
+    request<MomentPageVO>({ url: '/api/moment/following', params: { pageNum, pageSize } }),
 
   /** 某人主页的动态，时间倒序 */
   userMoments: (userId: string, pageNum = 1, pageSize = 10) =>

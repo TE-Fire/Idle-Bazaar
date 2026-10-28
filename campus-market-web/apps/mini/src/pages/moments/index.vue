@@ -2,8 +2,8 @@
 /**
  * 广场（notes/22 S3–S5）
  *
- * <p>一条流不分频道：校园场景动态量不大，再分 tab 只会每条都稀。
- * 「分享好物」靠卡片右上类型标区分，混排即可。
+ * <p>两条流：广场（全站时间流）与关注（只看已关注作者）。默认广场——新用户没有关注关系，
+ * 先落在关注流只会看到空白。切换时用请求序号丢弃过期响应，避免旧流的数据续到新流尾部。
  *
  * <p>发布走底部上滑面板（含文字 + 最多 9 图）：小程序没有对话框组件，
  * 且发布是本页唯一的重动作，独立页面反而多一次跳转与回填。
@@ -23,10 +23,15 @@ const PAGE = 10
 const MAX_IMAGES = 9
 const MAX_LEN = 500
 
+type MomentScope = 'square' | 'following'
+
+const scope = ref<MomentScope>('square')
 const list = ref<MomentVO[]>([])
 const pageNum = ref(1)
 const total = ref(0)
 const loading = ref(false)
+/** 请求序号：切流后旧请求的返回直接丢弃 */
+let reqSeq = 0
 const likePend = ref('')
 
 const finished = computed(() => list.value.length >= total.value)
@@ -43,29 +48,42 @@ const canSubmit = computed(
 )
 
 async function fetchPage(reset: boolean): Promise<void> {
-  if (loading.value) return
+  if (loading.value && !reset) return
   if (!reset && finished.value) return
+  const my = ++reqSeq
   loading.value = true
   const p = reset ? 1 : pageNum.value + 1
+  const useScope = scope.value
   try {
-    const res = await momentApi.square(p, PAGE)
+    const res = useScope === 'following' ? await momentApi.following(p, PAGE) : await momentApi.square(p, PAGE)
+    if (my !== reqSeq) return
     const rows = res.list ?? []
     list.value = reset ? rows : [...list.value, ...rows]
     pageNum.value = p
     total.value = rows.length < PAGE ? list.value.length : Number(res.total)
   } catch {
-    if (reset) {
+    if (my === reqSeq && reset) {
       list.value = []
       total.value = 0
     }
   } finally {
-    loading.value = false
+    if (my === reqSeq) loading.value = false
   }
 }
 
 function reload(): void {
   pageNum.value = 1
   total.value = 0
+  void fetchPage(true)
+}
+
+function switchScope(next: MomentScope): void {
+  if (scope.value === next) return
+  scope.value = next
+  list.value = []
+  pageNum.value = 1
+  total.value = 0
+  loading.value = false
   void fetchPage(true)
 }
 
@@ -196,13 +214,24 @@ onReachBottom(() => {
         </view>
       </view>
 
+      <!-- 双流切换：选中块随切换平移，比换字色更能读出当前在哪条流 -->
+      <view class="seg">
+        <view class="seg__cur" :class="{ 'seg__cur--right': scope === 'following' }" />
+        <view class="seg__i" :class="{ 'seg__i--on': scope === 'square' }" @click="switchScope('square')">
+          <text>广场</text>
+        </view>
+        <view class="seg__i" :class="{ 'seg__i--on': scope === 'following' }" @click="switchScope('following')">
+          <text>关注</text>
+        </view>
+      </view>
+
       <view v-if="!list.length && loading" class="feed">
         <view v-for="n in 3" :key="n" class="cm-skel feed-skel" />
       </view>
       <view v-else-if="!list.length" class="cm-state">
         <CmIcon name="heart" size="lg" tone="muted" />
-        <text class="cm-state__t">还没有人发动态</text>
-        <text class="cm-state__s">做第一个分享校园生活的人</text>
+        <text class="cm-state__t">{{ scope === 'following' ? '关注的人还没发动态' : '还没有人发动态' }}</text>
+        <text class="cm-state__s">{{ scope === 'following' ? '去广场逛逛，关注几个同学' : '做第一个分享校园生活的人' }}</text>
       </view>
 
       <view v-else class="feed">
@@ -332,6 +361,54 @@ onReachBottom(() => {
 
 .hero__pub--on {
   transform: scale(0.95);
+}
+
+/* ── 双流切换 ───────────────────────────────────────────── */
+
+.seg {
+  position: relative;
+  display: flex;
+  margin: 0 $cm-space-2 $cm-space-3;
+  padding: 6rpx;
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: $cm-radius-pill;
+  box-shadow: $cm-shadow-xs;
+}
+
+/* 选中块：宽 = 一半减去内边距，靠平移切换，不改宽高所以不触发布局 */
+.seg__cur {
+  position: absolute;
+  top: 6rpx;
+  bottom: 6rpx;
+  left: 6rpx;
+  width: calc(50% - 6rpx);
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  border-radius: $cm-radius-pill;
+  box-shadow: 0 8rpx 20rpx rgba(255, 106, 0, 0.28);
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.seg__cur--right {
+  transform: translateX(100%);
+}
+
+.seg__i {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $cm-font-size-sm;
+  font-weight: 500;
+  color: $cm-color-text-3;
+  transition: color 200ms ease-out, font-weight 200ms ease-out;
+}
+
+.seg__i--on {
+  color: #fff;
+  font-weight: 700;
 }
 
 .feed {

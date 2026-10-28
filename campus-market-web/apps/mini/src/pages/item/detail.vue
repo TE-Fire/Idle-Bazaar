@@ -150,6 +150,7 @@ function onPoster(): void {
     .filter(Boolean)
     .join(' · ')
   const q = [
+    `id=${encodeURIComponent(it.id)}`,
     `title=${encodeURIComponent(it.title)}`,
     `price=${encodeURIComponent(formatPrice(Number(it.price)))}`,
     `meta=${encodeURIComponent(meta)}`,
@@ -158,7 +159,8 @@ function onPoster(): void {
   void uni.navigateTo({ url: `/pages/poster/index?${q}` })
 }
 
-/** 评论头像 → TA 的主页 */function goProfile(userId: string): void {
+/** 评论头像 → TA 的主页 */
+function goProfile(userId: string): void {
   void uni.navigateTo({ url: `/pages/user/index?userId=${userId}` })
 }
 

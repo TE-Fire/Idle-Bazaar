@@ -12,6 +12,10 @@
     "./role": "./src/role.ts",
     "./item": "./src/item.ts",
     "./admin": "./src/admin.ts",
-    "./format": "./src/format.ts"
+    "./format": "./src/format.ts",
+    "./qrcode": "./src/qrcode.ts"
+  },
+  "dependencies": {
+    "qrcode-generator": "^2.0.4"
   }
 }

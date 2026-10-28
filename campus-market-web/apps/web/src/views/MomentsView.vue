@@ -2,8 +2,8 @@
 /**
  * 广场（notes/22 S3–S5 的宿主页）
  *
- * <p>一条流、不分 tab：动态与「分享好物」混排，靠卡片右上的类型标区分。
- * 校园场景里动态量不大，分频道反而每条都稀。
+ * <p>两条流：**广场**（全站时间流）与**关注**（只看已关注作者）。默认广场——
+ * 新用户没有关注关系，先落在关注流会是一片空白；关注流空态里给一句引导回广场。
  *
  * <p>加载用「哨兵 + IntersectionObserver」而不是滚动监听：滚动监听每帧算一次
  * getBoundingClientRect，长列表里是白白的开销；哨兵只在真正进出视口时触发一次。
@@ -22,13 +22,19 @@ import { useUserStore } from '@/stores/user'
 
 const PAGE_SIZE = 10
 
+/** square 全广场 / following 只看关注 */
+type MomentScope = 'square' | 'following'
+
 const router = useRouter()
 const session = useUserStore()
 
+const scope = ref<MomentScope>('square')
 const moments = ref<MomentVO[]>([])
 const pageNum = ref(1)
 const total = ref(0)
 const loading = ref(false)
+/** 请求序号：切换流时旧请求的响应直接丢弃，避免把上一页塞进新流 */
+let seq = 0
 /** 正在请求的那条动态 id：防止连点重复请求 */
 const likePending = ref<string | null>(null)
 
@@ -47,26 +53,49 @@ let observer: IntersectionObserver | null = null
 
 const finished = computed(() => moments.value.length >= total.value)
 
+const emptyText = computed(() =>
+  scope.value === 'following'
+    ? '关注的人还没发动态，去广场逛逛，关注几个同学'
+    : '还没有人发动态，你可以做第一个'
+)
+
 async function load(reset = false): Promise<void> {
-  if (loading.value) return
+  if (loading.value && !reset) return
   if (!reset && finished.value) return
+  const my = ++seq
   loading.value = true
   const next = reset ? 1 : pageNum.value + 1
+  const useScope = scope.value
   try {
-    const page = await userMomentApi.square(next, PAGE_SIZE)
+    const page =
+      useScope === 'following'
+        ? await userMomentApi.following(next, PAGE_SIZE)
+        : await userMomentApi.square(next, PAGE_SIZE)
+    // 期间切换过流：这个响应已经过期，整包丢弃
+    if (my !== seq) return
     const rows = page.list ?? []
     moments.value = reset ? rows : [...moments.value, ...rows]
     pageNum.value = next
     total.value = Number(page.total)
     if (rows.length < PAGE_SIZE) total.value = moments.value.length
   } catch {
-    if (reset) {
+    if (my === seq && reset) {
       moments.value = []
       total.value = 0
     }
   } finally {
-    loading.value = false
+    if (my === seq) loading.value = false
   }
+}
+
+function switchScope(next: MomentScope): void {
+  if (scope.value === next) return
+  scope.value = next
+  moments.value = []
+  pageNum.value = 1
+  total.value = 0
+  loading.value = false
+  void load(true)
 }
 
 function requireLogin(): boolean {
@@ -138,8 +167,30 @@ onBeforeUnmount(() => {
       <el-button type="primary" round @click="openComposer">＋ 发条动态</el-button>
     </header>
 
+    <div class="tabs">
+      <button
+        type="button"
+        class="tabs__item"
+        :class="{ 'is-on': scope === 'square' }"
+        @click="switchScope('square')"
+      >
+        广场
+      </button>
+      <button
+        type="button"
+        class="tabs__item"
+        :class="{ 'is-on': scope === 'following' }"
+        @click="switchScope('following')"
+      >
+        关注
+      </button>
+    </div>
+
     <p v-if="!loading && !moments.length" class="empty">
-      还没有人发动态，你可以做第一个
+      {{ emptyText }}
+      <button v-if="scope === 'following'" type="button" class="empty__go" @click="switchScope('square')">
+        去广场
+      </button>
     </p>
 
     <div class="feed">
@@ -196,6 +247,35 @@ onBeforeUnmount(() => {
   color: var(--cm-color-text-3);
 }
 
+/* 双流切换：贴着内容左对齐的胶囊组，不占满行——铺满会让人以为是页面级切换 */
+.tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  background: var(--cm-color-bg);
+  border-radius: var(--cm-radius-pill);
+}
+
+.tabs__item {
+  padding: 6px 20px;
+  border: 0;
+  border-radius: var(--cm-radius-pill);
+  background: transparent;
+  font-size: var(--cm-font-size-sm);
+  font-weight: 500;
+  color: var(--cm-color-text-3);
+  cursor: pointer;
+  transition: background 180ms ease-out, color 180ms ease-out, box-shadow 180ms ease-out;
+}
+
+.tabs__item.is-on {
+  background: var(--cm-color-surface);
+  color: var(--cm-color-text-1);
+  font-weight: 700;
+  box-shadow: var(--cm-shadow-1);
+}
+
 /* 与页头同宽，不再单独限宽 */
 .feed {
   display: flex;
@@ -209,6 +289,17 @@ onBeforeUnmount(() => {
   text-align: center;
   font-size: var(--cm-font-size-sm);
   color: var(--cm-color-text-3);
+}
+
+.empty__go {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  color: var(--cm-color-brand);
+  text-decoration: underline;
+  cursor: pointer;
 }
 
 .sentinel {

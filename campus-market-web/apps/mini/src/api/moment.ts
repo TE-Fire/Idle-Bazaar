@@ -36,6 +36,8 @@ export interface MomentVO {
   likeCount: string
   liked: boolean
   commentCount: string
+  /** 0 正常 / 1 敏感词屏蔽（仅自己主页可见）/ 2 举报下架 */
+  auditStatus?: number
   createTime: string
 }
 
@@ -73,10 +75,14 @@ export interface MomentPublishParams {
 
 export const momentApi = {
   publish: (data: MomentPublishParams) =>
-    request<string>({ url: '/api/moment/publish', method: 'POST', data }),
+    request<string>({ url: '/api/moment/publish', method: 'POST', data: { ...data } }),
 
   square: (pageNum = 1, pageSize = 10) =>
     request<MomentPageVO>({ url: '/api/moment/square', data: { pageNum, pageSize } }),
+
+  /** 关注流：只看已关注作者 */
+  following: (pageNum = 1, pageSize = 10) =>
+    request<MomentPageVO>({ url: '/api/moment/following', data: { pageNum, pageSize } }),
 
   userMoments: (userId: string, pageNum = 1, pageSize = 10) =>
     request<MomentPageVO>({ url: `/api/moment/user/${userId}`, data: { pageNum, pageSize } }),

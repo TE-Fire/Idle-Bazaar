@@ -64,6 +64,9 @@ onReachBottom(() => {
       <view v-for="n in list" :key="n.id" class="row">
         <view class="row__dot" :class="{ 'row__dot--on': n.readFlag === 0 }" />
         <view class="row__body">
+          <view class="row__tag" :class="{ 'row__tag--i': n.type === 5 }">
+            <text>{{ n.type === 5 ? '互动' : '系统' }}</text>
+          </view>
           <text class="row__text">{{ n.content }}</text>
           <text class="row__time">{{ formatRelativeTime(n.createTime) }}</text>
         </view>
@@ -126,6 +129,24 @@ onReachBottom(() => {
   display: flex;
   flex-direction: column;
   gap: 8rpx;
+}
+
+/* 类型标：互动用品牌色，系统处置用中性灰——处置结果带压力，不该和点赞同色 */
+.row__tag {
+  display: inline-flex;
+  align-items: center;
+  height: 32rpx;
+  padding: 0 10rpx;
+  margin-bottom: 8rpx;
+  font-size: 20rpx;
+  color: $cm-color-text-3;
+  background: $cm-color-bg;
+  border-radius: 6rpx;
+}
+
+.row__tag--i {
+  color: $cm-color-brand-text;
+  background: $cm-color-brand-bg;
 }
 
 .row__text {

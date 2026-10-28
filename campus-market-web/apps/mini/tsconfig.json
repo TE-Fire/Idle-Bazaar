@@ -4,7 +4,9 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@campus/shared": ["../../packages/shared/src/index.ts"],
+      "@campus/mock": ["../../packages/mock/src/index.ts"]
     },
     "lib": ["esnext", "dom"],
     "types": ["@dcloudio/types"],
