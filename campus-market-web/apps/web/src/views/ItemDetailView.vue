@@ -12,7 +12,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
-import { userDictApi, userItemApi, type ApiItemVO, type CategoryVO } from '@campus/api'
+import { userDictApi, userItemApi, userMomentApi, type ApiItemVO, type CategoryVO } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
@@ -24,6 +24,8 @@ const userStore = useUserStore()
 
 const item = ref<ApiItemVO | null>(null)
 const loading = ref(true)
+/** 分享到广场在途：防连点重复发动态 */
+const sharing = ref(false)
 
 /** 分类字典：把商品挂的二级分类 id 还原成「一级 / 二级」，商品表只存二级 id */
 const dictCats = ref<CategoryVO[]>([])
@@ -96,10 +98,36 @@ function onCompare(): void {
   if (!compare.toggle(goods)) ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
 }
 
+/**
+ * 分享到广场（动态 type=2）
+ *
+ * <p>正文给一句默认推荐语，不让用户先写再发——分享要一步完成才有转化。
+ * 商品必须仍在售，非在售服务端返回 4023，由请求层提示。
+ */
+async function onShare(): Promise<void> {
+  if (!item.value || sharing.value) return
+  if (!userStore.userId) {
+    void router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  sharing.value = true
+  try {
+    await userMomentApi.publish({
+      type: 2,
+      content: `推荐一件好物：${item.value.title}`,
+      itemId: item.value.id
+    })
+    ElMessage.success('已分享到广场')
+  } catch {
+    // http 层已提示（含 4023 商品不在售）
+  } finally {
+    sharing.value = false
+  }
+}
+
 /** 聊一聊：未登录先跳登录（带回跳）；自己的商品不进会话。
  *  商品摘要随 query 带上——首聊时会话还没建，ChatView 的壳会话用它显示顶部卡片 */
-function onChat(): void {
-  if (!item.value) return
+function onChat(): void {  if (!item.value) return
   if (!userStore.userId) {
     void router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
@@ -211,7 +239,10 @@ function goSeller(): void {
     </div>
 
     <section class="desc">
-      <h2>商品描述</h2>
+      <div class="desc__hd">
+        <h2>商品描述</h2>
+        <el-button link type="primary" :loading="sharing" @click="onShare">分享到广场</el-button>
+      </div>
       <p class="desc__text">{{ item.description || '卖家没有填写描述。' }}</p>
     </section>
   </div>
@@ -433,8 +464,15 @@ function goSeller(): void {
   box-shadow: var(--cm-shadow-1);
 }
 
+.desc__hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--cm-space-3);
+}
+
 .desc h2 {
-  margin: 0 0 var(--cm-space-3);
+  margin: 0;
   font-size: var(--cm-font-size-md);
   font-weight: 600;
 }

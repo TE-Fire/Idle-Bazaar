@@ -50,6 +50,15 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/UserProfileView.vue'),
         meta: { title: '个人主页' }
       },
+      // 广场：动态流（notes/22 S3–S5），动态与分享好物混排
+      { path: 'moments', name: 'moments', component: () => import('@/views/MomentsView.vue'), meta: { title: '广场' } },
+      // 动态详情：正文 + 评论（S6）
+      {
+        path: 'moment/:id',
+        name: 'moment-detail',
+        component: () => import('@/views/MomentDetailView.vue'),
+        meta: { title: '动态详情' }
+      },
       // 订单详情：状态动作都在这页（付款 / 退款 / 核销 / 收货 / 纠纷），?role=seller 切卖家视角
       {
         path: 'order/:id',

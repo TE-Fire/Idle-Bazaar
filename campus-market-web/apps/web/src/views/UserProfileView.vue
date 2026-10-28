@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /**
- * 个人主页（notes/22 S2 的宿主页面）
+ * 个人主页（notes/22 S2 的宿主页面，S4 动态 Tab 在此落地）
  *
- * <p>资料卡 + 关注按钮 + TA 的在售闲置。动态 Tab（S4）还没实现，先给占位空态——
- * 占位写在同一个 tab 结构里，S4 落地时只换内容不换骨架。
+ * <p>资料卡 + 关注按钮 + 两个 Tab：TA 的在售闲置 / TA 的动态。
+ * 动态 Tab 懒加载——首屏只拉商品，点开才请求动态，避免进主页发两串请求。
  *
  * <p>商品网格复用 ProductCard（经 toGoodsItem 映射），与首页同一张卡：
- * 主页商品不允许长出第二套视觉，否则改卡片要改两处。
+ * 主页商品不允许长出第二套视觉，否则改卡片要改两处。动态同理复用 MomentCard。
  *
  * <p>关注按钮乐观更新：成功即翻转并同步粉丝数，失败不动界面（http 层已提示），
  * 下次进页回到服务端真值。自己的主页不显示关注按钮，粉丝数照常展示。
@@ -14,10 +14,12 @@
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { userItemApi, userSocialApi, type UserProfileVO } from '@campus/api'
+import { ElMessage } from 'element-plus'
+import { userItemApi, userMomentApi, userSocialApi, type MomentVO, type UserProfileVO } from '@campus/api'
 import type { GoodsItem } from '@campus/shared'
 import { toGoodsItem } from '@/utils/item-map'
 import ProductCard from '@/components/ProductCard.vue'
+import MomentCard from '@/components/MomentCard.vue'
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
 import { useUserStore } from '@/stores/user'
 
@@ -40,6 +42,15 @@ const pageNum = ref(1)
 const itemsLoading = ref(false)
 /** 逐行 loading：关注请求在途时按钮不重复点 */
 const acting = ref(false)
+
+const MOMENT_SIZE = 10
+const moments = ref<MomentVO[]>([])
+const momentTotal = ref(0)
+const momentPage = ref(1)
+const momentsLoading = ref(false)
+/** 懒加载：切过一次才有值，之后切回不重复请求 */
+const momentsLoaded = ref(false)
+const likePending = ref<string | null>(null)
 
 const isSelf = computed(() => !!profile.value?.self)
 const nickname = computed(() => profile.value?.nickname || '校园用户')
@@ -76,9 +87,59 @@ async function loadItems(): Promise<void> {
   }
 }
 
+async function loadMoments(reset = false): Promise<void> {
+  if (momentsLoading.value) return
+  momentsLoading.value = true
+  const next = reset ? 1 : momentPage.value + 1
+  try {
+    const page = await userMomentApi.userMoments(userId.value, next, MOMENT_SIZE)
+    const rows = page.list ?? []
+    moments.value = reset ? rows : [...moments.value, ...rows]
+    momentPage.value = next
+    momentTotal.value = Number(page.total)
+    if (rows.length < MOMENT_SIZE) momentTotal.value = moments.value.length
+    momentsLoaded.value = true
+  } catch {
+    if (reset) {
+      moments.value = []
+      momentTotal.value = 0
+    }
+  } finally {
+    momentsLoading.value = false
+  }
+}
+
 function switchTab(next: 'items' | 'moments'): void {
   if (tab.value === next) return
   tab.value = next
+  if (next === 'moments' && !momentsLoaded.value) void loadMoments(true)
+}
+
+/** 点赞：乐观翻转，失败按原值回滚 */
+async function toggleMomentLike(m: MomentVO): Promise<void> {
+  if (likePending.value === m.id) return
+  likePending.value = m.id
+  const wasLiked = m.liked
+  const before = Number(m.likeCount)
+  m.liked = !wasLiked
+  m.likeCount = String(Math.max(before + (wasLiked ? -1 : 1), 0))
+  try {
+    if (wasLiked) {
+      await userMomentApi.unlike(m.id)
+    } else {
+      await userMomentApi.like(m.id)
+    }
+  } catch {
+    m.liked = wasLiked
+    m.likeCount = String(before)
+    ElMessage.error('操作失败，请重试')
+  } finally {
+    likePending.value = null
+  }
+}
+
+function goMomentDetail(m: MomentVO): void {
+  void router.push({ name: 'moment-detail', params: { id: m.id } })
 }
 
 /** 关注 / 取关：幂等接口，本地只做乐观翻转 */
@@ -111,11 +172,16 @@ function gotoLogin(): void {
 watch(
   () => userId.value,
   () => {
-    if (userId.value) {
-      pageNum.value = 1
-      void loadProfile()
-      void loadItems()
-    }
+    if (!userId.value) return
+    pageNum.value = 1
+    // 换人：动态全部作废，重新按需拉
+    moments.value = []
+    momentTotal.value = 0
+    momentPage.value = 1
+    momentsLoaded.value = false
+    void loadProfile()
+    void loadItems()
+    if (tab.value === 'moments') void loadMoments(true)
   }
 )
 
@@ -203,7 +269,21 @@ onMounted(() => {
       />
     </template>
 
-    <p v-else class="empty">动态功能即将上线，敬请期待</p>
+    <template v-else>
+      <p v-if="!momentsLoading && !moments.length" class="empty">TA 还没发过动态</p>
+      <div class="feed">
+        <MomentCard
+          v-for="m in moments"
+          :key="m.id"
+          :moment="m"
+          @toggle-like="toggleMomentLike"
+          @comment="goMomentDetail"
+        />
+      </div>
+      <div v-if="moments.length < momentTotal" class="more">
+        <el-button :loading="momentsLoading" @click="loadMoments(false)">加载更多</el-button>
+      </div>
+    </template>
 
     <ProfileEditDialog v-model="editSelfOpen" />
   </div>
@@ -430,6 +510,21 @@ onMounted(() => {
   text-align: center;
   font-size: var(--cm-font-size-sm);
   color: var(--cm-color-text-3);
+}
+
+/* 动态流：单列，与广场同一宽度节奏 */
+.feed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-3);
+  width: 100%;
+  max-width: 720px;
+}
+
+.more {
+  display: flex;
+  justify-content: center;
+  padding: var(--cm-space-2) 0;
 }
 
 .pager {

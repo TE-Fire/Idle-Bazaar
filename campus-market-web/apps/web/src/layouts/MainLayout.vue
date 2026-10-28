@@ -15,7 +15,7 @@
 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
+import { ChatDotRound, Compass, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
 import { userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
@@ -132,6 +132,7 @@ async function logout(): Promise<void> {
           <RouterLink :to="{ name: 'publish' }" class="nav__publish">
             <el-icon :size="14"><Position /></el-icon>发布闲置
           </RouterLink>
+          <RouterLink :to="{ name: 'moments' }" class="lnk"><el-icon :size="16"><Compass /></el-icon>广场</RouterLink>
           <RouterLink :to="{ name: 'chat' }" class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</RouterLink>
           <RouterLink :to="{ name: 'orders' }" class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</RouterLink>
           <!-- 登录态：头像悬停弹出菜单（关注 / 我的商品 / 我的主页 / 编辑 / 退出）
