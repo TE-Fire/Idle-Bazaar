@@ -18,6 +18,7 @@ import { userItemApi, userSocialApi, type UserProfileVO } from '@campus/api'
 import type { GoodsItem } from '@campus/shared'
 import { toGoodsItem } from '@/utils/item-map'
 import ProductCard from '@/components/ProductCard.vue'
+import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -42,6 +43,9 @@ const acting = ref(false)
 
 const isSelf = computed(() => !!profile.value?.self)
 const nickname = computed(() => profile.value?.nickname || '校园用户')
+
+/** 自己的主页：直接在这里编辑资料（与顶栏下拉共用弹层） */
+const editSelfOpen = ref(false)
 
 async function loadProfile(): Promise<void> {
   loading.value = true
@@ -168,6 +172,9 @@ onMounted(() => {
       >
         {{ acting ? '处理中' : profile.following ? '已关注' : '+ 关注' }}
       </button>
+      <button v-else type="button" class="who__edit" @click="editSelfOpen = true">
+        编辑资料
+      </button>
     </section>
 
     <!-- Tab：商品 / 动态占位 -->
@@ -197,6 +204,8 @@ onMounted(() => {
     </template>
 
     <p v-else class="empty">动态功能即将上线，敬请期待</p>
+
+    <ProfileEditDialog v-model="editSelfOpen" />
   </div>
 
   <div v-else-if="!loading" class="cm-shell">
@@ -359,6 +368,26 @@ onMounted(() => {
   &:disabled {
     opacity: 0.6;
     cursor: default;
+  }
+}
+
+/* 自己的主页：次级描边按钮，与关注按钮同位 */
+.who__edit {
+  flex: none;
+  align-self: flex-start;
+  height: 34px;
+  min-width: 92px;
+  padding: 0 var(--cm-space-5);
+  font-size: var(--cm-font-size-sm);
+  font-weight: 700;
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-surface);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-pill);
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--cm-color-text-2);
   }
 }
 

@@ -15,12 +15,12 @@
 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ChatDotRound, CopyDocument, Position, Star, Top } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { uploadImage, userDictApi } from '@campus/api'
+import { ChatDotRound, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
+import { userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import CompareBar from '@/components/CompareBar.vue'
+import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -59,64 +59,25 @@ onMounted(async () => {
 /** 热搜词：闲鱼把一批高频词铺在搜索框下面。这里写死一组校园高频词，点击即搜 */
 const HOT_WORDS = ['笔记本电脑', '考研资料', '自行车', 'iPad', '电动车', '台灯', '吉他', '篮球'] as const
 
-/* ── 资料编辑（notes/20 D3：昵称 + 头像，顶栏弹层）────────────── */
+/* ── 资料编辑：弹层抽到 ProfileEditDialog，这里只持开关 ────── */
 
 const editOpen = ref(false)
-const editNick = ref('')
-const editAvatar = ref('')
-const uploading = ref(false)
-const saving = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
-
-/** 打开编辑弹层：以当前会话为初值，取消不改任何东西 */
 function openEdit(): void {
-  editNick.value = session.nickname
-  editAvatar.value = session.avatarUrl
   editOpen.value = true
 }
 
-function pickAvatar(): void {
-  fileInput.value?.click()
-}
+/** 头像首字（无头像时兜底） */
+const initial = computed(() => (session.nickname || '我').slice(0, 1))
 
-/** 选完图即上传（两步票据制）：成功换预览；失败由 http 层统一提示，这里只收尾状态 */
-function onFile(e: Event): void {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  uploading.value = true
-  void uploadImage(file)
-    .then((url) => {
-      editAvatar.value = url
-    })
-    .catch(() => undefined)
-    .finally(() => {
-      uploading.value = false
-      input.value = ''
-    })
+/** 「我的主页」= 自己的个人主页，复用 user-profile 路由（self 自适应） */
+function goMe(): void {
+  void router.push({ name: 'user-profile', params: { id: session.userId } })
 }
-
-async function saveProfile(): Promise<void> {
-  const nick = editNick.value.trim()
-  if (!nick) {
-    ElMessage.warning({ message: '昵称不能为空', duration: 2000 })
-    return
-  }
-  if (uploading.value) {
-    ElMessage.warning({ message: '头像上传中，稍候', duration: 2000 })
-    return
-  }
-  saving.value = true
-  try {
-    // 局部更新：没换过头像就不传 avatarUrl——传空串会被服务端判非法（4021）
-    await session.updateProfile(
-      editAvatar.value ? { nickname: nick, avatarUrl: editAvatar.value } : { nickname: nick }
-    )
-    editOpen.value = false
-    ElMessage.success({ message: '已保存', duration: 2000 })
-  } finally {
-    saving.value = false
-  }
+function goMyItems(): void {
+  void router.push({ name: 'my-items' })
+}
+function goFollow(): void {
+  void router.push({ name: 'follow' })
 }
 
 function onSearch(): void {
@@ -173,20 +134,51 @@ async function logout(): Promise<void> {
           </RouterLink>
           <RouterLink :to="{ name: 'chat' }" class="lnk"><el-icon :size="16"><ChatDotRound /></el-icon>消息</RouterLink>
           <RouterLink :to="{ name: 'orders' }" class="lnk"><el-icon :size="16"><CopyDocument /></el-icon>订单</RouterLink>
-          <RouterLink v-if="session.isLogin" :to="{ name: 'follow' }" class="lnk">
-            <el-icon :size="16"><Star /></el-icon>关注
-          </RouterLink>
-          <!-- 登录态：未登录显示入口，已登录显示头像 + 昵称 + 我的商品 + 退出 -->
-          <RouterLink v-if="!session.isLogin" :to="{ name: 'login' }" class="lnk">登录</RouterLink>
-          <template v-else>
-            <button type="button" class="nav__avatar" title="编辑资料" @click="openEdit">
-              <img v-if="session.avatarUrl" :src="session.avatarUrl" class="nav__avatar-img" alt="" />
-              <span v-else class="nav__avatar-t">{{ (session.nickname || '我').slice(0, 1) }}</span>
-            </button>
-            <RouterLink :to="{ name: 'my-items' }" class="lnk">{{ session.nickname || '我的' }}</RouterLink>
-            <a class="lnk" @click="openEdit">编辑</a>
-            <a class="lnk" @click="logout">退出</a>
+          <!-- 登录态：头像悬停弹出菜单（关注 / 我的商品 / 我的主页 / 编辑 / 退出）
+               都收在这里，顶栏不再散落；未登录只留入口 -->
+          <template v-if="session.isLogin">
+            <el-dropdown class="nav__user" trigger="hover" placement="bottom-end">
+              <span class="nav__user-trigger">
+                <button type="button" class="nav__avatar" title="点击查看菜单">
+                  <img v-if="session.avatarUrl" :src="session.avatarUrl" class="nav__avatar-img" alt="" />
+                  <span v-else class="nav__avatar-t">{{ initial }}</span>
+                </button>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu class="udrop">
+                  <div class="udrop__head">
+                    <div class="udrop__ava">
+                      <img v-if="session.avatarUrl" :src="session.avatarUrl" alt="" />
+                      <span v-else>{{ initial }}</span>
+                    </div>
+                    <div class="udrop__meta">
+                      <p class="udrop__name">{{ session.nickname || '我的' }}</p>
+                      <p class="udrop__sub">
+                        <span v-if="session.authStatus === 2" class="udrop__ok">已认证</span>
+                        <span>信用 {{ session.creditScore }} 分</span>
+                      </p>
+                    </div>
+                  </div>
+                  <el-dropdown-item @click="goMe">
+                    <el-icon><User /></el-icon>我的主页
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="goMyItems">
+                    <el-icon><Goods /></el-icon>我的商品
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="goFollow">
+                    <el-icon><Star /></el-icon>我的关注
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="openEdit">
+                    <el-icon><Edit /></el-icon>编辑资料
+                  </el-dropdown-item>
+                  <el-dropdown-item divided @click="logout">
+                    <el-icon><SwitchButton /></el-icon>退出登录
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </template>
+          <RouterLink v-else :to="{ name: 'login' }" class="lnk">登录</RouterLink>
         </nav>
       </div>
     </header>
@@ -220,25 +212,8 @@ async function logout(): Promise<void> {
 
     <CompareBar />
 
-    <!-- 资料编辑弹层：Web 端没有独立「我的」页，编辑入口收在顶栏（notes/20 §五） -->
-    <el-dialog v-model="editOpen" title="编辑资料" width="400px" append-to-body>
-      <div class="pf">
-        <button type="button" class="pf__avatar" @click="pickAvatar">
-          <img v-if="editAvatar" :src="editAvatar" class="pf__img" alt="" />
-          <span v-else class="pf__t">{{ (session.nickname || '我').slice(0, 1) }}</span>
-          <span class="pf__mask">更换头像</span>
-          <span v-if="uploading" class="pf__loading">上传中</span>
-        </button>
-        <input ref="fileInput" class="pf__file" type="file" accept="image/jpeg,image/png,image/webp" @change="onFile" />
-        <label class="pf__label">昵称</label>
-        <el-input v-model="editNick" maxlength="64" show-word-limit placeholder="请输入昵称" />
-        <p class="pf__hint">昵称展示在商品列表、详情与留言中；头像支持 jpg / png / webp，不超过 5MB。</p>
-      </div>
-      <template #footer>
-        <el-button @click="editOpen = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="saveProfile">保存</el-button>
-      </template>
-    </el-dialog>
+    <!-- 资料编辑弹层：头像下拉「编辑资料」、个人主页「编辑资料」共用 -->
+    <ProfileEditDialog v-model="editOpen" />
   </div>
 </template>
 
@@ -351,9 +326,9 @@ async function logout(): Promise<void> {
 
 /* ── 右侧动作区 ─────────────────────────────────────────── */
 
+/* 右侧动作区：margin-left:auto 推到最右端；整组与搜索框垂直居中 */
 .nav__right {
   margin-left: auto;
-  padding-top: var(--cm-space-1);
   display: flex;
   align-items: center;
   gap: var(--cm-space-5);
@@ -361,6 +336,10 @@ async function logout(): Promise<void> {
   color: var(--cm-color-text-1);
   white-space: nowrap;
 }
+
+/* 头像尺寸跟随导航栏节奏：取与搜索框（40px）相近的 36px，hover 轻微上浮。
+   注意：尺寸必须写死，不能走 scoped 里的 :root 变量（scoped 属性选择器
+   作用不到 <html>，变量不会被声明，var() 回退 auto 会让头像撑成原图大小） */
 
 .campus {
   width: 108px;
@@ -401,22 +380,35 @@ async function logout(): Promise<void> {
   }
 }
 
-/* 顶栏头像：黄底上的白环小圆，点击进资料编辑（notes/20 D4） */
+/* 顶栏头像：黄底上的白环小圆，悬停弹菜单（notes/20 D4） */
+.nav__user {
+  margin-left: 0;
+}
+
+.nav__user-trigger {
+  display: inline-flex;
+  outline: none;
+  cursor: pointer;
+}
+
 .nav__avatar {
-  width: 28px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.92);
   border-radius: 50%;
   background: var(--cm-color-brand-dark);
+  box-shadow: 0 1px 4px rgba(31, 31, 38, 0.18);
   cursor: pointer;
   overflow: hidden;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
 
   &:hover {
-    opacity: 0.85;
+    transform: translateY(-1px);
+    box-shadow: 0 3px 10px rgba(31, 31, 38, 0.26);
   }
 }
 
@@ -427,9 +419,92 @@ async function logout(): Promise<void> {
 }
 
 .nav__avatar-t {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--cm-color-brand);
+}
+
+/* ── 头像悬停下拉菜单 ───────────────────────────────────── */
+
+.udrop {
+  padding: var(--cm-space-2) 0;
+  min-width: 184px;
+
+  /* 头部资料卡 */
+  .udrop__head {
+    display: flex;
+    align-items: center;
+    gap: var(--cm-space-3);
+    padding: var(--cm-space-2) var(--cm-space-4) var(--cm-space-3);
+  }
+
+  .udrop__ava {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    overflow: hidden;
+    background: var(--cm-color-brand-bg);
+    color: var(--cm-color-text-1);
+    font-weight: 700;
+
+    img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+  }
+
+  .udrop__meta {
+    min-width: 0;
+  }
+
+  .udrop__name {
+    margin: 0;
+    font-size: var(--cm-font-size-md);
+    font-weight: 700;
+    color: var(--cm-color-text-1);
+  }
+
+  .udrop__sub {
+    margin: 2px 0 0;
+    display: flex;
+    align-items: center;
+    gap: var(--cm-space-2);
+    font-size: var(--cm-font-size-xs);
+    color: var(--cm-color-text-3);
+  }
+
+  .udrop__ok {
+    color: var(--cm-color-ok);
+  }
+
+  /* 下拉项：覆盖 el-dropdown-item 默认行高与留白 */
+  :deep(.el-dropdown-menu__item) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--cm-font-size-sm);
+    color: var(--cm-color-text-1);
+    padding: 0 var(--cm-space-4);
+
+    .el-icon {
+      font-size: 16px;
+    }
+  }
+
+  :deep(.el-dropdown-menu__item--divided) {
+    margin-top: 4px;
+    border-top: 1px solid var(--cm-color-border);
+  }
+
+  /* 「退出登录」用红色，抬高特异性盖过上面统一的 item 颜色 */
+  :deep(.el-dropdown-menu__item.udrop__logout) {
+    color: var(--cm-color-danger, #cf1322);
+  }
 }
 
 /* ── 内容区 ─────────────────────────────────────────────── */
@@ -512,88 +587,5 @@ async function logout(): Promise<void> {
   .rail {
     display: none;
   }
-}
-
-/* ── 资料编辑弹层 ───────────────────────────────────────── */
-
-.pf {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--cm-space-3);
-}
-
-.pf__avatar {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 50%;
-  background: var(--cm-color-brand-bg);
-  cursor: pointer;
-  overflow: hidden;
-
-  &:hover .pf__mask {
-    opacity: 1;
-  }
-}
-
-.pf__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.pf__t {
-  font-size: 28px;
-  font-weight: 700;
-  /* 品牌黄作文字色对比度不足（web 端也没定义 brand-text），直接用正文色 */
-  color: var(--cm-color-text-1);
-}
-
-/*  hover 蒙层：告诉用户这块能点（桌面端没有长按换头像的心智） */
-.pf__mask {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--cm-font-size-xs);
-  color: #fff;
-  background: rgba(31, 31, 38, 0.45);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
-}
-
-.pf__loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: var(--cm-font-size-xs);
-  color: #fff;
-  background: rgba(31, 31, 38, 0.55);
-}
-
-.pf__file {
-  display: none;
-}
-
-.pf__label {
-  align-self: flex-start;
-  font-size: var(--cm-font-size-sm);
-  font-weight: 600;
-  color: var(--cm-color-text-2);
-}
-
-.pf__hint {
-  margin: 0;
-  font-size: var(--cm-font-size-xs);
-  color: var(--cm-color-text-3);
 }
 </style>
