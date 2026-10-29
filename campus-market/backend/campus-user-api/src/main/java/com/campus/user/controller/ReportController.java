@@ -28,7 +28,8 @@ public class ReportController {
 
     private final ReportService reportService;
 
-    @Operation(summary = "提交举报", description = "targetType：1 商品 2 用户；凭证 ≤3 张")
+    @Operation(summary = "提交举报",
+            description = "targetType：1 商品 / 2 用户 / 3 动态 / 4 商品评论 / 5 动态评论；凭证 ≤3 张")
     @PostMapping
     public Result<Long> submit(@Valid @RequestBody ReportCreateReq req) {
         return Result.ok(reportService.report(UserContext.getUserId(), req));
