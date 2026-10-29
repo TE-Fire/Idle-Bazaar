@@ -13,7 +13,7 @@
  */
 
 import { computed } from 'vue'
-import { formatRelativeTime } from '@campus/shared'
+import { CONTENT_AUDIT_STATUS, formatRelativeTime } from '@campus/shared'
 import { REPORT_TARGET, reportTarget } from '@/utils/report'
 import { getSession } from '@/utils/session'
 import CmIcon from './CmIcon.vue'
@@ -74,7 +74,7 @@ function previewImage(i: number): void {
           <text class="mc__nick">{{ nickname }}</text>
           <text v-if="author?.authStatus === 2" class="mc__ok">已认证</text>
           <!-- 只在看自己的主页时出现：被敏感词屏蔽的动态只有作者可见 -->
-          <text v-if="moment.auditStatus === 1" class="mc__hidden">仅自己可见</text>
+          <text v-if="moment.auditStatus === CONTENT_AUDIT_STATUS.MASKED" class="mc__hidden">仅自己可见</text>
         </view>
         <text class="mc__time">{{ timeText }}</text>
       </view>

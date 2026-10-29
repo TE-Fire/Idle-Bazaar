@@ -16,6 +16,7 @@ import com.campus.core.entity.Item;
 import com.campus.core.entity.MomentComment;
 import com.campus.core.entity.MomentLike;
 import com.campus.core.entity.UserMoment;
+import com.campus.core.enums.ContentAuditStatusEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.ItemMapper;
@@ -56,8 +57,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class MomentService {
 
-    private static final int AUDIT_NORMAL = 0;
-    private static final int AUDIT_MASKED = 1;
     private static final int TYPE_STATUS = 1;
     private static final int TYPE_SHARE = 2;
     private static final int MAX_IMAGES = 9;
@@ -110,7 +109,7 @@ public class MomentService {
         m.setContent(clean);
         m.setImages(writeImages(images));
         m.setItemId(type == TYPE_SHARE ? itemId : null);
-        m.setAuditStatus(AUDIT_NORMAL);
+        m.setAuditStatus(ContentAuditStatusEnum.NORMAL.getCode());
         momentMapper.insert(m);
         return m.getId();
     }
@@ -120,7 +119,7 @@ public class MomentService {
         Page<UserMoment> p = momentMapper.selectPage(new Page<>(pageNum, pageSize),
                 new LambdaQueryWrapper<UserMoment>()
                         .eq(UserMoment::getDeleted, 0L)
-                        .eq(UserMoment::getAuditStatus, AUDIT_NORMAL)
+                        .eq(UserMoment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode())
                         .orderByDesc(UserMoment::getCreateTime));
         return pageVO(p, viewerId);
     }
@@ -145,7 +144,7 @@ public class MomentService {
         Page<UserMoment> p = momentMapper.selectPage(new Page<>(pageNum, pageSize),
                 new LambdaQueryWrapper<UserMoment>()
                         .eq(UserMoment::getDeleted, 0L)
-                        .eq(UserMoment::getAuditStatus, AUDIT_NORMAL)
+                        .eq(UserMoment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode())
                         .in(UserMoment::getUserId, followees)
                         .orderByDesc(UserMoment::getCreateTime));
         return pageVO(p, viewerId);
@@ -164,9 +163,10 @@ public class MomentService {
                 .eq(UserMoment::getDeleted, 0L)
                 .orderByDesc(UserMoment::getCreateTime);
         if (self) {
-            w.in(UserMoment::getAuditStatus, AUDIT_NORMAL, AUDIT_MASKED);
+            w.in(UserMoment::getAuditStatus,
+                    ContentAuditStatusEnum.NORMAL.getCode(), ContentAuditStatusEnum.MASKED.getCode());
         } else {
-            w.eq(UserMoment::getAuditStatus, AUDIT_NORMAL);
+            w.eq(UserMoment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode());
         }
         return pageVO(momentMapper.selectPage(new Page<>(pageNum, pageSize), w), viewerId);
     }
@@ -177,8 +177,8 @@ public class MomentService {
                 .eq(UserMoment::getId, momentId)
                 .eq(UserMoment::getDeleted, 0L));
         boolean mine = m != null && m.getUserId() != null && m.getUserId() == viewerId;
-        BizAssert.isTrue(m != null && (Integer.valueOf(AUDIT_NORMAL).equals(m.getAuditStatus())
-                || (mine && Integer.valueOf(AUDIT_MASKED).equals(m.getAuditStatus()))),
+        BizAssert.isTrue(m != null && (ContentAuditStatusEnum.NORMAL.getCode().equals(m.getAuditStatus())
+                || (mine && ContentAuditStatusEnum.MASKED.getCode().equals(m.getAuditStatus()))),
                 UserErrorCode.MOMENT_NOT_FOUND);
         MomentDetailVO vo = new MomentDetailVO();
         vo.setMoment(toVOList(List.of(m), viewerId).get(0));
@@ -234,7 +234,7 @@ public class MomentService {
         c.setUserId(userId);
         c.setReplyTo(req.getReplyTo());
         c.setContent(clean);
-        c.setAuditStatus(AUDIT_NORMAL);
+        c.setAuditStatus(ContentAuditStatusEnum.NORMAL.getCode());
         commentMapper.insert(c);
 
         notifyComment(m, userId, req.getReplyTo(), clean);
@@ -332,7 +332,7 @@ public class MomentService {
         for (MomentComment c : commentMapper.selectList(new LambdaQueryWrapper<MomentComment>()
                 .in(MomentComment::getMomentId, momentIds)
                 .eq(MomentComment::getDeleted, 0L)
-                .eq(MomentComment::getAuditStatus, AUDIT_NORMAL))) {
+                .eq(MomentComment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode()))) {
             commentCounts.merge(c.getMomentId(), 1L, Long::sum);
         }
 
@@ -371,7 +371,7 @@ public class MomentService {
         List<MomentComment> rows = commentMapper.selectList(new LambdaQueryWrapper<MomentComment>()
                 .eq(MomentComment::getMomentId, momentId)
                 .eq(MomentComment::getDeleted, 0L)
-                .eq(MomentComment::getAuditStatus, AUDIT_NORMAL)
+                .eq(MomentComment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode())
                 .orderByAsc(MomentComment::getCreateTime));
         if (rows.isEmpty()) {
             return List.of();
@@ -407,7 +407,7 @@ public class MomentService {
         UserMoment m = momentMapper.selectOne(new LambdaQueryWrapper<UserMoment>()
                 .eq(UserMoment::getId, momentId)
                 .eq(UserMoment::getDeleted, 0L)
-                .eq(UserMoment::getAuditStatus, AUDIT_NORMAL));
+                .eq(UserMoment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode()));
         return BizAssert.notNull(m, UserErrorCode.MOMENT_NOT_FOUND);
     }
 

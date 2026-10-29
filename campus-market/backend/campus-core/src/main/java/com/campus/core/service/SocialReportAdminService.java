@@ -15,6 +15,7 @@ import com.campus.core.entity.ItemComment;
 import com.campus.core.entity.MomentComment;
 import com.campus.core.entity.Report;
 import com.campus.core.entity.UserMoment;
+import com.campus.core.enums.ContentAuditStatusEnum;
 import com.campus.core.enums.CreditReasonEnum;
 import com.campus.core.enums.ReportStatusEnum;
 import com.campus.core.enums.ReportTargetTypeEnum;
@@ -51,8 +52,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class SocialReportAdminService {
 
-    /** audit_status：2 举报下架 */
-    private static final int AUDIT_OFFLINE = 2;
     private static final int SUMMARY_MAX = 60;
     private static final List<Integer> SOCIAL_TYPES = List.of(
             ReportTargetTypeEnum.MOMENT.getCode(),
@@ -155,7 +154,7 @@ public class SocialReportAdminService {
                 }
                 momentMapper.update(null, new LambdaUpdateWrapper<UserMoment>()
                         .eq(UserMoment::getId, targetId)
-                        .set(UserMoment::getAuditStatus, AUDIT_OFFLINE));
+                        .set(UserMoment::getAuditStatus, ContentAuditStatusEnum.OFFLINE.getCode()));
                 return m.getUserId();
             }
             case ITEM_COMMENT -> {
@@ -165,7 +164,7 @@ public class SocialReportAdminService {
                 }
                 itemCommentMapper.update(null, new LambdaUpdateWrapper<ItemComment>()
                         .eq(ItemComment::getId, targetId)
-                        .set(ItemComment::getAuditStatus, AUDIT_OFFLINE));
+                        .set(ItemComment::getAuditStatus, ContentAuditStatusEnum.OFFLINE.getCode()));
                 return c.getUserId();
             }
             case MOMENT_COMMENT -> {
@@ -175,7 +174,7 @@ public class SocialReportAdminService {
                 }
                 momentCommentMapper.update(null, new LambdaUpdateWrapper<MomentComment>()
                         .eq(MomentComment::getId, targetId)
-                        .set(MomentComment::getAuditStatus, AUDIT_OFFLINE));
+                        .set(MomentComment::getAuditStatus, ContentAuditStatusEnum.OFFLINE.getCode()));
                 return c.getUserId();
             }
             default -> {

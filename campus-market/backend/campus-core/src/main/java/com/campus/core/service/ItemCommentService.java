@@ -9,6 +9,7 @@ import com.campus.core.dto.req.ItemCommentReq;
 import com.campus.core.dto.resp.ItemCommentVO;
 import com.campus.core.dto.resp.UserPubVO;
 import com.campus.core.entity.Item;
+import com.campus.core.enums.ContentAuditStatusEnum;
 import com.campus.core.entity.ItemComment;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.errcode.UserErrorCode;
@@ -36,7 +37,6 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ItemCommentService {
 
-    private static final int AUDIT_NORMAL = 0;
     private static final int MAX_LEN = 500;
     private static final int MAX_PAGE_SIZE = 50;
     private static final int NOTICE_BRIEF_LEN = 30;
@@ -65,7 +65,7 @@ public class ItemCommentService {
         c.setUserId(userId);
         c.setReplyTo(req.getReplyTo());
         c.setContent(sensitiveWordService.filter(content));
-        c.setAuditStatus(AUDIT_NORMAL);
+        c.setAuditStatus(ContentAuditStatusEnum.NORMAL.getCode());
         commentMapper.insert(c);
 
         notifySeller(item, userId, c.getContent());
@@ -98,7 +98,7 @@ public class ItemCommentService {
                 new LambdaQueryWrapper<ItemComment>()
                         .eq(ItemComment::getItemId, itemId)
                         .eq(ItemComment::getDeleted, 0L)
-                        .eq(ItemComment::getAuditStatus, AUDIT_NORMAL)
+                        .eq(ItemComment::getAuditStatus, ContentAuditStatusEnum.NORMAL.getCode())
                         .orderByAsc(ItemComment::getCreateTime)
                         .orderByAsc(ItemComment::getId));
         return PageResult.of(toVOList(p.getRecords()), p.getTotal(), p.getCurrent(), p.getSize());

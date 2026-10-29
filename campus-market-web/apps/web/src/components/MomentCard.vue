@@ -14,7 +14,7 @@
 
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { formatRelativeTime } from '@campus/shared'
+import { CONTENT_AUDIT_STATUS, formatRelativeTime } from '@campus/shared'
 import type { MomentVO } from '@campus/api'
 import { useUserStore } from '@/stores/user'
 
@@ -89,7 +89,7 @@ function onComment(): void {
         <p class="mc__sub">
           <span v-if="author?.authStatus === 2" class="mc__ok">已认证</span>
           <!-- 只在看自己的主页时出现：被敏感词屏蔽的动态只有作者可见 -->
-          <span v-if="moment.auditStatus === 1" class="mc__hidden">仅自己可见</span>
+          <span v-if="moment.auditStatus === CONTENT_AUDIT_STATUS.MASKED" class="mc__hidden">仅自己可见</span>
           <span>{{ timeText }}</span>
         </p>
       </div>
