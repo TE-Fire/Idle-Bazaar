@@ -232,12 +232,9 @@ function onMeetPointChange(e: { detail: { value: number } }): void {
   form.value.meetPointId = meetPointIds.value[e.detail.value] ?? ''
 }
 
-/**
- * switch 变更。事件类型在 @dcloudio/types 里是松的 Event，没有 detail，
- * 这里显式收形参再断言，避免 template 里到处 as any。
- */
-function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
-  form.value[field] = (e as { detail: { value: boolean } }).detail.value
+/** 自绘开关的翻转：原生 switch 在 H5 是固定 px（52×32），压不进 72rpx 的行高 */
+function toggle(field: 'negotiable' | 'delivery'): void {
+  form.value[field] = !form.value[field]
 }
 </script>
 
@@ -315,11 +312,27 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
     <view class="sec">
       <view class="switch-row">
         <text>可议价</text>
-        <switch :checked="form.negotiable" color="#FF6A00" @change="onToggle('negotiable', $event)" />
+        <view
+          class="sw"
+          :class="{ 'sw--on': form.negotiable }"
+          hover-class="sw--press"
+          :hover-stay-time="80"
+          @click="toggle('negotiable')"
+        >
+          <view class="sw__knob" />
+        </view>
       </view>
       <view class="switch-row">
         <text>包校园配送</text>
-        <switch :checked="form.delivery" color="#FF6A00" @change="onToggle('delivery', $event)" />
+        <view
+          class="sw"
+          :class="{ 'sw--on': form.delivery }"
+          hover-class="sw--press"
+          :hover-stay-time="80"
+          @click="toggle('delivery')"
+        >
+          <view class="sw__knob" />
+        </view>
       </view>
     </view>
 
@@ -346,8 +359,11 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 
 <style scoped lang="scss">
 .page {
-  /* 底部导航由 TabBar 占位，这里只留卡片自身的呼吸 */
-  padding: $cm-space-4 $cm-space-4 $cm-space-5;
+  /* 只给三边：padding-bottom 必须留给 .cm-page--tab——这里若写简写（哪怕写 0），
+     scoped 单类声明也会压过全局类，底部按钮就被 dock 盖住（2026-10-29 踩过）。 */
+  padding-top: $cm-space-4;
+  padding-left: $cm-space-4;
+  padding-right: $cm-space-4;
 }
 
 .sec {
@@ -507,6 +523,49 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
   color: $cm-color-text-1;
 }
 
+/* ── 开关（自绘） ─────────────────────────────────────────
+   原生 switch 在 H5 是固定 px 尺寸（轨道 52×32、滑块 30×30），
+   与 72rpx 行高不匹配，白色滑块几乎糊满轨道；颜色也只能传 hex，
+   用不了令牌。自绘后尺寸走 rpx、品牌色走令牌、滑动带动效。 */
+.sw {
+  flex: none;
+  width: 88rpx;
+  height: 50rpx;
+  padding: 5rpx;
+  box-sizing: border-box;
+  border-radius: $cm-radius-pill;
+  /* 关闭态用 gray-300：白滑块压在 gray-200 上几乎没有边界，会糊成一个圆 */
+  background: $cm-color-gray-300;
+  transition: background-color 220ms ease-out;
+}
+
+.sw--on {
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+}
+
+.sw__knob {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2rpx 6rpx rgba(17, 24, 39, 0.22);
+  /* 回弹曲线：滑到位时有一点过冲，手感比线性更像物理开关 */
+  transition: transform 240ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 行程 = 88 - 5×2 - 40 = 38rpx */
+.sw--on .sw__knob {
+  transform: translateX(38rpx);
+}
+
+.sw--press .sw__knob {
+  transform: scale(0.92);
+}
+
+.sw--on.sw--press .sw__knob {
+  transform: translateX(38rpx) scale(0.92);
+}
+
 /* ── 提交 ───────────────────────────────────────────────── */
 
 .submit {
@@ -527,6 +586,7 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 
 .submit--off {
   background: $cm-color-brand-bg;
+  box-shadow: none;
 }
 
 .submit--off .submit__t {
@@ -568,9 +628,18 @@ function onToggle(field: 'negotiable' | 'delivery', e: unknown): void {
 .btn--off {
   background: $cm-color-brand-bg;
   border-color: transparent;
+  /* 禁用态不该留品牌投影，否则看着仍像可按 */
+  box-shadow: none;
 }
 
 .btn--off .btn__t {
   color: $cm-color-text-3;
+}
+
+/* 「提交送审」复用了 .submit--off，但 .btn 的渐变声明写在它之后（同特殊度、后定义者赢），
+   禁用态会被盖回实心橙；这里用更高特殊度压回来。 */
+.btns .submit--off {
+  background: $cm-color-brand-bg;
+  box-shadow: none;
 }
 </style>
