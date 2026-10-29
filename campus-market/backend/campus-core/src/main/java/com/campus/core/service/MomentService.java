@@ -23,6 +23,8 @@ import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.MomentCommentMapper;
 import com.campus.core.mapper.MomentLikeMapper;
 import com.campus.core.mapper.UserMomentMapper;
+import com.campus.core.redis.MomentRedisKeys;
+import com.campus.core.service.cache.MomentCache;
 import com.campus.core.service.cache.UserPubCache;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -52,6 +54,9 @@ import java.util.Set;
  *
  * <p>互动通知（被赞/被评）在写路径末尾推送，失败只 warn 不影响主流程；
  * 同一人对同一动态的点赞 24 小时内只推一次、评论 30 分钟一次，避免取消再赞刷屏。
+ *
+ * <p>列表缓存只装公共视图（`liked` 恒 false、作者本人视角不进缓存），命中后按 viewer 补。
+ * 发布**不**主动失效列表——最迟一个 TTL 后出现在广场；下架则 INCR 版本戳，要求立刻不可见。
  */
 @Service
 @RequiredArgsConstructor
@@ -65,11 +70,33 @@ public class MomentService {
     /** 关注流最多拼多少个 followee：关注数无上限，`IN` 列表不设口子会打爆 SQL */
     private static final int FOLLOW_FEED_MAX_FOLLOWEES = 300;
 
+    /** 只缓存前 3 页：更深的页命中率趋零，存下来只是占内存 */
+    private static final int MAX_CACHED_PAGE = 3;
+
+    /** 广场流 TTL（秒）：首页最热，保底 90 + 随机 0–60；深页 180 + 0–120 */
+    private static final long SQUARE_P1_BASE = 90;
+    private static final long SQUARE_P1_JITTER = 60;
+    private static final long SQUARE_PN_BASE = 180;
+    private static final long SQUARE_PN_JITTER = 120;
+
+    /** 个人主页 TTL（秒）：按作者共享但访问更分散，给得比广场长 */
+    private static final long USER_P1_BASE = 180;
+    private static final long USER_P1_JITTER = 120;
+    private static final long USER_PN_BASE = 300;
+    private static final long USER_PN_JITTER = 180;
+
+    /**
+     * 加载公共视图时用的假 viewer：`liked` 恒为 false，命中后由 {@link #patchLiked} 按
+     * 当前用户补。不能传真实 userId —— 第一个访问者的点赞态会被烤进共享缓存。
+     */
+    private static final long ANON_VIEWER = 0L;
+
     private final UserMomentMapper momentMapper;
     private final MomentLikeMapper likeMapper;
     private final MomentCommentMapper commentMapper;
     private final ItemMapper itemMapper;
     private final UserPubCache userPubCache;
+    private final MomentCache momentCache;
     private final SensitiveWordService sensitiveWordService;
     private final NoticeService noticeService;
     private final FollowService followService;
@@ -114,8 +141,24 @@ public class MomentService {
         return m.getId();
     }
 
-    /** 广场流：全站正常动态，时间倒序 */
+    /** 广场流：全站正常动态，时间倒序。前 3 页读穿缓存，点赞态按当前用户补 */
     public MomentPageVO square(long viewerId, int pageNum, int pageSize) {
+        if (!cacheablePage(pageNum)) {
+            return loadSquare(viewerId, pageNum, pageSize);
+        }
+        long ver = momentCache.feedVersion();
+        if (ver == MomentCache.NO_VERSION) {
+            return loadSquare(viewerId, pageNum, pageSize);
+        }
+        MomentPageVO vo = momentCache.getOrLoad(
+                MomentRedisKeys.squarePage(ver, pageNum, pageSize), MomentPageVO.class,
+                pageNum == 1 ? MomentCache.ttl(SQUARE_P1_BASE, SQUARE_P1_JITTER)
+                        : MomentCache.ttl(SQUARE_PN_BASE, SQUARE_PN_JITTER),
+                () -> loadSquare(ANON_VIEWER, pageNum, pageSize));
+        return patchLiked(vo, viewerId);
+    }
+
+    private MomentPageVO loadSquare(long viewerId, int pageNum, int pageSize) {
         Page<UserMoment> p = momentMapper.selectPage(new Page<>(pageNum, pageSize),
                 new LambdaQueryWrapper<UserMoment>()
                         .eq(UserMoment::getDeleted, 0L)
@@ -125,12 +168,10 @@ public class MomentService {
     }
 
     /**
-     * 关注流：只看自己关注的作者，时间倒序。
+     * 关注流：只看我关注的人，时间倒序。关注关系读 Redis（见 FollowService#followingIds）。
      *
-     * <p>关注关系用子查询而不是先查关注 id 再 `IN`：关注上千人时 IN 列表会撑爆语句长度，
-     * 子查询走 `idx_follower` 只取一遍。`viewerId` 是 long，拼接无注入面。
+     * <p>per-viewer 视角、几乎不交叉，缓存命中率极低且 key 随用户数线性增长，因此不进缓存。
      */
-    /** 关注流：只看我关注的人，时间倒序。关注关系读 Redis（见 FollowService#followingIds） */
     public MomentPageVO following(long viewerId, int pageNum, int pageSize) {
         List<Long> followees = followService.followingIds(viewerId, FOLLOW_FEED_MAX_FOLLOWEES);
         if (followees.isEmpty()) {
@@ -155,8 +196,27 @@ public class MomentService {
      *
      * <p>看自己的主页时纳入「敏感词屏蔽(1)」——否则用户发出去的内容自己看不见，会以为发布失败；
      * 看别人时只出正常内容。「举报下架(2)」对自己也不可见，下架是平台结论，不是待处理的草稿。
+     *
+     * <p><b>本人视角不走缓存</b>：可见范围随 viewer 变化，缓存只能装公共视图。
      */
     public MomentPageVO userMoments(long viewerId, long targetUserId, int pageNum, int pageSize) {
+        boolean self = viewerId == targetUserId;
+        if (self || !cacheablePage(pageNum)) {
+            return loadUserMoments(viewerId, targetUserId, pageNum, pageSize);
+        }
+        long ver = momentCache.feedVersion();
+        if (ver == MomentCache.NO_VERSION) {
+            return loadUserMoments(viewerId, targetUserId, pageNum, pageSize);
+        }
+        MomentPageVO vo = momentCache.getOrLoad(
+                MomentRedisKeys.userPage(ver, targetUserId, pageNum, pageSize), MomentPageVO.class,
+                pageNum == 1 ? MomentCache.ttl(USER_P1_BASE, USER_P1_JITTER)
+                        : MomentCache.ttl(USER_PN_BASE, USER_PN_JITTER),
+                () -> loadUserMoments(ANON_VIEWER, targetUserId, pageNum, pageSize));
+        return patchLiked(vo, viewerId);
+    }
+
+    private MomentPageVO loadUserMoments(long viewerId, long targetUserId, int pageNum, int pageSize) {
         boolean self = viewerId == targetUserId;
         LambdaQueryWrapper<UserMoment> w = new LambdaQueryWrapper<UserMoment>()
                 .eq(UserMoment::getUserId, targetUserId)
@@ -283,6 +343,35 @@ public class MomentService {
     }
 
     /* ── 组装 ── */
+
+    /** 前 3 页才有缓存价值：深页访问稀疏，命中率趋零 */
+    private static boolean cacheablePage(int pageNum) {
+        return pageNum >= 1 && pageNum <= MAX_CACHED_PAGE;
+    }
+
+    /**
+     * 补「我是否赞过」：缓存里 `liked` 恒为 false，按当前用户批量查一次点赞表。
+     *
+     * <p>一次 `IN` 走 `idx` 全覆盖，比为每个 viewer 单独存一份列表便宜得多；
+     * 若把点赞态烤进共享缓存，列表就只能给一个人用，命中率从全站塌成单人。
+     */
+    private MomentPageVO patchLiked(MomentPageVO vo, long viewerId) {
+        if (vo == null || vo.getList() == null || vo.getList().isEmpty() || viewerId <= 0) {
+            return vo;
+        }
+        List<Long> ids = vo.getList().stream().map(MomentVO::getId).toList();
+        Set<Long> mine = new HashSet<>();
+        for (MomentLike l : likeMapper.selectList(new LambdaQueryWrapper<MomentLike>()
+                .in(MomentLike::getMomentId, ids)
+                .eq(MomentLike::getUserId, viewerId)
+                .eq(MomentLike::getDeleted, 0L))) {
+            mine.add(l.getMomentId());
+        }
+        for (MomentVO m : vo.getList()) {
+            m.setLiked(mine.contains(m.getId()));
+        }
+        return vo;
+    }
 
     private MomentPageVO pageVO(Page<UserMoment> p, long viewerId) {
         MomentPageVO vo = new MomentPageVO();

@@ -24,6 +24,7 @@ import com.campus.core.mapper.ItemCommentMapper;
 import com.campus.core.mapper.MomentCommentMapper;
 import com.campus.core.mapper.ReportMapper;
 import com.campus.core.mapper.UserMomentMapper;
+import com.campus.core.service.cache.MomentCache;
 import com.campus.core.service.cache.UserPubCache;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,6 +64,7 @@ public class SocialReportAdminService {
     private final ItemCommentMapper itemCommentMapper;
     private final MomentCommentMapper momentCommentMapper;
     private final UserPubCache userPubCache;
+    private final MomentCache momentCache;
     private final NoticeService noticeService;
     private final CreditService creditService;
     private final ObjectMapper objectMapper;
@@ -155,6 +157,8 @@ public class SocialReportAdminService {
                 momentMapper.update(null, new LambdaUpdateWrapper<UserMoment>()
                         .eq(UserMoment::getId, targetId)
                         .set(UserMoment::getAuditStatus, ContentAuditStatusEnum.OFFLINE.getCode()));
+                // 下架要「立刻不可见」：列表缓存靠版本戳整体失效，不能等 TTL
+                momentCache.invalidateFeeds();
                 return m.getUserId();
             }
             case ITEM_COMMENT -> {
