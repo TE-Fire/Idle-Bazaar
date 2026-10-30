@@ -277,7 +277,7 @@ CREATE TABLE msg_message (
   receiver_id bigint        NOT NULL COMMENT '接收者',
   type        tinyint       NOT NULL DEFAULT 1 COMMENT '1文本 2图片 3卡片（面交约定） 4系统处置 5互动 6平台公告',
   content     varchar(2000) DEFAULT NULL COMMENT '文本内容',
-  extra       json          DEFAULT NULL COMMENT '卡片消息结构化载荷（面交点/时间/商品）；公告存 title',
+  extra       json          DEFAULT NULL COMMENT '卡片消息结构化载荷（面交点/时间/商品）；公告存 title 与 campusId',
   batch_id    bigint        DEFAULT NULL COMMENT '公告批次：同一条公告发给多人的行同批次，撤回按批次软删',
   read_flag   tinyint       NOT NULL DEFAULT 0 COMMENT '0未读 1已读',
   read_time   datetime      DEFAULT NULL COMMENT '已读时间',

@@ -6,6 +6,9 @@
  * 混在一起会让「未读」这个数字两头都算不清。
  *
  * <p>进页面即全部标记已读——通知没有「逐条已读」的必要，逐条点只会让用户多点几下。
+ *
+ * <p>三类正文同列表，靠 `type` 分标签：4 系统处置、5 互动、6 平台公告。公告多一个标题行
+ * （后端从 `extra.title` 解析出来），其余两类只有正文。
  */
 
 import { computed, onMounted, ref } from 'vue'
@@ -75,9 +78,10 @@ function more(): void {
       <li v-for="n in list" :key="n.id" class="row" :class="{ 'row--new': n.readFlag === 0 }">
         <span class="row__dot" />
         <div class="row__body">
-          <span class="row__tag" :class="{ 'row__tag--i': n.type === 5 }">
-            {{ n.type === 5 ? '互动' : '系统' }}
+          <span class="row__tag" :class="{ 'row__tag--i': n.type === 5, 'row__tag--n': n.type === 6 }">
+            {{ n.type === 6 ? '公告' : n.type === 5 ? '互动' : '系统' }}
           </span>
+          <p v-if="n.title" class="row__title">{{ n.title }}</p>
           <p class="row__text">{{ n.content }}</p>
           <span class="row__time">{{ formatRelativeTime(n.createTime) }}</span>
         </div>
@@ -172,6 +176,20 @@ function more(): void {
 .row__tag--i {
   color: var(--cm-color-brand-dark);
   background: var(--cm-color-brand-bg);
+}
+
+/* 公告：平台主动说的话，用主色实心标，与处置/互动一眼分开 */
+.row__tag--n {
+  color: #fff;
+  background: var(--cm-color-brand);
+}
+
+.row__title {
+  margin: 0 0 2px;
+  font-size: var(--cm-font-size-sm);
+  font-weight: 600;
+  color: var(--cm-color-text-1);
+  word-break: break-word;
 }
 
 .row__text {

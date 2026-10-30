@@ -59,6 +59,9 @@ public enum UserErrorCode implements IErrorCode {
     AUTH_APPLY_NOT_FOUND(4031, "认证申请不存在"),
     AUTH_NOT_PENDING(4032, "该申请已处理，请刷新列表"),
     CREDIT_ADJUST_INVALID(4033, "信用分调整幅度需在 −20 到 +20 之间且理由必填"),
+
+    /** 平台公告（notes/22 S12）：5000 是防误触「全员公告」的闸门，不是性能上限 */
+    NOTICE_AUDIENCE_TOO_LARGE(4034, "接收人数超过 5000 上限，请缩小范围后分批发布"),
     ;
 
     @Override

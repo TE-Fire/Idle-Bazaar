@@ -119,6 +119,17 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '内容管理', perm: PERM_CODES.CONTENT_EDIT }
       },
       {
+        /*
+         * A11 平台公告（A-B13 / F-A12，技术口径 notes/22 S12）：
+         * 管理端唯一「主动对外说话」的入口。权限复用 content.edit（与改字典同属运营内容），
+         * 不新增权限点。
+         */
+        path: 'notices',
+        name: 'notices',
+        component: () => import('@/views/NoticesView.vue'),
+        meta: { title: '平台公告', perm: PERM_CODES.CONTENT_EDIT }
+      },
+      {
         // A8 数据报表：四张校园独有可视化
         path: 'report',
         name: 'report',

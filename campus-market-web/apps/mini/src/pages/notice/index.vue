@@ -64,9 +64,10 @@ onReachBottom(() => {
       <view v-for="n in list" :key="n.id" class="row">
         <view class="row__dot" :class="{ 'row__dot--on': n.readFlag === 0 }" />
         <view class="row__body">
-          <view class="row__tag" :class="{ 'row__tag--i': n.type === 5 }">
-            <text>{{ n.type === 5 ? '互动' : '系统' }}</text>
+          <view class="row__tag" :class="{ 'row__tag--i': n.type === 5, 'row__tag--n': n.type === 6 }">
+            <text>{{ n.type === 6 ? '公告' : n.type === 5 ? '互动' : '系统' }}</text>
           </view>
+          <text v-if="n.title" class="row__title">{{ n.title }}</text>
           <text class="row__text">{{ n.content }}</text>
           <text class="row__time">{{ formatRelativeTime(n.createTime) }}</text>
         </view>
@@ -147,6 +148,19 @@ onReachBottom(() => {
 .row__tag--i {
   color: $cm-color-brand-text;
   background: $cm-color-brand-bg;
+}
+
+/* 公告：平台主动说的话，用实心品牌标，与处置/互动一眼分开 */
+.row__tag--n {
+  color: #fff;
+  background: $cm-color-brand;
+}
+
+.row__title {
+  font-size: $cm-font-size-sm;
+  font-weight: 600;
+  color: $cm-color-text-1;
+  word-break: break-all;
 }
 
 .row__text {

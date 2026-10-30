@@ -8,6 +8,8 @@ import com.campus.core.dto.resp.NoticeVO;
 import com.campus.core.entity.MsgMessage;
 import com.campus.core.mapper.MsgMessageMapper;
 import com.campus.core.redis.NoticeRedisKeys;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,15 +19,19 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 通知（复用 `msg_message` 的 `zone=2` 分区，`sender_id=0` 表示平台发出）。
  *
- * <p>两类正文同一分区、靠 `type` 区分：`4` 系统处置（下架/裁决结果）、`5` 互动（被赞/被评/被关注）。
- * 同属「平台发给个人」的通知，前端一个列表按标签分色即可，不必再拆分区。
+ * <p>三类正文同一分区、靠 `type` 区分：`4` 系统处置（下架/裁决结果）、`5` 互动（被赞/被评/被关注）、
+ * `6` 平台公告（管理端发布，见 notes/22 S12）。同属「平台发给个人」的通知，
+ * 前端一个列表按标签分色即可，不必再拆分区。
  *
  * <p>推送失败不抛——通知是业务处置的附属品，处置本身成功就不该因为一条消息回滚。
+ * 公告发布是**主动行为**，不适用这条：它的失败要回滚，见 {@link NoticeAdminService}。
  */
 @Slf4j
 @Service
@@ -35,9 +41,12 @@ public class NoticeService {
     /** 分区：2 系统通知（1 私信 / 3 交易在 notes/19 预留） */
     private static final int ZONE_SYSTEM = 2;
     private static final long SENDER_SYSTEM = 0L;
-    /** 类型：4 系统处置 / 5 互动（赞·评·关注） */
+    /** 类型：4 系统处置 / 5 互动（赞·评·关注） / 6 平台公告 */
     private static final int TYPE_SYSTEM = 4;
     private static final int TYPE_INTERACT = 5;
+
+    /** 公告标题存在 `extra.title`（notes/22 S12），解析只读不写，用独立 mapper 即可 */
+    private static final ObjectMapper EXTRA_MAPPER = new ObjectMapper();
     private static final int READ_NO = 0;
     private static final int READ_YES = 1;
 
@@ -106,6 +115,7 @@ public class NoticeService {
             NoticeVO vo = new NoticeVO();
             vo.setId(m.getId());
             vo.setType(m.getType());
+            vo.setTitle(titleOf(m.getExtra()));
             vo.setContent(m.getContent());
             vo.setReadFlag(m.getReadFlag());
             vo.setCreateTime(m.getCreateTime());
@@ -135,5 +145,53 @@ public class NoticeService {
                 .eq(MsgMessage::getReadFlag, READ_NO)
                 .set(MsgMessage::getReadFlag, READ_YES)
                 .set(MsgMessage::getReadTime, LocalDateTime.now()));
+    }
+
+    /** 从 `extra` 取公告标题；非公告、无标题、格式坏掉一律返回 null（标题是锦上添花，不能让它拖挂列表） */
+    public static String titleOf(String extra) {
+        if (extra == null || extra.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = EXTRA_MAPPER.readTree(extra);
+            JsonNode title = node.get("title");
+            return title == null || title.isNull() ? null : title.asText();
+        } catch (Exception e) {
+            log.warn("[notice] extra 解析失败，按无标题处理 extra={}", extra);
+            return null;
+        }
+    }
+
+    /** 组装公告的 `extra`：标题与接收校区，撤回时靠行上的 `batchId` 定位，不靠这里 */
+    public static String extraOf(String title, Long campusId) {
+        Map<String, Object> map = new HashMap<>(2);
+        if (title != null) {
+            map.put("title", title);
+        }
+        if (campusId != null) {
+            map.put("campusId", campusId);
+        }
+        if (map.isEmpty()) {
+            return null;
+        }
+        try {
+            return EXTRA_MAPPER.writeValueAsString(map);
+        } catch (Exception e) {
+            log.warn("[notice] extra 组装失败 title={} campusId={}", title, campusId, e);
+            return null;
+        }
+    }
+
+    /** 从 `extra` 取接收校区（空 = 全员） */
+    public static Long campusIdOf(String extra) {
+        if (extra == null || extra.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode node = EXTRA_MAPPER.readTree(extra).get("campusId");
+            return node == null || node.isNull() ? null : node.asLong();
+        } catch (Exception e) {
+            return null;
+        }
     }
 }
