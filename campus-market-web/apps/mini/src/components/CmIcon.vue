@@ -12,7 +12,7 @@
 
 withDefaults(
   defineProps<{
-    /** 图标名：home / grid / plus / chat / me / bell / heart / search / arrow / clock / box / location / check / shield / receipt */
+    /** 图标名：home / grid / plus / chat / me / bell / heart / search / arrow / back / more / clock / box / location / check / shield / receipt */
     name: string
     /** 语义色：ink 主文字 / muted 弱化 / brand 品牌 / white 反白 / none 继承父级 */
     tone?: 'ink' | 'muted' | 'brand' | 'white' | 'none'
@@ -269,6 +269,34 @@ withDefaults(
   border-right: 3rpx solid currentColor;
   border-radius: 2rpx;
   transform: rotate(45deg);
+}
+
+/* ── back：左向折线（arrow 的镜像，自定义导航栏用） ── */
+.i--back::before {
+  content: '';
+  position: absolute;
+  left: 14rpx;
+  top: 13rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-bottom: 3rpx solid currentColor;
+  border-left: 3rpx solid currentColor;
+  border-radius: 2rpx;
+  transform: rotate(45deg);
+}
+
+/* ── more：三点横排（一个点 + 两道投影，省 DOM） ── */
+.i--more::before {
+  content: '';
+  position: absolute;
+  left: 4rpx;
+  top: 50%;
+  width: 8rpx;
+  height: 8rpx;
+  margin-top: -4rpx;
+  background: currentColor;
+  border-radius: 50%;
+  box-shadow: 14rpx 0 0 currentColor, 28rpx 0 0 currentColor;
 }
 
 /* ── clock：表盘 + 指针 ── */

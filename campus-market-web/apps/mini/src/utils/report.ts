@@ -18,13 +18,23 @@ export function reportTarget(targetType: number, targetId: string): void {
   uni.showActionSheet({
     itemList: [...REPORT_REASONS],
     success: (res) => {
-      const reason = REPORT_REASONS[res.tapIndex]
-      reportApi
-        .submit(targetType, targetId, reason)
-        .then(() => uni.showToast({ title: '举报已提交', icon: 'success' }))
-        .catch(() => undefined)
+      submitReport(targetType, targetId, REPORT_REASONS[res.tapIndex])
     }
   })
+}
+
+/**
+ * 提交举报：原因已选定，只负责发请求。
+ *
+ * <p>给自绘原因面板（商品详情「更多 → 举报」）复用——那里先弹自己的面板，
+ * 再调系统 actionSheet 会出现「一个面板未收起又开下一个」，小程序端第二次直接不弹。
+ */
+export function submitReport(targetType: number, targetId: string, reason: string): void {
+  if (!targetId || !reason) return
+  reportApi
+    .submit(targetType, targetId, reason)
+    .then(() => uni.showToast({ title: '举报已提交', icon: 'success' }))
+    .catch(() => undefined)
 }
 
 export { REPORT_TARGET }

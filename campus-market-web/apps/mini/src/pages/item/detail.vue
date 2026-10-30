@@ -5,17 +5,22 @@
  * <p>「半熟人信任可见」（原则 4）：学号认证、同校、面交点三项必须一眼看到——
  * 所以这三样放在参数区的最前面，不折叠。
  *
+ * <p>页面用自定义导航：顶部操作区浮在图集上（左返回、右更多），把分享 / 海报 / 举报
+ * 收进「更多」，正文只留商品信息。
+ *
  * <p>数据接 `/api/item/{id}`（免登录）。底部「聊一聊」进询单会话（同步留言）；
  * 「我想要」下单（未登录先跳登录）：只插待付款订单，商品不锁定，金额按标价。
  */
 
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
-import { CONDITION_LABELS, formatPrice, formatRelativeTime } from '@campus/shared'
+import { onLoad, onPageScroll } from '@dcloudio/uni-app'
+import { formatPrice, formatRelativeTime } from '@campus/shared'
 import { userItemApi, userOrderApi, type ApiItemVO } from '@/api/user'
 import { itemCommentApi, momentApi, type ItemCommentVO } from '@/api/moment'
-import { REPORT_TARGET, reportTarget } from '@/utils/report'
+import { REPORT_REASONS } from '@/api/social'
+import { REPORT_TARGET, reportTarget, submitReport } from '@/utils/report'
 import { getSession } from '@/utils/session'
+import CmIcon from '@/components/CmIcon.vue'
 import ConditionTag from '@/components/ConditionTag.vue'
 
 const myId = getSession().userId
@@ -24,6 +29,64 @@ const id = ref('')
 const item = ref<ApiItemVO | null>(null)
 /** 分享到广场在途：防止连点重复发动态 */
 const sharing = ref(false)
+
+/** 状态栏高度：H5 为 0，小程序端要留出系统栏，否则按钮压在时间下面 */
+const statusBarHeight = uni.getSystemInfoSync().statusBarHeight ?? 0
+const sysInfo = uni.getSystemInfoSync()
+/** 系统栏之下再让 10px：按钮离顶太近时单手够不到，也让图集顶部那层压暗有落点 */
+const TOP_GAP = 10
+
+/** 顶部操作区：滚过图集后转白底并淡出标题，图集上保持挖空圆钮 */
+const scrollTop = ref(0)
+onPageScroll((e) => {
+  scrollTop.value = e.scrollTop
+})
+/** 图集 640rpx≈333px、顶栏 = TOP_GAP + 96rpx ≈ 60px：滑到图完全躲进栏后（333-60）再转实底 */
+const BAR_SOLID_AT = 273
+const barSolid = computed(() => !item.value || scrollTop.value > BAR_SOLID_AT)
+
+/** 「更多」：menu 是三个动作，report 是第二步选原因——同一个小浮层内切换，不叠系统弹层 */
+const moreOpen = ref(false)
+const moreStep = ref<'menu' | 'report'>('menu')
+const reportReason = ref('')
+/** 浮层锚点：贴着「更多」按钮右下角弹出，若取不到按钮位置就退到右侧安全位 */
+const moreAnchor = ref({ top: statusBarHeight + TOP_GAP + 58, right: 16, cx: sysInfo.windowWidth - 40 })
+/** 自己的商品没有举报对象，只给分享与海报 */
+const canReport = computed(() => !!item.value && item.value.sellerId !== myId)
+
+/**
+ * 描述拆句：首句当引子（大一号、深色），其余按句分段。
+ * 长段落靠段间距给呼吸，不靠首行缩进——移动端缩进会切碎阅读节奏。
+ */
+const descParts = computed(() => {
+  const raw = (item.value?.description ?? '').trim()
+  // 没写描述时不摆引子架子，占位句按正文排
+  if (!raw) return { lead: '', body: ['卖家没有填写描述。'] }
+  const sents = raw
+    .replace(/\r/g, '')
+    .replace(/\n+/g, '。')
+    .split('。')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  // 只有一句话时不拆：整段塞进引子字号反而更难读
+  if (sents.length < 2) return { lead: '', body: [raw] }
+  return { lead: `${sents[0]}。`, body: sents.slice(1).map((s) => `${s}。`) }
+})
+
+/** 浮层宽度上限 176px（三行中文菜单的舒适宽度）；窄屏留 12px 边距，箭头夹在左右各 18px 内 */
+const POP_W = 176
+const popGeo = computed(() => {
+  const vw = sysInfo.windowWidth
+  const w = Math.min(POP_W, vw - 24)
+  const right = Math.max(12, Math.min(moreAnchor.value.right, vw - 12 - w))
+  const arrowLeft = Math.max(18, Math.min(w - 18, moreAnchor.value.cx - (vw - right - w)))
+  return { w, right, arrowLeft }
+})
+const popStyle = computed(() => ({
+  top: `${moreAnchor.value.top}px`,
+  right: `${popGeo.value.right}px`,
+  width: `${popGeo.value.w}px`
+}))
 
 /** 商品评论（notes/22 S7）：仅 ON_SALE 可发，下架后仍可读历史 */
 const comments = ref<ItemCommentVO[]>([])
@@ -159,6 +222,69 @@ function onPoster(): void {
   void uni.navigateTo({ url: `/pages/poster/index?${q}` })
 }
 
+/** 返回：直接进入（无栈）时回首页，否则退一层——自定义导航没有系统返回键兜底 */
+function goBack(): void {
+  if (getCurrentPages().length > 1) {
+    void uni.navigateBack()
+    return
+  }
+  void uni.reLaunch({ url: '/pages/index/index' })
+}
+
+/** 打开前先量按钮位置，浮层落在手指当前位置的下方，不必再把手指移到底部 */
+function openMore(): void {
+  if (!item.value) return
+  if (moreOpen.value) {
+    closeMore()
+    return
+  }
+  moreStep.value = 'menu'
+  reportReason.value = ''
+  uni
+    .createSelectorQuery()
+    .select('.tbtn--more')
+    .boundingClientRect((res) => {
+      const r = res as UniApp.NodeInfo | null
+      const { bottom, right, width } = r ?? {}
+      if (bottom != null && right != null && width != null && width > 0) {
+        moreAnchor.value = { top: bottom + 10, right: sysInfo.windowWidth - right, cx: right - width / 2 }
+      }
+      moreOpen.value = true
+    })
+    .exec()
+}
+
+function closeMore(): void {
+  moreOpen.value = false
+}
+
+/** 更多里的三个动作：分享与海报直接走，举报先切到选原因这一步 */
+function onMore(key: 'share' | 'poster' | 'report'): void {
+  if (key === 'report') {
+    moreStep.value = 'report'
+    return
+  }
+  closeMore()
+  if (key === 'share') {
+    void onShare()
+  } else {
+    onPoster()
+  }
+}
+
+function onReportSubmit(): void {
+  if (!item.value || !reportReason.value) return
+  if (!getSession().tokenValue) {
+    closeMore()
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    void uni.navigateTo({ url: '/pages/login/index' })
+    return
+  }
+  const reason = reportReason.value
+  closeMore()
+  submitReport(REPORT_TARGET.ITEM, item.value.id, reason)
+}
+
 /** 评论头像 → TA 的主页 */
 function goProfile(userId: string): void {
   void uni.navigateTo({ url: `/pages/user/index?userId=${userId}` })
@@ -219,135 +345,312 @@ async function send(): Promise<void> {
 </script>
 
 <template>
-  <view v-if="item" class="page cm-page">
-    <swiper class="swiper" indicator-dots circular>
-      <swiper-item v-for="(s, i) in shots" :key="i">
-        <image v-if="s" :src="s" mode="aspectFill" class="shot__img" />
-        <view v-else class="shot" :style="{ backgroundImage: shotGradient() }" />
-      </swiper-item>
-    </swiper>
-
-    <view class="box box--hero">
-      <text class="price">{{ formatPrice(Number(item.price)) }}</text>
-      <text v-if="item.originPrice" class="origin">原价 {{ formatPrice(Number(item.originPrice)) }}</text>
-      <text class="title">{{ item.title }}</text>
-      <text class="want">浏览 {{ item.viewCount }} 次 · {{ formatRelativeTime(item.publishAt) }}</text>
-    </view>
-
-    <!-- 校园四项：成色 / 校区 / 面交点 / 认证，前三项必须一眼可见 -->
-    <view class="box">
-      <view class="row">
-        <text class="row__k">成色</text>
-        <ConditionTag :grade="item.grade as 'A'" />
-        <text class="row__v">{{ CONDITION_LABELS[item.grade as 'A'] }}</text>
-      </view>
-      <view class="row"><text class="row__k">校区</text><text class="row__v">{{ item.campusName }}</text></view>
-      <view class="row"><text class="row__k">面交点</text><text class="row__v">{{ item.meetPointName ?? '待定' }}</text></view>
-      <view class="row">
-        <text class="row__k">交易</text>
-        <text class="row__v">{{ item.negotiable ? '可议价' : '一口价' }} · {{ item.deliveryIncluded ? '包配送' : '自提' }}</text>
-      </view>
-    </view>
-
-    <view class="box seller" hover-class="seller--active" @click="goSeller">
-      <view class="avatar" :style="{ backgroundImage: shotGradient() }" />
-      <view class="seller__meta">
-        <text class="seller__nick">{{ item.sellerNick ?? '卖家' }}</text>
-        <text class="seller__sub">信用 {{ item.sellerCredit ?? 100 }} 分 · 进主页</text>
-      </view>
-      <text class="seller__arrow">›</text>
-    </view>
-
-    <view class="box">
-      <text class="desc__t">商品描述</text>
-      <text class="desc">{{ item.description || '卖家没有填写描述。' }}</text>
-      <view class="share-row" hover-class="share-row--active" @click="onShare">
-        <text class="share-row__t">{{ sharing ? '分享中…' : '分享到广场，让更多同学看到' }}</text>
-        <text class="share-row__arrow">›</text>
-      </view>
-      <view class="share-row" hover-class="share-row--active" @click="onPoster">
-        <text class="share-row__t">生成分享海报</text>
-        <text class="share-row__arrow">›</text>
-      </view>
-    </view>
-
-    <!-- 商品评论（notes/22 S7）：售前问答，扁平一层 -->
-    <view class="box">
-      <view class="cmt__hd">
-        <text class="desc__t">商品评论</text>
-        <text class="cmt__n">{{ commentTotal }} 条</text>
-      </view>
-
-      <text v-if="!comments.length" class="cmt__empty">还没有人评论，来问两句</text>
-
-      <view v-for="c in comments" :key="c.id" class="row">
-        <view class="row__ava" @click="goProfile(c.userId)">
-          <image v-if="c.author?.avatarUrl" class="row__ava-img" :src="c.author.avatarUrl" mode="aspectFill" />
-          <text v-else class="row__ava-t">{{ initial(c.author?.nickname) }}</text>
+  <view class="page cm-page">
+    <!-- 顶部操作区：浮在图集上，滚动后转白底并淡出页面标题 -->
+    <view
+      class="topbar"
+      :class="{ 'topbar--solid': barSolid }"
+      :style="{ paddingTop: statusBarHeight + TOP_GAP + 'px' }"
+    >
+      <view class="topbar__scrim" :class="{ 'topbar__scrim--off': barSolid }" />
+      <view class="topbar__row">
+        <view class="tbtn" hover-class="tbtn--on" @click="goBack">
+          <CmIcon name="back" tone="ink" size="sm" />
         </view>
-        <view class="row__body">
-          <view class="row__top">
-            <text class="row__nick">{{ c.author?.nickname || '校园用户' }}</text>
-            <text class="row__time">{{ formatRelativeTime(c.createTime) }}</text>
+        <text class="topbar__title">商品详情</text>
+        <view
+          v-if="item"
+          class="tbtn tbtn--more"
+          :class="{ 'tbtn--open': moreOpen }"
+          hover-class="tbtn--on"
+          @click="openMore"
+        >
+          <CmIcon name="more" :tone="moreOpen ? 'white' : 'ink'" size="sm" />
+        </view>
+      </view>
+    </view>
+
+    <template v-if="item">
+      <swiper class="swiper" indicator-dots circular>
+        <swiper-item v-for="(s, i) in shots" :key="i">
+          <image v-if="s" :src="s" mode="aspectFill" class="shot__img" />
+          <view v-else class="shot" :style="{ backgroundImage: shotGradient() }" />
+        </swiper-item>
+      </swiper>
+
+      <view class="box box--hero">
+        <view class="hero__price">
+          <text class="price">{{ formatPrice(Number(item.price)) }}</text>
+          <text v-if="item.originPrice" class="origin">原价 {{ formatPrice(Number(item.originPrice)) }}</text>
+        </view>
+        <text class="title">{{ item.title }}</text>
+        <text class="want">浏览 {{ item.viewCount }} 次 · {{ formatRelativeTime(item.publishAt) }}</text>
+      </view>
+
+      <!-- 交易信息：成色与交易条件并成一行标签作焦点，校区/面交点退为两列底注 -->
+      <view class="box box--spec">
+        <view class="spec__tags">
+          <ConditionTag :grade="item.grade as 'A'" />
+          <text class="spec__tag">{{ item.negotiable ? '可议价' : '一口价' }}</text>
+          <text class="spec__tag">{{ item.deliveryIncluded ? '包配送' : '自提' }}</text>
+        </view>
+        <view class="spec__grid">
+          <view class="spec__cell">
+            <text class="spec__k">校区</text>
+            <text class="spec__v">{{ item.campusName }}</text>
           </view>
-          <text class="row__text">
-            <text v-if="c.replyTo" class="row__reply">回复 @{{ c.replyToNick || 'TA' }}：</text>{{ c.content }}
-          </text>
-          <view class="row__acts">
-            <text class="row__act" @click="setReply(c)">回复</text>
-            <text
-              v-if="c.userId !== myId"
-              class="row__act"
-              @click="reportTarget(REPORT_TARGET.ITEM_COMMENT, c.id)"
-            >
-              举报
+          <view class="spec__cell">
+            <text class="spec__k">面交点</text>
+            <text class="spec__v">{{ item.meetPointName ?? '待定' }}</text>
+          </view>
+        </view>
+      </view>
+
+      <view class="box seller" hover-class="seller--active" @click="goSeller">
+        <view class="avatar" :style="{ backgroundImage: shotGradient() }" />
+        <view class="seller__meta">
+          <text class="seller__nick">{{ item.sellerNick ?? '卖家' }}</text>
+          <view class="seller__row">
+            <text class="seller__chip">信用 {{ item.sellerCredit ?? 100 }}</text>
+            <text class="seller__hint">进主页看在售</text>
+          </view>
+        </view>
+        <text class="seller__arrow">›</text>
+      </view>
+
+      <!-- 描述独占一张卡：分享类动作已收进「更多」，这里不再分心 -->
+      <view class="box box--desc">
+        <text class="desc__t">商品描述</text>
+        <text v-if="descParts.lead" class="desc__lead">{{ descParts.lead }}</text>
+        <text v-for="(p, i) in descParts.body" :key="i" class="desc__p">{{ p }}</text>
+      </view>
+
+      <!-- 商品评论（notes/22 S7）：售前问答，扁平一层 -->
+      <view class="box">
+        <view class="cmt__hd">
+          <text class="desc__t">商品评论</text>
+          <text class="cmt__n">{{ commentTotal }} 条</text>
+        </view>
+
+        <text v-if="!comments.length" class="cmt__empty">还没有人评论，来问两句</text>
+
+        <view v-for="c in comments" :key="c.id" class="row">
+          <view class="row__ava" @click="goProfile(c.userId)">
+            <image v-if="c.author?.avatarUrl" class="row__ava-img" :src="c.author.avatarUrl" mode="aspectFill" />
+            <text v-else class="row__ava-t">{{ initial(c.author?.nickname) }}</text>
+          </view>
+          <view class="row__body">
+            <view class="row__top">
+              <text class="row__nick">{{ c.author?.nickname || '校园用户' }}</text>
+              <text class="row__time">{{ formatRelativeTime(c.createTime) }}</text>
+            </view>
+            <text class="row__text">
+              <text v-if="c.replyTo" class="row__reply">回复 @{{ c.replyToNick || 'TA' }}：</text>{{ c.content }}
             </text>
+            <view class="row__acts">
+              <text class="row__act" @click="setReply(c)">回复</text>
+              <text
+                v-if="c.userId !== myId"
+                class="row__act"
+                @click="reportTarget(REPORT_TARGET.ITEM_COMMENT, c.id)"
+              >
+                举报
+              </text>
+            </view>
+          </view>
+        </view>
+
+        <view class="cmt__editor">
+          <view v-if="replyTarget" class="cmt__to">
+            <text class="cmt__to-t">回复 @{{ replyTarget.nick }}</text>
+            <text class="cmt__cancel" @click="clearReply">取消</text>
+          </view>
+          <view class="cmt__row">
+            <input
+              v-model="draft"
+              class="cmt__input"
+              :maxlength="500"
+              :disabled="!canComment"
+              :placeholder="replyHint"
+              placeholder-class="cmt__ph"
+              confirm-type="send"
+              @confirm="send"
+            />
+            <view
+              class="cmt__send"
+              :class="{ 'cmt__send--off': !canComment || !draft.trim() || sending }"
+              @click="send"
+            >
+              <text>{{ sending ? '发送中' : '发送' }}</text>
+            </view>
           </view>
         </view>
       </view>
 
-      <view class="cmt__editor">
-        <view v-if="replyTarget" class="cmt__to">
-          <text class="cmt__to-t">回复 @{{ replyTarget.nick }}</text>
-          <text class="cmt__cancel" @click="clearReply">取消</text>
-        </view>
-        <view class="cmt__row">
-          <input
-            v-model="draft"
-            class="cmt__input"
-            :maxlength="500"
-            :disabled="!canComment"
-            :placeholder="replyHint"
-            placeholder-class="cmt__ph"
-            confirm-type="send"
-            @confirm="send"
-          />
-          <view
-            class="cmt__send"
-            :class="{ 'cmt__send--off': !canComment || !draft.trim() || sending }"
-            @click="send"
-          >
-            <text>{{ sending ? '发送中' : '发送' }}</text>
-          </view>
-        </view>
+      <!-- 底部固定操作条：50pt + 安全区，主行动占 60% -->
+      <view class="actionbar">
+        <view class="actionbar__minor" @click="onChat">聊一聊</view>
+        <view class="actionbar__main" hover-class="actionbar__main--active" @click="onBuy">我想要</view>
       </view>
+    </template>
+
+    <view v-else class="empty">
+      <text>商品不存在或已下架</text>
     </view>
 
-    <!-- 底部固定操作条：50pt + 安全区，主行动占 60% -->
-    <view class="actionbar">
-      <view class="actionbar__minor" @click="onChat">聊一聊</view>
-      <view class="actionbar__main" hover-class="actionbar__main--active" @click="onBuy">我想要</view>
-    </view>
-  </view>
+    <!-- 更多：贴「更多」按钮下方弹出，遮罩透明只负责收起，不改变页面布局 -->
+    <view v-if="moreOpen" class="pop-mask" @click="closeMore" @touchmove.stop.prevent />
+    <view v-if="moreOpen" class="pop" :style="popStyle">
+      <view class="pop__arrow" :style="{ left: popGeo.arrowLeft + 'px' }" />
 
-  <view v-else class="empty">
-    <text>商品不存在或已下架</text>
+      <template v-if="moreStep === 'menu'">
+        <view class="pop__row" hover-class="pop__row--on" @click="onMore('share')">
+          <text class="pop__l">{{ sharing ? '分享中…' : '分享到广场' }}</text>
+        </view>
+        <view class="pop__row" hover-class="pop__row--on" @click="onMore('poster')">
+          <text class="pop__l">生成海报</text>
+        </view>
+        <view v-if="canReport" class="pop__row" hover-class="pop__row--on" @click="onMore('report')">
+          <text class="pop__l">举报商品</text>
+          <text class="pop__arrow-r">›</text>
+        </view>
+      </template>
+
+      <template v-else>
+        <view class="pop__hd" @click="moreStep = 'menu'">
+          <text class="pop__back">‹</text>
+          <text class="pop__t">举报原因</text>
+        </view>
+        <view
+          v-for="r in REPORT_REASONS"
+          :key="r"
+          class="pop__opt"
+          :class="{ 'pop__opt--on': reportReason === r }"
+          @click="reportReason = r"
+        >
+          <text class="pop__opt-t">{{ r }}</text>
+          <view class="pop__dot" />
+        </view>
+        <view class="pop__submit" :class="{ 'pop__submit--off': !reportReason }" @click="onReportSubmit">
+          <text>提交举报</text>
+        </view>
+      </template>
+    </view>
   </view>
 </template>
 
 <style scoped lang="scss">
 .page {
   padding-bottom: calc(160rpx + env(safe-area-inset-bottom));
+}
+
+/* ── 顶部操作区：挖空圆钮浮在图集上，滚动后转白底 ── */
+.topbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  /* 高于遮罩：浮层展开时两颗按钮仍可直接点，再按一次即收起 */
+  z-index: 38;
+  background: transparent;
+  transition: background-color 220ms ease-out, box-shadow 220ms ease-out;
+}
+
+.topbar--solid {
+  background: rgba(255, 255, 255, 0.9);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1rpx 0 $cm-color-border;
+}
+
+/* 图集上的压暗层：白底图里白盘会与背景糊在一起，靠这层给按钮一条可读的底色 */
+.topbar__scrim {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: -64rpx;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(17, 17, 22, 0.28) 0%,
+    rgba(17, 17, 22, 0.12) 58%,
+    rgba(17, 17, 22, 0) 100%
+  );
+  transition: opacity 220ms ease-out;
+}
+
+.topbar__scrim--off {
+  opacity: 0;
+}
+
+.topbar__row {
+  position: relative;
+  height: 96rpx;
+  padding: 0 $cm-space-4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* 微信右上角胶囊固定在系统栏下方，这里让出一格再放「更多」，否则两个按钮叠在一起 */
+/* #ifdef MP-WEIXIN */
+.topbar__row {
+  padding-right: 200rpx;
+}
+/* #endif */
+
+/* 挖空圆钮：实白盘 + 白环 + 投影，压在浅色图上边界仍清楚；图标用墨色线框 */
+.tbtn {
+  width: 68rpx;
+  height: 68rpx;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1rpx solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.94);
+  /* 内侧一道极淡的墨线：纯白图里白盘与背景同色时，靠它守住圆形边界 */
+  box-shadow: inset 0 0 0 1rpx rgba(17, 17, 22, 0.08), 0 2rpx 10rpx rgba(17, 17, 22, 0.22);
+  transition: background-color 220ms ease-out, border-color 220ms ease-out, box-shadow 220ms ease-out,
+    transform 140ms ease-out;
+}
+
+.topbar--solid .tbtn {
+  border-color: $cm-color-gray-100;
+  background: $cm-color-gray-100;
+  box-shadow: none;
+}
+
+/* 展开态：盘转深墨、图标反白，指明浮层是从哪个按钮出来的 */
+.tbtn.tbtn--open,
+.topbar--solid .tbtn.tbtn--open {
+  border-color: rgba(17, 17, 22, 0.88);
+  background: rgba(17, 17, 22, 0.88);
+  box-shadow: 0 2rpx 10rpx rgba(17, 17, 22, 0.28);
+}
+
+.tbtn--on {
+  transform: scale(0.92);
+}
+
+/* 绝对居中：空态只有返回键时也不会被 space-between 挤到右边 */
+.topbar__title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: $cm-font-size-base;
+  font-weight: 700;
+  color: $cm-color-text-1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 220ms ease-out;
+}
+
+.topbar--solid .topbar__title {
+  opacity: 1;
 }
 
 /* 图集通铺到屏幕边（闲鱼口径）：卡片从图下面才开始 */
@@ -386,6 +689,12 @@ async function send(): Promise<void> {
   box-shadow: $cm-shadow-md;
 }
 
+.hero__price {
+  display: flex;
+  align-items: baseline;
+  gap: $cm-space-3;
+}
+
 .price {
   font-size: 60rpx;
   font-weight: $cm-font-weight-heavy;
@@ -412,27 +721,60 @@ async function send(): Promise<void> {
   color: $cm-color-text-3;
 }
 
-.row {
+/* 交易信息：标签行作焦点，两列底注承接次级信息；四行平铺的分隔线全去掉，省出纵向空间 */
+.box--spec {
+  gap: $cm-space-4;
+}
+
+.spec__tags {
   display: flex;
   align-items: center;
-  gap: $cm-space-4;
-  font-size: $cm-font-size-sm;
-  min-height: 56rpx;
+  flex-wrap: wrap;
+  gap: $cm-space-2;
 }
 
-.row__k {
-  width: 112rpx;
+.spec__tag {
+  font-size: $cm-font-size-xs;
+  line-height: 1.6;
+  padding: 0 8rpx;
+  color: $cm-color-text-2;
+  background: $cm-color-gray-100;
+  border-radius: $cm-radius-sm;
+}
+
+.spec__grid {
+  display: flex;
+  gap: $cm-space-3;
+  padding-top: $cm-space-3;
+  border-top: 1rpx solid $cm-color-border;
+}
+
+.spec__cell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.spec__k {
+  font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
-  flex: none;
 }
 
-.row__v {
+.spec__v {
+  font-size: $cm-font-size-base;
+  font-weight: 500;
   color: $cm-color-text-1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .seller {
   flex-direction: row;
   align-items: center;
+  gap: $cm-space-4;
 }
 
 .seller--active {
@@ -440,9 +782,8 @@ async function send(): Promise<void> {
 }
 
 .seller__arrow {
-  margin-left: auto;
   font-size: $cm-font-size-lg;
-  color: $cm-color-text-3;
+  color: $cm-color-gray-400;
 }
 
 .avatar {
@@ -453,18 +794,36 @@ async function send(): Promise<void> {
 }
 
 .seller__meta {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 6rpx;
-  margin-left: $cm-space-4;
+  gap: 8rpx;
 }
 
 .seller__nick {
-  font-size: $cm-font-size-base;
-  font-weight: 600;
+  font-size: $cm-font-size-md;
+  font-weight: 700;
+  color: $cm-color-text-1;
 }
 
-.seller__sub {
+.seller__row {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+}
+
+/* 信用做浅底标签：比一行灰字更像「资质」，又不至于抢昵称的主位 */
+.seller__chip {
+  font-size: $cm-font-size-xs;
+  line-height: 1.6;
+  padding: 0 10rpx;
+  color: $cm-color-brand-text;
+  background: $cm-color-brand-bg;
+  border-radius: $cm-radius-sm;
+}
+
+.seller__hint {
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
 }
@@ -475,35 +834,166 @@ async function send(): Promise<void> {
   color: $cm-color-text-1;
 }
 
-.desc {
+/* 描述独占一卡：首句当引子，正文分段；靠字号与行距拉出阅读节奏 */
+.box--desc {
+  padding: $cm-space-5 $cm-space-5 $cm-space-6;
+  gap: $cm-space-3;
+}
+
+.desc__lead {
+  font-size: $cm-font-size-md;
+  font-weight: 600;
+  line-height: 1.65;
+  color: $cm-color-text-1;
+  word-break: break-all;
+}
+
+.desc__p {
+  font-size: $cm-font-size-base;
+  line-height: 1.85;
+  color: $cm-color-text-2;
+  word-break: break-all;
+}
+
+/* ── 「更多」浮层：贴着按钮下方弹出，尺寸固定，不影响正文与点击区 ── */
+.pop-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 35;
+}
+
+.pop {
+  position: fixed;
+  z-index: 41;
+  padding: 10rpx 8rpx;
+  box-sizing: border-box;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: $cm-radius-xl;
+  box-shadow: 0 16rpx 48rpx rgba(17, 17, 22, 0.14), 0 4rpx 12rpx rgba(17, 17, 22, 0.06);
+  transform-origin: top right;
+  animation: popIn 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 箭头顶在按钮中心正下方，指明清单一源 */
+.pop__arrow {
+  position: absolute;
+  top: -7rpx;
+  width: 16rpx;
+  height: 16rpx;
+  margin-left: -8rpx;
+  border-radius: 4rpx;
+  background: rgba(255, 255, 255, 0.98);
+  transform: rotate(45deg);
+}
+
+.pop__row {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+  /* 左右各留 4px：分隔线内缩，不顶到圆角边缘，观感更软 */
+  margin: 0 8rpx;
+  padding: 24rpx 20rpx;
+  transition: background-color 120ms ease-out;
+}
+
+.pop__row + .pop__row {
+  border-top: 1rpx solid $cm-color-border;
+}
+
+.pop__row--on {
+  background: $cm-color-gray-50;
+  border-radius: $cm-radius-lg;
+}
+
+.pop__l {
+  flex: 1;
+  font-size: $cm-font-size-base;
+  color: $cm-color-text-1;
+}
+
+.pop__arrow-r {
+  font-size: $cm-font-size-md;
+  line-height: 1;
+  color: $cm-color-gray-400;
+}
+
+/* 举报第二步：头部回退一行，原因行比菜单行更矮，五项加按钮仍在 280px 内 */
+.pop__hd {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin: 0 8rpx;
+  padding: 12rpx 20rpx 8rpx;
+}
+
+.pop__back {
+  font-size: $cm-font-size-md;
+  line-height: 1;
+  color: $cm-color-text-3;
+}
+
+.pop__t {
   font-size: $cm-font-size-sm;
-  line-height: 1.7;
+  font-weight: 600;
   color: $cm-color-text-2;
 }
 
-/* 分享到广场：描述卡内的次级动作行，不抢底部主行动 */
-.share-row {
+.pop__opt {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: $cm-space-2;
-  padding: $cm-space-3;
-  background: $cm-color-bg;
-  border-radius: $cm-radius-md;
+  margin: 0 8rpx;
+  padding: 18rpx 20rpx;
 }
 
-.share-row--active {
-  opacity: 0.8;
-}
-
-.share-row__t {
+.pop__opt-t {
   font-size: $cm-font-size-sm;
-  color: $cm-color-brand-text;
+  color: $cm-color-text-2;
 }
 
-.share-row__arrow {
-  font-size: $cm-font-size-md;
-  color: $cm-color-text-3;
+.pop__dot {
+  width: 30rpx;
+  height: 30rpx;
+  flex: none;
+  border: 1rpx solid $cm-color-gray-300;
+  border-radius: 50%;
+}
+
+.pop__opt--on .pop__opt-t {
+  font-weight: 600;
+  color: $cm-color-text-1;
+}
+
+.pop__opt--on .pop__dot {
+  border-color: $cm-color-brand;
+  background: $cm-color-brand;
+  /* 内圈留白：实心点外面套一圈品牌色，比加粗描边更轻盈 */
+  box-shadow: inset 0 0 0 6rpx #fff;
+}
+
+.pop__submit {
+  margin: 8rpx 20rpx 10rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  text-align: center;
+  font-size: $cm-font-size-sm;
+  font-weight: 700;
+  color: #fff;
+  background: $cm-color-text-1;
+  border-radius: 12rpx;
+}
+
+.pop__submit--off {
+  background: $cm-color-gray-200;
+  color: $cm-color-gray-500;
+}
+
+@keyframes popIn {
+  from { opacity: 0; transform: translateY(-10rpx) scale(0.96); }
+  to { opacity: 1; transform: none; }
 }
 
 /* ── 商品评论 ── */
