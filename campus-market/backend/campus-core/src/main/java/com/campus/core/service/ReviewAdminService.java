@@ -13,6 +13,7 @@ import com.campus.core.dto.req.ReviewRejectReq;
 import com.campus.core.dto.resp.DictCategoryVO;
 import com.campus.core.dto.resp.ItemImageVO;
 import com.campus.core.dto.resp.ReviewQueueVO;
+import com.campus.core.dto.resp.SlaConfigVO;
 import com.campus.core.dto.resp.ReviewSlaVO;
 import com.campus.core.dto.resp.ReviewTaskVO;
 import com.campus.core.dto.resp.WeightPartsVO;
@@ -77,11 +78,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ReviewAdminService {
 
-    /** SLA 阈值（business/03 F-A9）：与前端 mock 的 DEFAULT_SLA 一致，A9 设置落地后改从配置读 */
-    private static final int FIRST_RESPONSE_HOURS = 2;
-    private static final int BACKLOG_HOURS = 24;
-    private static final int AVG_HANDLE_SECONDS = 30;
-
     /** 权重公式里的两个乘数（business/03 F-A2） */
     private static final int REPORT_WEIGHT = 3;
     private static final int PRICE_ABNORMAL_WEIGHT = 5;
@@ -105,6 +101,7 @@ public class ReviewAdminService {
     private final CategoryAvgPriceCache categoryAvgPriceCache;
     private final UserPubCache userPubCache;
     private final CreditService creditService;
+    private final SysConfigService sysConfigService;
 
     /* ══ 一、队列 ═══════════════════════════════════════════ */
 
@@ -459,20 +456,25 @@ public class ReviewAdminService {
     }
 
     /**
-     * SLA 概览。due = 等待 ≥ 2h 且 < 24h（已超时但未积压）；overdue = 等待 ≥ 24h；
-     * avgHandleSeconds 为目标常量（30s），非 handle_cost_ms 统计值。三项统计不区分单据类型，
+     * SLA 概览。due = 等待 ≥ 首审阈值且 < 积压阈值（已超时但未积压）；overdue = 等待 ≥ 积压阈值；
+     * avgHandleSeconds 是目标值而非 handle_cost_ms 统计值。三项统计不区分单据类型，
      * 故「申诉 48h 内复审」承诺未在概览体现，本期未落地。
+     *
+     * <p>阈值读 {@code sys_config}（设置页可调），不再写死常量——写死的话设置页改完刷新即失效。
      */
     private ReviewSlaVO sla(List<ReviewTaskVO> tasks) {
+        SlaConfigVO cfg = sysConfigService.sla();
+        int firstResponseHours = cfg.getFirstResponseHours();
+        int backlogHours = cfg.getBacklogHours();
         ReviewSlaVO s = new ReviewSlaVO();
         s.setPending(tasks.size());
         s.setDue((int) tasks.stream()
-                .filter(t -> t.getWaitHours() >= FIRST_RESPONSE_HOURS && t.getWaitHours() < BACKLOG_HOURS)
+                .filter(t -> t.getWaitHours() >= firstResponseHours && t.getWaitHours() < backlogHours)
                 .count());
-        s.setOverdue((int) tasks.stream().filter(t -> t.getWaitHours() >= BACKLOG_HOURS).count());
-        s.setFirstResponseHours(FIRST_RESPONSE_HOURS);
-        s.setBacklogHours(BACKLOG_HOURS);
-        s.setAvgHandleSeconds(AVG_HANDLE_SECONDS);
+        s.setOverdue((int) tasks.stream().filter(t -> t.getWaitHours() >= backlogHours).count());
+        s.setFirstResponseHours(firstResponseHours);
+        s.setBacklogHours(backlogHours);
+        s.setAvgHandleSeconds(cfg.getAvgHandleSeconds());
         return s;
     }
 

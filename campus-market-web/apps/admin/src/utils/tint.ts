@@ -1,9 +1,8 @@
 /**
- * 渐变占位的内联样式（骨架期）
+ * 头像占位渐变的内联样式
  *
- * <p>MinIO 与上传接口就位前，商品图 / 头像 / 证件都用 `mock/tints.ts` 里的两色渐变代替。
- * 这里是把它转成 CSS 内联样式的小工具，集中一处是为了将来换成
- * `background-image: url(...)` 时只改这一个函数。
+ * <p>学生没有头像时按用户 id 取一组两色渐变画底色，比灰圆更像「有人」。
+ * 抽成一个函数是为了将来统一换成 `background-image: url(...)` 时只改这一处。
  */
 
 export const tintStyle = (tints: readonly [string, string]): { background: string } => ({

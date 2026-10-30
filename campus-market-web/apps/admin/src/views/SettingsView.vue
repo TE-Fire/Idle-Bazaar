@@ -21,30 +21,56 @@ import { reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
 import { PERM_CODES } from '@campus/shared'
-import { adminSensitiveApi, type SensitiveWordVO } from '@campus/api'
-import { DEFAULT_SLA } from '@/mock/settings'
+import { adminSensitiveApi, settingsApi, type SlaThresholds, type SensitiveWordVO } from '@campus/api'
 
 const active = ref<'sla' | 'word'>('sla')
 
-/* ── SLA 配置：改的是 mock 里的同一份对象，A5 队列立刻按新阈值判定 ── */
+/* ── SLA 配置：落库（`sys_config`），改完看板 / 报表 / 审核队列三处同时生效 ── */
 
-const slaForm = reactive({ ...DEFAULT_SLA })
+/** 业务文档默认值：重置按钮用它，不是前端自己编的数 */
+const SLA_DEFAULTS: SlaThresholds = {
+  firstResponseHours: 2,
+  p95Hours: 6,
+  targetRate: 95,
+  backlogHours: 24,
+  avgHandleSeconds: 30,
+  appealHours: 48
+}
 
-const saveSla = (): void => {
-  Object.assign(DEFAULT_SLA, slaForm)
-  message.success('SLA 阈值已更新，审核队列的临期/超时判定即时生效')
+const slaForm = reactive<SlaThresholds>({ ...SLA_DEFAULTS })
+const slaLoading = ref(false)
+const slaSaving = ref(false)
+
+async function loadSla(): Promise<void> {
+  slaLoading.value = true
+  try {
+    Object.assign(slaForm, await settingsApi.sla())
+  } catch {
+    // 请求层已提示
+  } finally {
+    slaLoading.value = false
+  }
+}
+
+void loadSla()
+
+async function saveSla(): Promise<void> {
+  if (slaSaving.value) return
+  slaSaving.value = true
+  try {
+    await settingsApi.updateSla({ ...slaForm })
+    message.success('SLA 阈值已保存，看板与报表的达标率即时按新阈值判定')
+    await loadSla()
+  } catch {
+    // 请求层已提示（1000 参数越界等）
+  } finally {
+    slaSaving.value = false
+  }
 }
 
 const resetSla = (): void => {
-  Object.assign(slaForm, {
-    firstResponseHours: 2,
-    p95Hours: 6,
-    targetRate: 95,
-    backlogHours: 24,
-    avgHandleSeconds: 30,
-    appealHours: 48
-  })
-  message.info('已恢复为业务文档默认值')
+  Object.assign(slaForm, SLA_DEFAULTS)
+  message.info('已填回业务文档默认值，点「保存」才生效')
 }
 
 /* ── 敏感词 ── */
@@ -171,7 +197,14 @@ const removeWord = async (row: SensitiveWordVO): Promise<void> => {
         </a-form>
         <div class="settings__actions">
           <a-space>
-            <a-button v-perm="PERM_CODES.SETTINGS_EDIT" type="primary" shape="round" @click="saveSla">
+            <a-button
+              v-perm="PERM_CODES.SETTINGS_EDIT"
+              type="primary"
+              shape="round"
+              :loading="slaSaving"
+              :disabled="slaLoading"
+              @click="saveSla"
+            >
               保存
             </a-button>
             <a-button shape="round" @click="resetSla">恢复默认</a-button>
