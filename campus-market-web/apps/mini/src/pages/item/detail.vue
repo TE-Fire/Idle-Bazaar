@@ -170,6 +170,26 @@ function onBuy(): void {
     .catch(() => uni.hideLoading())
 }
 
+/** 收藏 / 取消收藏：状态就地改 item.favorited，不重新拉详情 */
+function onFavorite(): void {
+  if (!item.value) return
+  if (!getSession().tokenValue) {
+    uni.showToast({ title: '请先登录', icon: 'none' })
+    void uni.navigateTo({ url: '/pages/login/index' })
+    return
+  }
+  const id = item.value.id
+  const wasFav = !!item.value.favorited
+  const call = wasFav ? userItemApi.unfavorite(id) : userItemApi.favorite(id)
+  call
+    .then(() => {
+      const it = item.value
+      if (it) it.favorited = !wasFav
+      uni.showToast({ title: wasFav ? '已取消收藏' : '已收藏', icon: 'none' })
+    })
+    .catch(() => undefined)
+}
+
 /** 卖家卡 → TA 的个人主页 */
 function goSeller(): void {
   if (!item.value) return
@@ -492,8 +512,11 @@ async function send(): Promise<void> {
         </view>
       </view>
 
-      <!-- 底部固定操作条：50pt + 安全区，主行动占 60% -->
+      <!-- 底部固定操作条：收藏 + 聊一聊 + 我想要，主行动占 60% -->
       <view class="actionbar">
+        <view class="actionbar__fav" :class="{ 'actionbar__fav--on': item.favorited }" @click="onFavorite">
+          <CmIcon name="heart" size="md" />
+        </view>
         <view class="actionbar__minor" @click="onChat">聊一聊</view>
         <view class="actionbar__main" hover-class="actionbar__main--active" @click="onBuy">我想要</view>
       </view>
@@ -1182,6 +1205,23 @@ async function send(): Promise<void> {
   background: $cm-color-surface;
   border-top: 1rpx solid $cm-color-border;
   box-shadow: 0 -4rpx 20rpx rgba(27, 27, 33, 0.05);
+}
+
+/* 收藏：图标钮不占文字宽度；未收藏压暗，收藏后转红并放大一点 */
+.actionbar__fav {
+  flex: 0 0 auto;
+  width: 64rpx;
+  height: 84rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $cm-color-text-3;
+  transition: color 0.16s ease, transform 0.16s ease;
+}
+
+.actionbar__fav--on {
+  color: #e8543f;
+  transform: scale(1.08);
 }
 
 /* 次要动作：描边胶囊，白底不抢主按钮 */

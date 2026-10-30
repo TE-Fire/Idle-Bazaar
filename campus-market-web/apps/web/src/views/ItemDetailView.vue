@@ -37,6 +37,8 @@ const item = ref<ApiItemVO | null>(null)
 const loading = ref(true)
 /** 分享到广场在途：防连点重复发动态 */
 const sharing = ref(false)
+/** 收藏在途：防连点 */
+const favoriting = ref(false)
 /** 海报弹层：纯前端 canvas，打开时才绘制 */
 const posterOpen = ref(false)
 
@@ -222,8 +224,32 @@ function onChat(): void {
   })
 }
 
-function onEdit(): void {
+/** 收藏 / 取消收藏：未登录先跳登录（带回跳）。状态就地改 item.favorited，不重新拉详情 */
+async function onFavorite(): Promise<void> {
   if (!item.value) return
+  if (!userStore.userId) {
+    void router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  if (favoriting.value) return
+  favoriting.value = true
+  const id = item.value.id
+  try {
+    if (item.value.favorited) {
+      await userItemApi.unfavorite(id)
+      item.value.favorited = false
+      ElMessage.success('已取消收藏')
+    } else {
+      await userItemApi.favorite(id)
+      item.value.favorited = true
+      ElMessage.success('已收藏，可在「我的收藏」里找回')
+    }
+  } finally {
+    favoriting.value = false
+  }
+}
+
+function onEdit(): void {  if (!item.value) return
   void router.push({ path: '/publish', query: { edit: item.value.id } })
 }
 
@@ -297,6 +323,15 @@ function goSeller(): void {
               {{ selected ? '已加入对比' : '加入对比' }}
             </el-button>
           </template>
+          <el-button
+            size="large"
+            :type="item.favorited ? 'danger' : 'default'"
+            :plain="!!item.favorited"
+            :loading="favoriting"
+            @click="onFavorite"
+          >
+            {{ item.favorited ? '已收藏' : '收藏' }}
+          </el-button>
         </div>
 
         <!-- 卖家卡：点击进 TA 的主页（资料 + 在售闲置） -->

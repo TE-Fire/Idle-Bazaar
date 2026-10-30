@@ -15,6 +15,7 @@ import com.campus.core.dto.resp.DictMeetPointVO;
 import com.campus.core.dto.resp.ItemImageVO;
 import com.campus.core.dto.resp.UserPubVO;
 import com.campus.core.entity.AppUser;
+import com.campus.core.entity.Favorite;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.ItemImage;
@@ -22,6 +23,7 @@ import com.campus.core.enums.AuditStatusEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.mapper.AppUserMapper;
+import com.campus.core.mapper.FavoriteMapper;
 import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
@@ -81,6 +83,8 @@ public class ItemService {
     private final ReportMapper reportMapper;
 
     private final ItemImageJanitor itemImageJanitor;
+
+    private final FavoriteMapper favoriteMapper;
 
     /**
      * 发布商品。提交即送审：落 PENDING 并插 `item_audit` 进队（先审后发，business/01 F-W3）；
@@ -245,6 +249,16 @@ public class ItemService {
 
     /** 商品详情并累加浏览量；不去重（热度粗略信号，做到 UV 精确要另建去重表，不划算） */
     public ApiItemVO detail(Long itemId) {
+        return detail(itemId, null);
+    }
+
+    /**
+     * 商品详情，附带「当前登录人是否已收藏」。
+     *
+     * <p>收藏态跟着详情一次返回，不另开接口：详情页首屏要同时展示商品与收藏按钮，
+     * 拆成两次请求会让按钮先空后亮，且多一次往返。
+     */
+    public ApiItemVO detail(Long itemId, Long viewerId) {
         Item item = itemMapper.selectById(itemId);
         BizAssert.notNull(item, ItemErrorCode.ITEM_NOT_FOUND);
         BizAssert.isTrue(ItemStatusEnum.fromCode(item.getStatus()) != ItemStatusEnum.FORCED_OFFLINE,
@@ -264,7 +278,35 @@ public class ItemService {
                 .map(this::toImageVO)
                 .toList());
         fillSellers(List.of(vo));
+        vo.setFavorited(viewerId != null && favoriteMapper.selectCount(new LambdaQueryWrapper<Favorite>()
+                .eq(Favorite::getUserId, viewerId)
+                .eq(Favorite::getItemId, itemId)
+                .eq(Favorite::getDeleted, 0)) > 0);
         return vo;
+    }
+
+    /**
+     * 按 id 批量取商品卡片（收藏列表用）：保持入参顺序，已软删与强制下架的不返回。
+     *
+     * <p>已售出/已下架的照常返回——收藏列表要让用户看见「我收的那件已经卖掉了」，
+     * 这才是收藏该有的信息。
+     */
+    public List<ApiItemVO> cardsByIds(List<Long> itemIds) {
+        if (itemIds == null || itemIds.isEmpty()) {
+            return List.of();
+        }
+        List<Item> rows = itemMapper.selectList(new LambdaQueryWrapper<Item>()
+                .in(Item::getId, itemIds)
+                .eq(Item::getDeleted, 0)
+                .ne(Item::getStatus, ItemStatusEnum.FORCED_OFFLINE.getCode()));
+        if (rows.isEmpty()) {
+            return List.of();
+        }
+        List<ApiItemVO> vos = toApiVOs(rows);
+        fillSellers(vos);
+        Map<Long, ApiItemVO> byId = vos.stream()
+                .collect(Collectors.toMap(ApiItemVO::getId, v -> v, (a, b) -> a));
+        return itemIds.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     /* ══ 三、编辑 ═════════════════════════════════════════════ */

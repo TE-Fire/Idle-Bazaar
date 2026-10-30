@@ -68,4 +68,10 @@ public class ApiItemVO {
 
     /** 详情专用，列表为 null */
     private List<ItemImageVO> images;
+
+    /** 当前登录人是否已收藏；未登录为 false。仅详情页填充 */
+    private Boolean favorited;
+
+    /** 收藏时间；仅「我的收藏」列表填充 */
+    private LocalDateTime favoritedAt;
 }

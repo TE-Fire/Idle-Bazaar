@@ -89,6 +89,10 @@ function open(e: { key: string; label: string }): void {
     void uni.navigateTo({ url: '/pages/notice/index' })
     return
   }
+  if (e.key === 'fav') {
+    void uni.navigateTo({ url: '/pages/favorites/index' })
+    return
+  }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })
 }
 

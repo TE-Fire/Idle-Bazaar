@@ -50,10 +50,10 @@ public class ItemController {
         return Result.ok(itemService.search(req));
     }
 
-    @Operation(summary = "商品详情", description = "浏览量 +1，返回图片列表")
+    @Operation(summary = "商品详情", description = "浏览量 +1，返回图片列表；登录态额外返回 favorited")
     @GetMapping("/{id}")
     public Result<ApiItemVO> detail(@PathVariable Long id) {
-        return Result.ok(itemService.detail(id));
+        return Result.ok(itemService.detail(id, UserContext.getUserIdOrNull()));
     }
 
     @Operation(summary = "编辑商品", description = "草稿可继续编辑，draft=false 时送审；已发布商品改价格或改成色回待审核，只改描述免审")

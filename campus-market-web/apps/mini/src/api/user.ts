@@ -95,6 +95,10 @@ export interface ApiItemVO {
   publishAt: string
   viewCount: number
   images?: Array<{ id: string; url: string; sort: number }>
+  /** 当前登录人是否已收藏；未登录恒 false。仅详情返回 */
+  favorited?: boolean
+  /** 收藏时间；仅「我的收藏」列表返回 */
+  favoritedAt?: string
 }
 
 export interface ItemPublishReq {
@@ -203,7 +207,20 @@ export const userItemApi = {
 
   remove: (id: string) => request<void>({ url: `/api/item/${id}/delete`, method: 'POST' }),
 
-  offline: (id: string) => request<void>({ url: `/api/item/${id}/offline`, method: 'POST' })
+  offline: (id: string) => request<void>({ url: `/api/item/${id}/offline`, method: 'POST' }),
+
+  /** 收藏，幂等 */
+  favorite: (id: string) => request<void>({ url: `/api/item/${id}/favorite`, method: 'POST' }),
+
+  /** 取消收藏，幂等 */
+  unfavorite: (id: string) => request<void>({ url: `/api/item/${id}/favorite`, method: 'DELETE' }),
+
+  /** 我的收藏：收藏时间倒序；已删除与被强制下架的商品不返回 */
+  favorites: (pageNum = 1, pageSize = 10) =>
+    request<{ list: ApiItemVO[]; total: number }>({
+      url: '/api/item/favorites',
+      data: { pageNum, pageSize }
+    })
 }
 
 /* ── 订单（状态机见 notes/13 第二节）────────────────────── */

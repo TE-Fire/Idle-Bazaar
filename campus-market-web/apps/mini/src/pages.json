@@ -54,6 +54,14 @@
       }
     },
     {
+      "path": "pages/favorites/index",
+      "style": {
+        "navigationBarTitleText": "我的收藏",
+        "enablePullDownRefresh": true,
+        "onReachBottomDistance": 50
+      }
+    },
+    {
       "path": "pages/order/detail",
       "style": {
         "navigationBarTitleText": "订单详情"

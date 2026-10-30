@@ -15,7 +15,7 @@
 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bell, ChatDotRound, Compass, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
+import { Bell, ChatDotRound, Collection, Compass, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
 import { userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
@@ -75,6 +75,9 @@ function goMe(): void {
 }
 function goMyItems(): void {
   void router.push({ name: 'my-items' })
+}
+function goFavorites(): void {
+  void router.push({ name: 'favorites' })
 }
 function goFollow(): void {
   void router.push({ name: 'follow' })
@@ -170,6 +173,9 @@ async function logout(): Promise<void> {
                   </el-dropdown-item>
                   <el-dropdown-item @click="goMyItems">
                     <el-icon><Goods /></el-icon>我的商品
+                  </el-dropdown-item>
+                  <el-dropdown-item @click="goFavorites">
+                    <el-icon><Collection /></el-icon>我的收藏
                   </el-dropdown-item>
                   <el-dropdown-item @click="goFollow">
                     <el-icon><Star /></el-icon>我的关注

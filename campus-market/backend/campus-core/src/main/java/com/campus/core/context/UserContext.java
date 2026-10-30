@@ -37,4 +37,9 @@ public final class UserContext {
         }
         return id;
     }
+
+    /** 当前登录学生 id；未登录返回 null（免登录接口里问「是不是我收藏的」用） */
+    public static Long getUserIdOrNull() {
+        return StpUserUtil.isLogin() ? getUserId() : null;
+    }
 }

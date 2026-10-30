@@ -4,7 +4,9 @@ import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.campus.core.entity.Item;
 import lombok.Data;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.Update;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -43,4 +45,11 @@ public interface ItemMapper extends BaseMapper<Item> {
             "WHERE o.deleted = 0 AND o.status = 4 AND i.deleted = 0 " +
             "GROUP BY i.category_id")
     List<CategoryAvgRow> avgPriceByCategory();
+
+    /**
+     * 收藏数增减：SQL 里自算，不先读后写。
+     * `GREATEST(..., 0)` 兜住历史脏数据——计数为负比数不准更糟，前端会显示「-1 人收藏」。
+     */
+    @Update("UPDATE item SET fav_count = GREATEST(fav_count + #{delta}, 0) WHERE id = #{itemId}")
+    int updateFavCount(@Param("itemId") Long itemId, @Param("delta") int delta);
 }

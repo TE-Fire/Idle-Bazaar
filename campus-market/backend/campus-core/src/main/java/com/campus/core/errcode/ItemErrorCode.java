@@ -29,6 +29,9 @@ public enum ItemErrorCode implements IErrorCode {
 
     /** 编辑只允许草稿 / 在售 / 已下架：待审核与已处置态再改，会让队列里的那条单据失去指向 */
     ITEM_CANNOT_EDIT(1109, "当前状态不能编辑（仅草稿、在售或已下架可编辑）"),
+
+    /** 收藏时商品已被卖家删除：与 1101 分开，是因为这里多半不是 id 打错而是东西没了 */
+    FAVORITE_ITEM_NOT_FOUND(1111, "商品不存在或已被删除"),
     ;
 
     @Override

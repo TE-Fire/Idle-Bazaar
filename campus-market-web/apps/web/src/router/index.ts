@@ -33,6 +33,10 @@ const routes: RouteRecordRaw[] = [
       { path: 'publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { title: '发布闲置' } },
       // 我的商品：卖家视角全状态（含草稿），操作按状态给出
       { path: 'my-items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我的商品' } },
+      // 我的收藏：收藏时间倒序，已售出照常展示（notes/24）
+      { path: 'favorites', name: 'favorites', component: () => import('@/views/FavoritesView.vue'), meta: { title: '我的收藏' } },
+      // P5 搜索结果：与 /list 同一组件，关键词走 q（后端 keyword 同时匹配标题与描述）
+      { path: 'search', name: 'search', component: () => import('@/views/HomeView.vue'), meta: { title: '搜索结果' } },
       // 我的订单：买 / 卖两个视角共用一页，状态筛服务端（notes/13 第七节）
       { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { title: '我的订单' } },
       // 关注 / 粉丝：/follow 看自己，/user/:id/follow 看他人；?tab=fans 切到粉丝

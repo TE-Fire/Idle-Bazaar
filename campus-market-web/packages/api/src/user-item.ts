@@ -45,6 +45,10 @@ export interface ApiItemVO {
   viewCount: number
   /** 仅详情有 */
   images?: Array<{ id: string; url: string; sort: number }> | null
+  /** 当前登录人是否已收藏；未登录恒 false。仅详情返回 */
+  favorited?: boolean | null
+  /** 收藏时间；仅「我的收藏」列表返回 */
+  favoritedAt?: string | null
 }
 
 /** 发布 / 编辑入参。images 是已上传的 URL 列表（≤9，第一张为主图），上传走独立接口 */
@@ -100,5 +104,15 @@ export const userItemApi = {
   remove: (id: string) => request<void>({ url: `/api/item/${id}/delete`, method: 'POST' }),
 
   /** 卖家主动下架 → 已下架(4)，可重新编辑上架 */
-  offline: (id: string) => request<void>({ url: `/api/item/${id}/offline`, method: 'POST' })
+  offline: (id: string) => request<void>({ url: `/api/item/${id}/offline`, method: 'POST' }),
+
+  /** 收藏，幂等：已收藏再调返回成功 */
+  favorite: (id: string) => request<void>({ url: `/api/item/${id}/favorite`, method: 'POST' }),
+
+  /** 取消收藏，幂等：未收藏再调返回成功 */
+  unfavorite: (id: string) => request<void>({ url: `/api/item/${id}/favorite`, method: 'DELETE' }),
+
+  /** 我的收藏：按收藏时间倒序；已删除与强制下架的商品不返回 */
+  favorites: (params: { pageNum?: number; pageSize?: number } = {}) =>
+    request<PageResult<ApiItemVO>>({ url: '/api/item/favorites', params: { ...params } })
 }
