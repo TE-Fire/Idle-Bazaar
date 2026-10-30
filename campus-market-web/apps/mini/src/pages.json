@@ -74,6 +74,12 @@
       }
     },
     {
+      "path": "pages/review/index",
+      "style": {
+        "navigationBarTitleText": "交易评价"
+      }
+    },
+    {
       "path": "pages/follows/index",
       "style": {
         "navigationBarTitleText": "关注与粉丝",

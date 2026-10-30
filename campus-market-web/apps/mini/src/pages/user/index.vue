@@ -18,6 +18,7 @@ import MomentCard from '@/components/MomentCard.vue'
 import { userItemApi, type ApiItemVO } from '@/api/user'
 import { userSocialApi as socialApi, type UserProfileVO } from '@/api/social'
 import { momentApi, type MomentVO } from '@/api/moment'
+import { userReviewApi, type MiniReviewVO, type ReviewSummaryVO } from '@/api/review'
 import { toGoodsItem } from '@/utils/item-map'
 import type { GoodsItem } from '@campus/shared'
 import { getSession } from '@/utils/session'
@@ -41,7 +42,38 @@ const rightColumn = computed(() => goods.value.filter((_, i) => i % 2 === 1))
 
 /* ── Tab 与动态 ────────────────────────────────────────── */
 
-const tab = ref<'items' | 'moments'>('items')
+const tab = ref<'items' | 'moments' | 'reviews'>('items')
+
+/* ── 评价 tab：汇总 + 列表，与动态同样懒加载 ── */
+const reviews = ref<MiniReviewVO[]>([])
+const reviewSummary = ref<ReviewSummaryVO | null>(null)
+const reviewPage = ref(1)
+const reviewTotal = ref(0)
+const reviewLoading = ref(false)
+const reviewsLoaded = ref(false)
+
+async function fetchReviewPage(reset: boolean): Promise<void> {
+  if (reviewLoading.value) return
+  if (!reset && reviews.value.length >= reviewTotal.value) return
+  reviewLoading.value = true
+  const p = reset ? 1 : reviewPage.value + 1
+  try {
+    const res = await userReviewApi.list(userId.value, p, PAGE)
+    const rows = res.list ?? []
+    reviews.value = reset ? rows : [...reviews.value, ...rows]
+    reviewPage.value = p
+    reviewTotal.value = Number(res.total ?? reviews.value.length)
+    if (reset) reviewSummary.value = await userReviewApi.summary(userId.value)
+    reviewsLoaded.value = true
+  } catch {
+    if (reset) {
+      reviews.value = []
+      reviewTotal.value = 0
+    }
+  } finally {
+    reviewLoading.value = false
+  }
+}
 
 const moments = ref<MomentVO[]>([])
 const momentPage = ref(1)
@@ -72,10 +104,11 @@ async function fetchMomentPage(reset: boolean): Promise<void> {
   }
 }
 
-function switchTab(next: 'items' | 'moments'): void {
+function switchTab(next: 'items' | 'moments' | 'reviews'): void {
   if (tab.value === next) return
   tab.value = next
   if (next === 'moments' && !momentsLoaded.value) void fetchMomentPage(true)
+  if (next === 'reviews' && !reviewsLoaded.value) void fetchReviewPage(true)
 }
 
 async function toggleLike(m: MomentVO): Promise<void> {
@@ -201,8 +234,10 @@ onShow(() => {
 onReachBottom(() => {
   if (tab.value === 'items') {
     void fetchPage(false)
-  } else {
+  } else if (tab.value === 'moments') {
     void fetchMomentPage(false)
+  } else {
+    void fetchReviewPage(false)
   }
 })
 </script>
@@ -252,7 +287,7 @@ onReachBottom(() => {
         </view>
       </view>
 
-      <!-- Tab：闲置 / 动态（动态懒加载） -->
+      <!-- Tab：闲置 / 动态 / 评价（后两个懒加载） -->
       <view class="tabs">
         <view class="tab" :class="{ 'tab--on': tab === 'items' }" @click="switchTab('items')">
           <text class="tab__t">TA 的闲置</text>
@@ -260,6 +295,10 @@ onReachBottom(() => {
         </view>
         <view class="tab" :class="{ 'tab--on': tab === 'moments' }" @click="switchTab('moments')">
           <text class="tab__t">动态</text>
+          <view class="tab__ink" />
+        </view>
+        <view class="tab" :class="{ 'tab--on': tab === 'reviews' }" @click="switchTab('reviews')">
+          <text class="tab__t">评价{{ reviewSummary?.total ? ` ${reviewSummary.total}` : '' }}</text>
           <view class="tab__ink" />
         </view>
       </view>
@@ -283,7 +322,7 @@ onReachBottom(() => {
         </view>
       </block>
 
-      <block v-else>
+      <block v-else-if="tab === 'moments'">
         <view v-if="!moments.length && momentLoading" class="state"><text class="state__t">加载中…</text></view>
         <view v-else-if="!moments.length" class="state"><text class="state__t">TA 还没发过动态</text></view>
 
@@ -293,6 +332,54 @@ onReachBottom(() => {
 
         <view v-if="moments.length" class="loadmore">
           <text>{{ momentLoading ? '加载中…' : moments.length >= momentTotal ? '没有更多了' : '上拉加载更多' }}</text>
+        </view>
+      </block>
+
+      <!-- 评价：汇总 + 列表（一单一评，仅已完成订单可评） -->
+      <block v-else>
+        <view v-if="!reviews.length && reviewLoading" class="state"><text class="state__t">加载中…</text></view>
+        <view v-else-if="!reviews.length" class="state"><text class="state__t">还没有人评价 TA</text></view>
+
+        <block v-else>
+          <view v-if="reviewSummary?.total" class="rvsum">
+            <view class="rvsum__avg">
+              <text class="rvsum__num">{{ reviewSummary.avg }}</text>
+              <text class="rvsum__sub">平均分 · {{ reviewSummary.total }} 条</text>
+            </view>
+            <view class="rvsum__bars">
+              <view v-for="star in [5, 4, 3, 2, 1]" :key="star" class="rvbar">
+                <text class="rvbar__s">{{ star }} 星</text>
+                <view class="rvbar__track">
+                  <view
+                    class="rvbar__fill"
+                    :style="{
+                      width: `${reviewSummary.total ? (Number(reviewSummary.counts[String(star)] ?? 0) / reviewSummary.total) * 100 : 0}%`
+                    }"
+                  />
+                </view>
+                <text class="rvbar__n">{{ reviewSummary.counts[String(star)] ?? 0 }}</text>
+              </view>
+            </view>
+          </view>
+
+          <view class="rvlist">
+            <view v-for="r in reviews" :key="r.id" class="rvitem">
+              <view class="rvitem__hd">
+                <text class="rvitem__who">{{ r.reviewerNick || '校园用户' }}</text>
+                <text class="rvitem__stars">
+                  <text v-for="i in 5" :key="i" class="star" :class="{ 'star--on': i <= r.rating }">★</text>
+                </text>
+              </view>
+              <view v-if="r.tags?.length" class="rvitem__tags">
+                <text v-for="t in r.tags" :key="t" class="chip">{{ t }}</text>
+              </view>
+              <text v-if="r.comment" class="rvitem__text">{{ r.comment }}</text>
+            </view>
+          </view>
+        </block>
+
+        <view v-if="reviews.length" class="loadmore">
+          <text>{{ reviewLoading ? '加载中…' : reviews.length >= reviewTotal ? '没有更多了' : '上拉加载更多' }}</text>
         </view>
       </block>
     </template>
@@ -525,5 +612,131 @@ onReachBottom(() => {
 .loadmore text {
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
+}
+
+/* ── 评价 tab ─────────────────────────────────────────── */
+
+.rvsum {
+  display: flex;
+  gap: $cm-space-4;
+  padding: $cm-space-4;
+  margin-bottom: $cm-space-3;
+  background: $cm-color-surface;
+  border-radius: $cm-radius-lg;
+}
+
+.rvsum__avg {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 140rpx;
+}
+
+.rvsum__num {
+  font-size: 48rpx;
+  font-weight: 600;
+  color: $cm-color-text-1;
+}
+
+.rvsum__sub {
+  font-size: 20rpx;
+  color: $cm-color-text-3;
+}
+
+.rvsum__bars {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6rpx;
+}
+
+.rvbar {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: 20rpx;
+  color: $cm-color-text-3;
+}
+
+.rvbar__s {
+  width: 62rpx;
+}
+
+.rvbar__track {
+  flex: 1;
+  height: 10rpx;
+  background: $cm-color-bg;
+  border-radius: 999rpx;
+  overflow: hidden;
+}
+
+.rvbar__fill {
+  height: 100%;
+  background: $cm-color-brand;
+  border-radius: 999rpx;
+}
+
+.rvbar__n {
+  width: 48rpx;
+  text-align: right;
+}
+
+.rvlist {
+  display: flex;
+  flex-direction: column;
+  gap: $cm-space-2;
+}
+
+.rvitem {
+  padding: $cm-space-4;
+  background: $cm-color-surface;
+  border-radius: $cm-radius-lg;
+}
+
+.rvitem__hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.rvitem__who {
+  font-size: $cm-font-size-sm;
+  color: $cm-color-text-1;
+}
+
+.rvitem__stars {
+  display: flex;
+  gap: 4rpx;
+}
+
+.star {
+  font-size: 22rpx;
+  color: $cm-color-border;
+}
+
+.star--on {
+  color: $cm-color-brand;
+}
+
+.rvitem__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10rpx;
+  margin-top: $cm-space-2;
+}
+
+.chip {
+  padding: 4rpx 14rpx;
+  font-size: 20rpx;
+  color: $cm-color-text-2;
+  background: $cm-color-bg;
+  border-radius: 999rpx;
+}
+
+.rvitem__text {
+  margin-top: $cm-space-2;
+  font-size: $cm-font-size-sm;
+  line-height: 1.7;
+  color: $cm-color-text-1;
 }
 </style>

@@ -16,10 +16,17 @@
  * （卖家去点付款会被拒），所以不能靠页面猜。
  */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { userOrderApi, type OrderRole, type UserOrderStatus, type UserOrderVO } from '@campus/api'
+import {
+  userOrderApi,
+  userReviewApi,
+  type OrderReviewVO,
+  type OrderRole,
+  type UserOrderStatus,
+  type UserOrderVO
+} from '@campus/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -28,6 +35,8 @@ const order = ref<UserOrderVO | null>(null)
 const loading = ref(false)
 const acting = ref(false)
 const verifyCode = ref('')
+/** 已完成订单的互评状态：我评没评、对方评没评、还能不能评（notes/13 O18） */
+const review = ref<OrderReviewVO | null>(null)
 
 const role = computed<OrderRole>(() => (route.query.role === 'seller' ? 'seller' : 'buyer'))
 const isBuyer = computed(() => role.value === 'buyer')
@@ -57,10 +66,67 @@ async function load(): Promise<void> {
   loading.value = true
   try {
     order.value = await userOrderApi.detail(orderId.value)
+    // 评价状态只在已完成的单上取：其余状态问一次也是白问
+    if (order.value.status === 'COMPLETED') {
+      await loadReview()
+    }
   } catch {
     order.value = null
   } finally {
     loading.value = false
+  }
+}
+
+async function loadReview(): Promise<void> {
+  try {
+    review.value = await userReviewApi.ofOrder(orderId.value)
+  } catch {
+    review.value = null
+  }
+}
+
+/* ── 互评弹窗：评分 + 标签 + 文字，一单一评，提交后不回改 ── */
+
+const reviewOpen = ref(false)
+const reviewSaving = ref(false)
+const reviewForm = reactive<{ rating: number; tags: string[]; comment: string }>({
+  rating: 5,
+  tags: [],
+  comment: ''
+})
+
+const tagOptions = computed(() => {
+  const t = review.value?.tagTable
+  return [...(t?.positive ?? []), ...(t?.negative ?? [])].map((i) => i.label)
+})
+
+function openReview(): void {
+  reviewForm.rating = 5
+  reviewForm.tags = []
+  reviewForm.comment = ''
+  reviewOpen.value = true
+}
+
+async function submitReview(): Promise<void> {
+  if (reviewSaving.value) return
+  if (reviewForm.rating < 1) {
+    ElMessage.warning('请先选择评分')
+    return
+  }
+  reviewSaving.value = true
+  try {
+    await userReviewApi.submit(orderId.value, {
+      rating: reviewForm.rating,
+      tags: reviewForm.tags.length ? reviewForm.tags : undefined,
+      comment: reviewForm.comment.trim() || undefined
+    })
+    ElMessage.success('评价已提交')
+    reviewOpen.value = false
+    await loadReview()
+  } catch {
+    // http 层已提示（2010 未完成 / 2011 过期 / 4024 敏感词）
+  } finally {
+    reviewSaving.value = false
   }
 }
 
@@ -338,9 +404,64 @@ onMounted(load)
           </section>
 
           <RouterLink :to="{ name: 'chat' }" class="card card--link">找对方聊一聊 →</RouterLink>
+
+          <!-- 互评：只有已完成的单才有这一块（notes/13 O18） -->
+          <section v-if="order.status === 'COMPLETED'" class="card card--review">
+            <h2 class="card__h">交易评价</h2>
+
+            <template v-if="review?.mine">
+              <div class="rv">
+                <el-rate :model-value="review.mine.rating" disabled />
+                <p v-if="review.mine.tags?.length" class="rv__tags">
+                  <span v-for="t in review.mine.tags" :key="t" class="rv__tag">{{ t }}</span>
+                </p>
+                <p v-if="review.mine.comment" class="rv__text">{{ review.mine.comment }}</p>
+                <p class="tip">评价已提交，不能修改——公开内容允许回改会变成报复手段。</p>
+              </div>
+            </template>
+            <template v-else-if="review?.canReview">
+              <el-button type="primary" class="act" @click="openReview">去评价</el-button>
+              <p class="tip">面交后 30 天内可评，双方各评一条，互不影响。</p>
+            </template>
+            <p v-else class="tip">评价窗口已关闭。</p>
+
+            <div v-if="review?.peer" class="rv rv--peer">
+              <p class="rv__cap">对方的评价</p>
+              <el-rate :model-value="review.peer.rating" disabled />
+              <p v-if="review.peer.comment" class="rv__text">{{ review.peer.comment }}</p>
+            </div>
+          </section>
         </aside>
       </div>
     </template>
+
+    <!-- 互评弹窗 -->
+    <el-dialog v-model="reviewOpen" title="评价这笔交易" width="420px">
+      <div class="rform">
+        <div class="rform__row">
+          <span class="rform__label">评分</span>
+          <el-rate v-model="reviewForm.rating" />
+        </div>
+        <div v-if="tagOptions.length" class="rform__row">
+          <span class="rform__label">标签（最多 3 个）</span>
+          <el-checkbox-group v-model="reviewForm.tags" :max="3" class="rform__tags">
+            <el-checkbox v-for="t in tagOptions" :key="t" :value="t" :label="t" />
+          </el-checkbox-group>
+        </div>
+        <el-input
+          v-model="reviewForm.comment"
+          type="textarea"
+          :rows="4"
+          maxlength="500"
+          show-word-limit
+          placeholder="说说这次交易的感受（选填）"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="reviewOpen = false">取消</el-button>
+        <el-button type="primary" :loading="reviewSaving" @click="submitReview">提交评价</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -633,5 +754,73 @@ onMounted(load)
   &:hover {
     color: var(--cm-color-text-1);
   }
+}
+
+/* ── 交易评价 ─────────────────────────────────────────── */
+
+.rv {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-2);
+}
+
+/* 对方的评价单独一档：用浅底隔开，避免看成自己写的那段 */
+.rv--peer {
+  margin-top: var(--cm-space-3);
+  padding-top: var(--cm-space-3);
+  border-top: 1px dashed var(--cm-color-border);
+}
+
+.rv__cap {
+  margin: 0;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.rv__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cm-space-1);
+  margin: 0;
+}
+
+.rv__tag {
+  padding: 0 6px;
+  font-size: var(--cm-font-size-xs);
+  line-height: 20px;
+  color: var(--cm-color-text-2);
+  background: var(--cm-color-bg);
+  border-radius: var(--cm-radius-sm);
+}
+
+.rv__text {
+  margin: 0;
+  font-size: var(--cm-font-size-sm);
+  line-height: 1.7;
+  color: var(--cm-color-text-1);
+  word-break: break-word;
+}
+
+.rform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-3);
+}
+
+.rform__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-1);
+}
+
+.rform__label {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.rform__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--cm-space-1);
 }
 </style>

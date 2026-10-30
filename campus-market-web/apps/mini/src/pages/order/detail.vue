@@ -135,6 +135,11 @@ async function onReceive(): Promise<void> {
   await userOrderApi.receive(id.value)
 }
 
+/** 评价入口：评价状态由评价页自己拉（能不能评、评没评都在那边判） */
+function goReview(): void {
+  void uni.navigateTo({ url: `/pages/review/index?orderId=${id.value}` })
+}
+
 onLoad((query) => {
   const q = query as { id?: string; role?: string }
   id.value = q.id ?? ''
@@ -213,6 +218,12 @@ onShow(() => {
 
       <template v-else-if="order.status === 'DISPUTING'">
         <view class="hint">纠纷已提交，平台客服将介入裁决，请留意处理结果</view>
+      </template>
+
+      <!-- 已完成才给评价入口：待面交/已验货/退款中都还没走完交易，评人没有依据 -->
+      <template v-else-if="order.status === 'COMPLETED'">
+        <view class="btn btn--main" hover-class="btn--active" @click="goReview">评价这笔交易</view>
+        <view class="hint">面交后 30 天内可评，一单一评，提交后不能修改</view>
       </template>
 
       <template v-else>

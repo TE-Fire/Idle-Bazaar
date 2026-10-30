@@ -25,6 +25,12 @@ public enum OrderErrorCode implements IErrorCode {
     VERIFY_CODE_INVALID(2008, "核销码不正确"),
     /** 核销不鉴权谁扫的码（一单一码），但扫码人必须是这笔订单的当事人 */
     NOT_ORDER_PARTY(2009, "不是该订单的买卖双方，无权操作"),
+
+    /* ── 交易互评（2026-10-30 新增，notes/13 O18）── */
+    REVIEW_NOT_ALLOWED(2010, "仅已完成的订单可以评价"),
+    /** 窗口从面交核销（verify_time）起算 30 天；库里没有单独的「收货时间」列 */
+    REVIEW_EXPIRED(2011, "评价窗口已过（面交后 30 天内可评）"),
+    REVIEW_TAG_INVALID(2012, "评价标签不合法，请从可选标签中选择"),
     ;
 
     @Override
