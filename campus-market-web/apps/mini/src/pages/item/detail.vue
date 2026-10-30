@@ -40,6 +40,11 @@ const TOP_GAP = 10
 const scrollTop = ref(0)
 onPageScroll((e) => {
   scrollTop.value = e.scrollTop
+  // 浮层是钉在点击位置上的绝对层，页面一滚它就挂在错误的内容上。
+  // 遮罩挡住了页面主体的拖动，但顶栏那一条在遮罩之上，仍能带着浮层一起走。
+  if (moreOpen.value) {
+    closeMore()
+  }
 })
 /** 图集 640rpx≈333px、顶栏 = TOP_GAP + 96rpx ≈ 60px：滑到图完全躲进栏后（333-60）再转实底 */
 const BAR_SOLID_AT = 273
@@ -349,7 +354,7 @@ async function send(): Promise<void> {
     <!-- 顶部操作区：浮在图集上，滚动后转白底并淡出页面标题 -->
     <view
       class="topbar"
-      :class="{ 'topbar--solid': barSolid }"
+      :class="{ 'topbar--solid': barSolid, 'topbar--pop': moreOpen }"
       :style="{ paddingTop: statusBarHeight + TOP_GAP + 'px' }"
     >
       <view class="topbar__scrim" :class="{ 'topbar__scrim--off': barSolid }" />
@@ -602,6 +607,8 @@ async function send(): Promise<void> {
 
 /* 挖空圆钮：实白盘 + 白环 + 投影，压在浅色图上边界仍清楚；图标用墨色线框 */
 .tbtn {
+  /* relative 只为给浮层展开态让出层级（见 .topbar--pop），不影响排版 */
+  position: relative;
   width: 68rpx;
   height: 68rpx;
   flex: none;
@@ -633,6 +640,12 @@ async function send(): Promise<void> {
 
 .tbtn--on {
   transform: scale(0.92);
+}
+
+/* 浮层展开时遮罩升到 39（盖住顶栏），两个圆钮抬到 40 才仍可点：
+   返回照常退一层，更多照常收起——不必先点一下空白把菜单关掉。 */
+.topbar--pop .tbtn {
+  z-index: 40;
 }
 
 /* 绝对居中：空态只有返回键时也不会被 space-between 挤到右边 */
@@ -862,7 +875,9 @@ async function send(): Promise<void> {
   right: 0;
   top: 0;
   bottom: 0;
-  z-index: 35;
+  /* 盖过顶栏(38)：顶栏空白与标题也算「浮层外的区域」，点它们应当收起，
+     而不是戳在遮罩上面没反应。两个圆钮各自抬到 40，仍可点。 */
+  z-index: 39;
 }
 
 .pop {
