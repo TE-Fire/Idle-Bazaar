@@ -118,6 +118,8 @@ application-prod.yml
 /storage/
 **/logs/
 /logs/
+# dev.ps1 启动的进程 PID（本机运行时状态）
+/.run/
 *.sql.bak
 dump-*.sql
 *.dump
