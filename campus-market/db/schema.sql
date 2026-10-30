@@ -275,17 +275,19 @@ CREATE TABLE msg_message (
   session_id  bigint        DEFAULT NULL COMMENT '会话ID（私信时非空）',
   sender_id   bigint        NOT NULL DEFAULT 0 COMMENT '发送者，系统通知为0',
   receiver_id bigint        NOT NULL COMMENT '接收者',
-  type        tinyint       NOT NULL DEFAULT 1 COMMENT '1文本 2图片 3卡片（面交约定） 4系统',
+  type        tinyint       NOT NULL DEFAULT 1 COMMENT '1文本 2图片 3卡片（面交约定） 4系统处置 5互动 6平台公告',
   content     varchar(2000) DEFAULT NULL COMMENT '文本内容',
-  extra       json          DEFAULT NULL COMMENT '卡片消息结构化载荷（面交点/时间/商品）',
+  extra       json          DEFAULT NULL COMMENT '卡片消息结构化载荷（面交点/时间/商品）；公告存 title',
+  batch_id    bigint        DEFAULT NULL COMMENT '公告批次：同一条公告发给多人的行同批次，撤回按批次软删',
   read_flag   tinyint       NOT NULL DEFAULT 0 COMMENT '0未读 1已读',
   read_time   datetime      DEFAULT NULL COMMENT '已读时间',
   create_time datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted     bigint        NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_session (session_id, id) COMMENT '会话内翻页',
-  KEY idx_receiver (receiver_id, zone, read_flag) COMMENT '三分区未读查询（Vinted坑的关键索引）'
-) ENGINE=InnoDB COMMENT='消息（私信/系统/交易三分区合一）';
+  KEY idx_receiver (receiver_id, zone, read_flag) COMMENT '三分区未读查询（Vinted坑的关键索引）',
+  KEY idx_batch (batch_id) COMMENT '公告撤回：按批次批量软删'
+) ENGINE=InnoDB COMMENT='消息（私信/系统/交易三分区合一；平台公告按接收人逐行写）';
 
 -- ════════════════════════════════════════════════════════════
 -- 六、审核 · 举报 · 申诉（管理端裁决）
@@ -367,14 +369,14 @@ CREATE TABLE credit_log (
   change_value int          NOT NULL COMMENT '变动值（正/负）',
   before_score int          NOT NULL COMMENT '变动前',
   after_score  int          NOT NULL COMMENT '变动后',
-  reason_type  varchar(32)  NOT NULL COMMENT 'TRADE_DONE/BREACH_CANCEL/REPORTED/FORCE_OFF/BAN',
+  reason_type  varchar(32)  NOT NULL COMMENT 'TRADE_DONE/BREACH_CANCEL/REPORTED/FORCE_OFF/ADMIN_ADJUST',
   biz_id       bigint       DEFAULT NULL COMMENT '关联业务ID',
   remark       varchar(255) DEFAULT NULL COMMENT '说明',
   create_time  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   deleted      bigint       NOT NULL DEFAULT 0,
   PRIMARY KEY (id),
   KEY idx_user (user_id, create_time)
-) ENGINE=InnoDB COMMENT='信用分变动流水（初始100，完成+1上限120，违约-5，举报成立-10，强制下架-15，封禁清零）';
+) ENGINE=InnoDB COMMENT='信用分变动流水（初始100，完成+1上限120，违约-5，举报成立-10，强制下架-15，人工调整±20；封禁不动分）';
 
 CREATE TABLE user_review (
   id          bigint      NOT NULL COMMENT '雪花ID',
@@ -470,20 +472,8 @@ CREATE TABLE sys_operation_log (
 ) ENGINE=InnoDB COMMENT='操作日志（只追加不可删改；事务提交后异步写入）';
 
 -- ════════════════════════════════════════════════════════════
--- 九、减碳系数（估算假设，论文须标注）
+-- 九、敏感词
 -- ════════════════════════════════════════════════════════════
-
-CREATE TABLE carbon_factor (
-  id          bigint         NOT NULL COMMENT '雪花ID',
-  category_id bigint         NOT NULL COMMENT '分类',
-  factor_kg   decimal(10,2)  NOT NULL COMMENT '减碳系数 kg/件',
-  note        varchar(255)   DEFAULT NULL COMMENT '假设说明与局限（论文须标注为估算值）',
-  create_time datetime       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  update_time datetime       NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  deleted     bigint         NOT NULL DEFAULT 0,
-  PRIMARY KEY (id),
-  UNIQUE KEY uk_category (category_id, deleted)
-) ENGINE=InnoDB COMMENT='减碳估算系数（教材0.8/数码25/服饰3/生活用品5/其他2，均为假设值）';
 
 CREATE TABLE sys_sensitive_word (
   id          bigint      NOT NULL COMMENT '雪花ID',
@@ -497,6 +487,18 @@ CREATE TABLE sys_sensitive_word (
   UNIQUE KEY uk_word (word, deleted),
   KEY idx_level (level, status)
 ) ENGINE=InnoDB COMMENT='敏感词库（启动时载入内存，Redis 发布订阅热更新）';
+
+CREATE TABLE sys_config (
+  id           bigint       NOT NULL COMMENT '雪花ID',
+  config_key   varchar(64)  NOT NULL COMMENT '键，只允许 sla. 前缀',
+  config_value varchar(255) NOT NULL COMMENT '值，字符串存，读取时按类型转',
+  remark       varchar(255) DEFAULT NULL COMMENT '一句话说明，给运维看',
+  create_time  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time  datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted      bigint       NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_key (config_key, deleted)
+) ENGINE=InnoDB COMMENT='系统配置（只承载 SLA 六个阈值，不做通用配置中心）';
 
 -- ════════════════════════════════════════════════════════════
 -- 十、社交模块（关注/动态/评论/海报；notes/22 为字段唯一来源）
@@ -666,15 +668,6 @@ INSERT INTO dict_meet_point (id, campus_id, name, open_hours, sort) VALUES
  (1305,1001,'体育馆北门','08:00-21:00',5),
  (1306,1002,'东校区食堂','07:00-21:00',6);
 
--- ── 减碳系数（论文必须标注为估算假设值）────────────────────
-INSERT INTO carbon_factor (id, category_id, factor_kg, note) VALUES
- (1401,1201,0.80,'教材教辅：按单册纸张重量估算，未计印刷与运输'),
- (1402,1202,25.00,'数码电子：按整机生产碳足迹量级估算，未区分品类与剩余寿命'),
- (1403,1203,5.00,'生活用品：按小件日用品均值估算'),
- (1404,1204,3.00,'服饰鞋包：按单件纺织品均值估算'),
- (1405,1208,2.00,'其他闲置：保守取值，避免高估');
--- 注：以上系数均为假设值，未经本校实测校验，仅用于演示「循环率」指标的量级。
-
 -- ── 敏感词（分级：1 高危直接拒绝 / 2 低危替换打标）──────────
 INSERT INTO sys_sensitive_word (id, word, level) VALUES
  (1501,'加微信',2),
@@ -687,3 +680,12 @@ INSERT INTO sys_sensitive_word (id, word, level) VALUES
  (1508,'办证',1),
  (1509,'外挂',1);
 -- 说明：低危词（加微信、低价出）在校园场景属正常表述，故只打标送审而不阻断。
+
+-- ── 系统配置：SLA 六个阈值（设置页可调，改完落库）────────────
+INSERT INTO sys_config (id, config_key, config_value, remark) VALUES
+ (1601,'sla.firstResponseHours','2','首审响应达标线（小时）'),
+ (1602,'sla.p95Hours','6','首审耗时 P95 上限（小时）'),
+ (1603,'sla.targetRate','95','整体达标率目标（百分比）'),
+ (1604,'sla.backlogHours','24','积压红牌线（小时）'),
+ (1605,'sla.avgHandleSeconds','30','单条处置目标耗时（秒）'),
+ (1606,'sla.appealHours','48','申诉复审承诺（小时）');

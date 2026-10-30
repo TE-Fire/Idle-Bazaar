@@ -13,6 +13,9 @@
 | `cm:user:pub:{userId}` | String（JSON） | `UserPubVO`：昵称 / 头像 / 信用分 / 认证态 | 10min | 改昵称或头像后 DEL |
 | `cm:chat:unread:{userId}` | **Hash** | field = `sessionId`，value = 该会话未读条数 | 1h（写路径不续期） | 进会话已读后 `HDEL` 该 field |
 | `cm:item:state:{itemId}` + `cm:item:holder` | String + Hash | 占位状态字符串 / field = state key、value = 订单号 | 60s | 回滚 Lua 释放 |
+| `cm:config:sla` | **Hash** | 六个 SLA 阈值，field = `sla.xxx` | 10min | 设置页保存后 DEL |
+
+**收藏状态不进缓存，SLA 配置进。** 收藏是「用户 × 商品」的个人读，命中率取决于单个用户反复刷同一件商品，缓存收益极低、失效点却很多（收藏、取消、商品删除三处都要记得 DEL）；SLA 阈值是六个全局键，全管理端读同一份，缓存一次挡住全部读，写操作只有设置页一处——这才是该缓存的东西。判断标准始终是「谁读得多、谁写得多」，不是「是不是配置」。
 
 ## 字典：整包读，字符串最省事
 

@@ -263,9 +263,11 @@ P2 详情页点「我想要」
 | P2 商品详情 | `/item/:id` | F-W1 → F-W2 → F-W4 |
 | P3 发布闲置 | `/publish` | F-W3 ★ |
 | P4 对比页 | `/compare?ids=` | F-W2 ★ |
-| P5 搜索结果 | `/search?q=` | F-W1 |
+| P5 搜索结果 | `/search?q=` | F-W1（2026-10-30 建页，与 `/list` 共用结果卡） |
 | P6 消息 | `/chat` | W-B5、W-B10 |
-| P7 我的 | `/me` | W-B8、W-B9 |
+| P7 我的 | 无独立页 | W-B8、W-B9——由顶栏菜单承担；收藏与学号认证另有落点（P11、P12），不做「我的」聚合页 |
+| P11 我的收藏 | `/favorites` | W-B2、W-B8（2026-10-30 建页） |
+| P12 学号认证 | `/verify` | W-B9（2026-10-30 建页） |
 | P8 订单详情 | `/order/:id` | F-W4、F-W5 |
 | P9 个人主页 | `/user/:id` | W-B2、W-B11 |
 | P10 动态发布 / 广场 | `/moment/publish`、`/moment/square` | W-B11 |

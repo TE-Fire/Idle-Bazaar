@@ -44,7 +44,7 @@ docker exec -i cm-mysql mysql -uroot -pCampus@2026 < ../db/schema.sql
 mysql -h127.0.0.1 -uroot -p campus_market < ../db/schema.sql
 ```
 
-`schema.sql` 内含 24 张表 + 全部种子数据（12 学院 / 8 分类 / 成色 / 6 个面交点 / 4 角色 / 16 权限点 / 减碳系数 / 敏感词）。
+`schema.sql` 内含 28 张表 + 全部种子数据（12 学院 / 8 分类 / 成色 / 6 个面交点 / 4 角色 / 权限点 / 敏感词）。
 **种子里没有管理员密码**——演示账号由应用首次启动时自动生成（见下）。
 
 ## 四、环境配置（profile）
