@@ -14,6 +14,8 @@ interface Session {
   avatarUrl: string
   tokenName: string
   tokenValue: string
+  /** app_user.auth_status：0未认证 1审核中 2已认证 3未通过（认证页判状态用） */
+  authStatus?: number
 }
 
 let session: Session = { userId: '', nickname: '', avatarUrl: '', tokenName: '', tokenValue: '' }

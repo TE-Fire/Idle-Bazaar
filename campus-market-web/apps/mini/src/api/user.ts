@@ -63,8 +63,40 @@ export const userDictApi = {
       categories: CategoryVO[]
       grades: Array<{ code: string; label: string }>
       campuses: Array<{ id: string; name: string }>
+      colleges: Array<{ id: string; name: string; campusId?: string }>
       meetPoints: Array<{ id: string; name: string; campusId: string }>
     }>({ url: '/api/dict/all' })
+}
+
+/* ── 学号认证（notes/20 D5）───────────────────────────── */
+
+export interface UserAuthApplyVO {
+  id: string
+  userId: string
+  realName: string
+  studentNo: string
+  collegeId: string
+  credentialUrl?: string
+  /** 1审核中 2通过 3未通过 */
+  status: number
+  rejectReason?: string
+  handleTime?: string
+  createTime: string
+}
+
+export interface UserAuthApplyReq {
+  realName: string
+  studentNo: string
+  collegeId: string
+  credentialUrl?: string
+}
+
+export const userAuthApplyApi = {
+  apply: (req: UserAuthApplyReq) =>
+    request<string>({ url: '/api/user/auth/apply', method: 'POST', data: { ...req } }),
+
+  /** 最近一次申请：无申请返回 null；驳回时带 rejectReason */
+  latest: () => request<UserAuthApplyVO | null>({ url: '/api/user/auth/latest' })
 }
 
 /* ── 商品 ─────────────────────────────────────────────── */

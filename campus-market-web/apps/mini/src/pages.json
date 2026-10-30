@@ -62,6 +62,12 @@
       }
     },
     {
+      "path": "pages/verify/index",
+      "style": {
+        "navigationBarTitleText": "学号认证"
+      }
+    },
+    {
       "path": "pages/order/detail",
       "style": {
         "navigationBarTitleText": "订单详情"

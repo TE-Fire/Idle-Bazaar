@@ -60,4 +60,35 @@ public class CreditService {
         // 信用分是公开资料的一部分（商品卡 / 个人主页展示），写后失效
         userPubCache.evict(userId);
     }
+
+    /**
+     * 人工调整信用分（管理端，notes/20 D6）。
+     *
+     * <p>与 {@link #change} 分开：那个按原因取固定分值，这里由管理员给幅度；
+     * 结果仍夹在 0–120，流水原因是 ADMIN_ADJUST。理由必填由入参校验保证。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void adjust(long userId, int delta, String remark) {
+        Integer before = appUserMapper.selectCreditForUpdate(userId);
+        if (before == null) {
+            return;
+        }
+        int after = Math.max(MIN_SCORE, Math.min(MAX_SCORE, before + delta));
+        if (after == before) {
+            return;
+        }
+        appUserMapper.updateCredit(userId, after);
+
+        CreditLog row = new CreditLog();
+        row.setUserId(userId);
+        row.setChangeValue(after - before);
+        row.setBeforeScore(before);
+        row.setAfterScore(after);
+        row.setReasonType(CreditReasonEnum.ADMIN_ADJUST.name());
+        row.setBizId(null);
+        row.setRemark(remark);
+        creditLogMapper.insert(row);
+
+        userPubCache.evict(userId);
+    }
 }

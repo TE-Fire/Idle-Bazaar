@@ -51,6 +51,14 @@ public enum UserErrorCode implements IErrorCode {
     /* ── 社交：敏感词库维护（2026-10-30 新增，管理端 A9）── */
     SENSITIVE_WORD_EXISTS(4026, "该敏感词已存在"),
     SENSITIVE_WORD_NOT_FOUND(4027, "敏感词不存在或已删除"),
+
+    /** 学号认证（notes/20 D5）：学号唯一性只在审核通过时校验，提交阶段放行以便自助纠错 */
+    AUTH_ALREADY_VERIFIED(4028, "已完成学号认证，无需重复提交"),
+    AUTH_PENDING_EXISTS(4029, "认证申请正在审核中，请耐心等待"),
+    STUDENT_NO_TAKEN(4030, "该学号已被其他账号认证"),
+    AUTH_APPLY_NOT_FOUND(4031, "认证申请不存在"),
+    AUTH_NOT_PENDING(4032, "该申请已处理，请刷新列表"),
+    CREDIT_ADJUST_INVALID(4033, "信用分调整幅度需在 −20 到 +20 之间且理由必填"),
     ;
 
     @Override

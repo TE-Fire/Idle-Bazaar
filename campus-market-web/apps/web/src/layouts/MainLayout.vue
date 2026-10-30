@@ -15,7 +15,7 @@
 
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bell, ChatDotRound, Collection, Compass, CopyDocument, Edit, Goods, Position, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
+import { Bell, ChatDotRound, Collection, Compass, CopyDocument, Edit, Goods, Position, Postcard, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
 import { userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
@@ -86,6 +86,11 @@ function goFollow(): void {
 /** 系统通知：平台广播（举报处置结果等），与私信两个入口分开 */
 function goNotices(): void {
   void router.push({ name: 'notices' })
+}
+
+/** 学号认证：未认证时下拉里给入口，已认证后仍可进来查看认证信息 */
+function goVerify(): void {
+  void router.push({ name: 'verify' })
 }
 
 function onSearch(): void {
@@ -182,6 +187,9 @@ async function logout(): Promise<void> {
                   </el-dropdown-item>
                   <el-dropdown-item @click="goNotices">
                     <el-icon><Bell /></el-icon>系统通知
+                  </el-dropdown-item>
+                  <el-dropdown-item v-if="session.authStatus !== 2" @click="goVerify">
+                    <el-icon><Postcard /></el-icon>学号认证
                   </el-dropdown-item>
                   <el-dropdown-item @click="openEdit">
                     <el-icon><Edit /></el-icon>编辑资料

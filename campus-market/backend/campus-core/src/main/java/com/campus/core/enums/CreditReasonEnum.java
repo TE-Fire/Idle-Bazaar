@@ -24,7 +24,12 @@ public enum CreditReasonEnum {
     /** 平台强制下架 -15（当前不单独扣：举报成立内部已调强制下架，重复扣会双计） */
     FORCE_OFF(-15, "强制下架"),
     /** 封禁清零：delta 取负上限，下限 0 兜住 */
-    BAN(-120, "封禁");
+    BAN(-120, "封禁"),
+    /**
+     * 人工调整：delta 固定 0，实际幅度由调用方传入（±20）。
+     * 它只是流水上的原因标记，不参与 {@code CreditService#change} 的算分。
+     */
+    ADMIN_ADJUST(0, "人工调整");
 
     private final int delta;
 

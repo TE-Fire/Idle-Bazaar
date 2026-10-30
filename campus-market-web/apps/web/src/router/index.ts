@@ -37,6 +37,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'favorites', name: 'favorites', component: () => import('@/views/FavoritesView.vue'), meta: { title: '我的收藏' } },
       // P5 搜索结果：与 /list 同一组件，关键词走 q（后端 keyword 同时匹配标题与描述）
       { path: 'search', name: 'search', component: () => import('@/views/HomeView.vue'), meta: { title: '搜索结果' } },
+      // P12 学号认证：已认证/审核中/未通过三态同页（notes/20 D5）
+      { path: 'verify', name: 'verify', component: () => import('@/views/VerifyView.vue'), meta: { title: '学号认证' } },
       // 我的订单：买 / 卖两个视角共用一页，状态筛服务端（notes/13 第七节）
       { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { title: '我的订单' } },
       // 关注 / 粉丝：/follow 看自己，/user/:id/follow 看他人；?tab=fans 切到粉丝

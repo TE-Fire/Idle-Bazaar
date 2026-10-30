@@ -55,3 +55,35 @@ export const userAuthApi = {
 
   logout: () => request<void>({ url: '/api/auth/logout', method: 'POST' })
 }
+
+/* ── 学号认证（notes/20 D5）────────────────────────────── */
+
+export interface UserAuthApplyVO {
+  id: string
+  userId: string
+  realName: string
+  studentNo: string
+  collegeId: string
+  credentialUrl?: string | null
+  /** 1审核中 2通过 3未通过 */
+  status: number
+  rejectReason?: string | null
+  handleTime?: string | null
+  createTime: string
+}
+
+export interface UserAuthApplyReq {
+  realName: string
+  studentNo: string
+  collegeId: string
+  credentialUrl?: string
+}
+
+export const userAuthApplyApi = {
+  /** 提交认证：已认证 4028、审核中 4029；学号唯一性在审核通过时校验 */
+  apply: (req: UserAuthApplyReq) =>
+    request<string>({ url: '/api/user/auth/apply', method: 'POST', data: { ...req } }),
+
+  /** 最近一次申请：无申请返回 null，驳回时带 rejectReason */
+  latest: () => request<UserAuthApplyVO | null>({ url: '/api/user/auth/latest' })
+}

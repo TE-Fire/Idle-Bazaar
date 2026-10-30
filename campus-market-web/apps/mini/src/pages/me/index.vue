@@ -4,7 +4,7 @@
  *
  * <p>「我发布的 / 我买到的 / 我卖出的」三项入口合并到「我的交易」页（顶部三 tab，
  * 「我发布的」默认不出已售、已售以订单形态归到「我卖出的」，避免同商品两边重复）。
- * 收藏与学号认证仍为占位，点了明确提示「待建」。
+ * 收藏与学号认证都已有落点页面（notes/24、notes/20 D5）。
  * 未登录时点头像区进登录页；已登录进资料编辑页（昵称 / 头像，notes/20 D3）。
  *
  * <p>2026-10-28 视觉改版：头部从「白底一行」换成品牌渐变身份卡（导航栏同步改成
@@ -91,6 +91,14 @@ function open(e: { key: string; label: string }): void {
   }
   if (e.key === 'fav') {
     void uni.navigateTo({ url: '/pages/favorites/index' })
+    return
+  }
+  if (e.key === 'verify') {
+    if (!getSession().tokenValue) {
+      goLogin()
+      return
+    }
+    void uni.navigateTo({ url: '/pages/verify/index' })
     return
   }
   uni.showToast({ title: `「${e.label}」待建`, icon: 'none' })

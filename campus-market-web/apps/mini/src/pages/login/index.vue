@@ -82,7 +82,8 @@ async function submit(): Promise<void> {
       nickname: vo.nickname ?? '',
       avatarUrl: vo.avatarUrl ?? '',
       tokenName: vo.tokenName ?? '',
-      tokenValue: vo.tokenValue ?? ''
+      tokenValue: vo.tokenValue ?? '',
+      authStatus: vo.authStatus
     })
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {

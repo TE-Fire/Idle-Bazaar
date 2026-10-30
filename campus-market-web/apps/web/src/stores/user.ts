@@ -95,6 +95,14 @@ export const useUserStore = defineStore('user', () => {
     applySession(await userAuthApi.updateProfile(req))
   }
 
+  /**
+   * 重新拉一次登录人信息（认证状态、信用分等会变）。
+   * 用于学号认证提交后刷新 authStatus，避免顶栏「已认证」标识还停在旧值。
+   */
+  const refresh = async (): Promise<void> => {
+    applySession(await userAuthApi.info())
+  }
+
   const logout = async (): Promise<void> => {
     try {
       await userAuthApi.logout()
@@ -124,6 +132,7 @@ export const useUserStore = defineStore('user', () => {
     isLogin,
     login,
     updateProfile,
+    refresh,
     logout,
     clearSession
   }
