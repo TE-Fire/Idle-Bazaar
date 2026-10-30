@@ -47,6 +47,10 @@ public enum UserErrorCode implements IErrorCode {
     MOMENT_ITEM_INVALID(4023, "分享的商品不存在或不在售"),
     SENSITIVE_WORD_HIT(4024, "内容含有敏感词，请修改后重试"),
     ITEM_NOT_COMMENTABLE(4025, "商品当前不可评论（仅在售商品可评）"),
+
+    /* ── 社交：敏感词库维护（2026-10-30 新增，管理端 A9）── */
+    SENSITIVE_WORD_EXISTS(4026, "该敏感词已存在"),
+    SENSITIVE_WORD_NOT_FOUND(4027, "敏感词不存在或已删除"),
     ;
 
     @Override

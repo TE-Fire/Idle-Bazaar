@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
 
@@ -16,6 +17,7 @@ import java.time.LocalDateTime;
  * 过滤入口见 {@code SensitiveWordService}，与商品描述共用同一词库。
  */
 @Data
+@Accessors(chain = true)
 @TableName("sys_sensitive_word")
 public class SensitiveWord {
 

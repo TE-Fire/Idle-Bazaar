@@ -437,16 +437,12 @@ export const OP_TYPE_LABELS: Record<string, string> = {
   CAMPUS_STATUS: '启停校区',
 
   /* system */
-  ASSIGN_ROLE: '分配角色'
+  ASSIGN_ROLE: '分配角色',
+  SENSITIVE_WORD_CREATE: '新增敏感词',
+  SENSITIVE_WORD_UPDATE: '编辑敏感词',
+  SENSITIVE_WORD_STATUS: '启停敏感词',
+  SENSITIVE_WORD_DELETE: '删除敏感词'
 }
 
 /** 模块筛选下拉的取值；从标签表派生，避免两处各写一遍 */
 export const LOG_MODULES = Object.keys(LOG_MODULE_LABELS)
-
-/** 敏感词（sys_sensitive_word）：命中即进高风险队列 */
-export interface SensitiveWord {
-  id: string
-  word: string
-  level: '拦截' | '疑似'
-  enabled: boolean
-}

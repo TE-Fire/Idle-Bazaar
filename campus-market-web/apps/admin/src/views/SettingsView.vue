@@ -17,11 +17,12 @@
  * 操作效率是对审核员的要求（单条 ≤30s）。这里改的阈值会立刻影响 A5 审核队列的临期/超时判定。
  */
 
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import type { TableColumnsType } from 'ant-design-vue'
-import { PERM_CODES, type SensitiveWord } from '@campus/shared'
-import { DEFAULT_SLA, SENSITIVE_WORDS } from '@/mock/settings'
+import { PERM_CODES } from '@campus/shared'
+import { adminSensitiveApi, type SensitiveWordVO } from '@campus/api'
+import { DEFAULT_SLA } from '@/mock/settings'
 
 const active = ref<'sla' | 'word'>('sla')
 
@@ -48,39 +49,80 @@ const resetSla = (): void => {
 
 /* ── 敏感词 ── */
 
-const words = ref<SensitiveWord[]>(SENSITIVE_WORDS.map((w) => ({ ...w })))
+/** 级别展示名：1 高危直接拒发布、2 低危替换成等长 * 后放行 */
+const LEVEL_LABELS: Record<number, string> = { 1: '拦截', 2: '疑似' }
+
+const words = ref<SensitiveWordVO[]>([])
+const wordTotal = ref(0)
+const wordLoading = ref(false)
 const newWord = ref('')
-const newLevel = ref<SensitiveWord['level']>('疑似')
+const newLevel = ref(2)
 
 const wordColumns: TableColumnsType = [
   { title: '敏感词', dataIndex: 'word', width: 200 },
   { title: '级别', key: 'level', width: 110 },
-  { title: '状态', key: 'enabled', width: 110 },
+  { title: '状态', key: 'status', width: 110 },
   { title: '操作', key: 'action', width: 100 }
 ]
 
-const addWord = (): void => {
+/**
+ * 一次拉 100 条：词库量级在几十条，翻页反而碍事。
+ * 切到这个 Tab 才拉——SLA 那半边不需要它。
+ */
+async function loadWords(): Promise<void> {
+  wordLoading.value = true
+  try {
+    const p = await adminSensitiveApi.list({ pageSize: 100 })
+    words.value = p.list
+    wordTotal.value = p.total
+  } catch {
+    // 请求层已统一提示，这里只需把 loading 收掉
+  } finally {
+    wordLoading.value = false
+  }
+}
+
+watch(active, (key) => {
+  if (key === 'word') {
+    void loadWords()
+  }
+})
+
+const addWord = async (): Promise<void> => {
   const w = newWord.value.trim()
   if (!w) {
     message.warning('请输入敏感词')
     return
   }
-  if (words.value.some((x) => x.word === w)) {
-    message.warning('该词已存在')
-    return
+  try {
+    await adminSensitiveApi.create({ word: w, level: newLevel.value })
+    newWord.value = ''
+    message.success('已新增，3 秒内全端生效')
+    await loadWords()
+  } catch {
+    // 4026 重复词由请求层提示
   }
-  words.value.unshift({ id: `w-${Date.now()}`, word: w, level: newLevel.value, enabled: true })
-  newWord.value = ''
-  message.success('已新增')
 }
 
-const toggleWord = (row: SensitiveWord): void => {
-  row.enabled = !row.enabled
+/** 开关不回滚本地状态：改动以服务端为准，成功后重拉列表 */
+const toggleWord = async (row: SensitiveWordVO): Promise<void> => {
+  try {
+    await adminSensitiveApi.setEnabled(row.id, row.status !== 1)
+    message.success(row.status === 1 ? '已停用' : '已启用')
+    await loadWords()
+  } catch {
+    void loadWords()
+  }
 }
 
-const removeWord = (row: SensitiveWord): void => {
-  words.value = words.value.filter((w) => w.id !== row.id)
-  message.success('已删除')
+const removeWord = async (row: SensitiveWordVO): Promise<void> => {
+  try {
+    await adminSensitiveApi.remove(row.id)
+    message.success('已删除')
+    await loadWords()
+  } catch {
+    // 请求层已提示
+  }
 }
 </script>
 
@@ -139,29 +181,42 @@ const removeWord = (row: SensitiveWord): void => {
 
       <!-- 敏感词 -->
       <template v-else>
+        <p class="settings__note">
+          词库同时作用于<b>商品描述</b>、<b>动态</b>与两处<b>评论</b>：高危词直接拒绝发布，低危词替换成等长 `*`。
+          改动 3 秒内全端生效，不用重启后端。
+        </p>
         <div class="settings__filter">
           <a-space wrap :size="12">
             <a-input v-model:value="newWord" placeholder="新增敏感词" style="width: 200px" />
             <a-select v-model:value="newLevel" style="width: 110px">
-              <a-select-option value="拦截">拦截</a-select-option>
-              <a-select-option value="疑似">疑似</a-select-option>
+              <a-select-option :value="1">拦截</a-select-option>
+              <a-select-option :value="2">疑似</a-select-option>
             </a-select>
             <a-button v-perm="PERM_CODES.SETTINGS_EDIT" type="primary" shape="round" @click="addWord">
               新增
             </a-button>
           </a-space>
-          <span class="settings__count">共 {{ words.length }} 个</span>
+          <span class="settings__count">共 {{ wordTotal }} 个</span>
         </div>
 
-        <a-table :columns="wordColumns" :data-source="words" row-key="id" size="middle" :pagination="false">
+        <a-table
+          :columns="wordColumns"
+          :data-source="words"
+          :loading="wordLoading"
+          row-key="id"
+          size="middle"
+          :pagination="false"
+        >
           <template #bodyCell="{ column, record }">
             <template v-if="column.key === 'level'">
-              <a-tag :color="record.level === '拦截' ? 'red' : 'orange'">{{ record.level }}</a-tag>
+              <a-tag :color="record.level === 1 ? 'red' : 'orange'">
+                {{ LEVEL_LABELS[record.level] ?? record.level }}
+              </a-tag>
             </template>
-            <template v-else-if="column.key === 'enabled'">
+            <template v-else-if="column.key === 'status'">
               <a-switch
                 v-perm="PERM_CODES.SETTINGS_EDIT"
-                :checked="record.enabled"
+                :checked="record.status === 1"
                 size="small"
                 @change="toggleWord(record)"
               />
