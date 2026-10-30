@@ -164,7 +164,7 @@ onPullDownRefresh(() => {
 })
 
 function openSearch(): void {
-  uni.showToast({ title: '搜索页待建（M7）', icon: 'none' })
+  void uni.navigateTo({ url: '/pages/search/index' })
 }
 
 /** 顶栏「消息」进会话列表 */

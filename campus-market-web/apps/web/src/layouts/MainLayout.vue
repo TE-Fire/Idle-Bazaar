@@ -13,7 +13,7 @@
  * 发布按钮 / 对比角标这几处（design/01 原则 1）。
  */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bell, ChatDotRound, Collection, Compass, CopyDocument, Edit, Goods, Position, Postcard, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
 import { userDictApi } from '@campus/api'
@@ -28,6 +28,22 @@ const compare = useCompareStore()
 const session = useUserStore()
 
 const keyword = ref('')
+
+/** 搜索框要能重新聚焦：输入为空时按搜索不跳页，把焦点还回去（notes/24 规则 2） */
+const searchInput = ref<HTMLInputElement | null>(null)
+
+/** 关键词长度上限 50，与服务端 `ItemService.MAX_KEYWORD` 一致 */
+const KEYWORD_MAX = 50
+
+/** 结果页刷新 / 前进后退回来时，搜索框要显示 URL 里的词 */
+watch(
+  () => route.query.q,
+  (q) => {
+    if (typeof q === 'string') keyword.value = q
+    else if (!q) keyword.value = ''
+  },
+  { immediate: true }
+)
 
 /**
  * 顶栏校区切换：**单选、作用于全站列表**，选项来自字典（'' = 全部校区）。
@@ -94,12 +110,19 @@ function goVerify(): void {
 }
 
 function onSearch(): void {
-  void router.push({ name: 'list', query: { q: keyword.value || undefined } })
+  const q = keyword.value.trim().slice(0, KEYWORD_MAX)
+  // 空词不进结果态：留在当前页，把焦点还回输入框
+  if (!q) {
+    searchInput.value?.focus()
+    return
+  }
+  keyword.value = q
+  void router.push({ name: 'search', query: { q } })
 }
 
 function onHot(word: string): void {
   keyword.value = word
-  void router.push({ name: 'list', query: { q: word } })
+  void router.push({ name: 'search', query: { q: word } })
 }
 
 function backTop(): void {
@@ -123,6 +146,7 @@ async function logout(): Promise<void> {
         <div class="search-block">
           <div class="search">
             <input
+              ref="searchInput"
               v-model="keyword"
               class="search__input"
               placeholder="想要什么，搜一搜"

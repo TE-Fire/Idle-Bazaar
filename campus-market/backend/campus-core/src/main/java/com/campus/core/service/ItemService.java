@@ -61,6 +61,9 @@ public class ItemService {
     /** 列表分页上限：C 端能被脚本翻页，不设限的话深翻页会把列表查询拖垮 */
     private static final long MAX_PAGE_SIZE = 50;
 
+    /** 关键词长度上限：用户粘贴整段长句是常态，截断而不报错 */
+    private static final int MAX_KEYWORD = 50;
+
     /** 价格异常判定：标价超过同类目成交均价 3 倍（`item_audit.price_abnormal` 的口径） */
     private static final BigDecimal PRICE_ABNORMAL_TIMES = BigDecimal.valueOf(3);
 
@@ -223,7 +226,7 @@ public class ItemService {
                 .eq(Item::getStatus, ItemStatusEnum.ON_SALE.getCode())
                 .eq(Item::getDeleted, 0);
 
-        String keyword = trim(req.getKeyword());
+        String keyword = cut(req.getKeyword());
         if (keyword != null) {
             q.and(w -> w.like(Item::getTitle, keyword).or().like(Item::getDescription, keyword));
         }
@@ -576,6 +579,12 @@ public class ItemService {
 
     private String trim(String s) {
         return s == null || s.isBlank() ? null : s.trim();
+    }
+
+    /** 关键词去空格并按 MAX_KEYWORD 截断（搜页面的长句粘贴不在前端切断，服务端兜底） */
+    private String cut(String s) {
+        String t = trim(s);
+        return t == null || t.length() <= MAX_KEYWORD ? t : t.substring(0, MAX_KEYWORD);
     }
 
     private static int nvl(Integer v, int def) {

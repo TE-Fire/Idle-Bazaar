@@ -44,6 +44,9 @@ type SortKey = 'default' | 'price-asc' | 'price-desc' | 'time' | 'hot'
 type ViewMode = 'grid' | 'list'
 type TimeRange = '' | '24h' | '3d' | '7d'
 
+/** 关键词长度上限 50（服务端同样截断，前端先截一刀避免多发无用字符） */
+const KEYWORD_MAX = 50
+
 const route = useRoute()
 const router = useRouter()
 
@@ -105,10 +108,13 @@ async function fetchItems(): Promise<void> {
   loading.value = true
   loadError.value = false
   try {
-    // 服务端只返在售、按发布时间倒序；50 是后端 pageSize 上限
+    // 服务端只返在售、按发布时间倒序；50 是后端 pageSize 上限。
+    // 关键词交给服务端 LIKE（title / description），前端不再本地二次过滤——
+    // 本地过滤只能看到已加载的这一页，搜「教材」会漏掉第 51 件之后的结果。
     const res = await userItemApi.list({
       pageSize: 50,
-      categoryId: category.value || undefined
+      categoryId: category.value || undefined,
+      keyword: keyword.value.trim().slice(0, KEYWORD_MAX) || undefined
     })
     items.value = res.list.map(toGoodsItem)
   } catch {
@@ -171,8 +177,12 @@ const categoryName = computed(
 )
 
 function pickCat(id: string): void {
-  // 走 URL 而不是直改 category.value：与顶栏 / 促销卡的入口共用同一份 watch 同步
-  void router.push({ name: 'list', query: { cat: id || undefined } })
+  // 走 URL 而不是直改 category.value：与顶栏 / 促销卡的入口共用同一份 watch 同步。
+  // 带着当前关键词跳，换分类不等于放弃刚才搜的词
+  void router.push({
+    name: 'list',
+    query: { cat: id || undefined, q: keyword.value.trim() || undefined }
+  })
 }
 
 /** 促销卡位按分类名跳转：卡面文案是写死的装饰层，名字要先映射回字典 id */
@@ -217,12 +227,11 @@ const SORTS: { key: SortKey; label: string }[] = [
 /* ── 结果集 ─────────────────────────────────────────────── */
 
 const filtered = computed(() => {
-  const kw = keyword.value.trim()
   const now = Date.now()
 
   return items.value.filter((it) => {
-    // 分类不在这里比：前端拿不到父级关系，已由服务端 categoryId 过滤
-    if (kw && !`${it.title}${it.description}`.includes(kw)) return false
+    // 关键词与分类不在前端比：分类的前端拿不到父级关系，关键词要在全量数据上 LIKE，
+    // 两者都已由服务端过滤（见 fetchItems），这里再比一遍只会和搜索结果对不上
     if (priceMin.value !== null && it.price < priceMin.value) return false
     if (priceMax.value !== null && it.price > priceMax.value) return false
     // ★ 成色是「或」：勾了 A、B 表示 A 或 B 都行
@@ -269,15 +278,33 @@ interface Chip {
   clear: () => void
 }
 
+/**
+ * 摘掉关键词：URL 上的 q 也要摘。
+ *
+ * <p>`keyword` 由 URL 单向驱动（见上面的 watch），只改本地变量列表不会重拉，
+ * 用户会看到「关键词标签没了、结果还是旧词的结果」。地址栏本来就干净时直接重拉。
+ */
+function clearKeyword(): void {
+  keyword.value = ''
+  if (!route.query.q) {
+    void fetchItems()
+    return
+  }
+  const next = { ...route.query }
+  delete next.q
+  void router.replace({ path: route.path, query: next })
+}
+
 const chips = computed<Chip[]>(() => {
   const out: Chip[] = []
   if (keyword.value.trim())
-    out.push({ key: 'kw', label: `关键词：${keyword.value}`, clear: () => (keyword.value = '') })
+    out.push({ key: 'kw', label: `关键词：${keyword.value}`, clear: clearKeyword })
   if (category.value)
     out.push({
       key: 'cat',
       label: categoryName.value || '已选分类',
-      clear: () => router.push({ name: 'home' })
+      // 只摘分类，不顺手丢掉关键词（关键词在 URL 上，回首页会一起没）
+      clear: () => router.push({ name: 'list', query: { q: keyword.value.trim() || undefined } })
     })
   if (priceMin.value !== null || priceMax.value !== null)
     out.push({

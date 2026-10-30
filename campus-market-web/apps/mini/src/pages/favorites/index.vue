@@ -12,6 +12,7 @@ import { ref } from 'vue'
 import { onLoad, onPullDownRefresh, onReachBottom } from '@dcloudio/uni-app'
 import { ITEM_STATUS_LABELS, formatPrice } from '@campus/shared'
 import { userItemApi, type ApiItemVO } from '@/api/user'
+import { goTab } from '@/utils/tab-nav'
 
 const list = ref<ApiItemVO[]>([])
 const pageNum = ref(1)
@@ -55,9 +56,9 @@ function goDetail(id: string): void {
   void uni.navigateTo({ url: `/pages/item/detail?id=${id}` })
 }
 
-/** 空态「去逛逛」：首页是 tab 页，必须 switchTab 不能 navigateTo */
+/** 空态「去逛逛」：首页是 tab 页，走自绘底栏的 reLaunch（原生 tabBar 已删，switchTab 会失败） */
 function goHome(): void {
-  void uni.switchTab({ url: '/pages/index/index' })
+  goTab('home')
 }
 
 /** 取消收藏：先确认，成功后本地移除 */
