@@ -18,6 +18,7 @@ import {
   userItemApi,
   userItemCommentApi,
   userMomentApi,
+  userOrderApi,
   type ApiItemVO,
   type CategoryVO,
   type ItemCommentVO
@@ -100,6 +101,10 @@ const bg = (flip: boolean): string => {
 
 const selected = computed(() => (item.value ? compare.has(item.value.id) : false))
 const isMine = computed(() => !!item.value && userStore.userId === item.value.sellerId)
+/** 仅在售可下单：下架 / 已售不开放购买入口 */
+const onSale = computed(() => item.value?.status === 'ON_SALE')
+/** 卖家头像：按种子约定从 sellerId 派生 demo 头像（后端暂未下发 sellerAvatar） */
+const sellerAvatarUrl = computed(() => `/api/file/demo/avatar/${item.value?.sellerId}.png`)
 
 function onCompare(): void {
   if (!item.value) return
@@ -130,7 +135,29 @@ function onCompare(): void {
     tints: ['#ECEFF3', '#D3D9E0'],
     publishedAt: item.value.publishAt
   }
-  if (!compare.toggle(goods)) ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
+  const r = compare.toggle(goods)
+  if (r === 'full') ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
+  else if (r === 'mismatch')
+    ElMessage.warning({ message: `对比仅限同类商品（${compare.lockedCategoryName}）`, duration: 2200 })
+}
+
+/**
+ * 立即购买：登录后下单（待付款），跳订单详情页完成付款 / 面交核销。
+ * 面交电商的入口——没有它用户只能「聊一聊」却下不了单。
+ */
+async function onBuy(): Promise<void> {
+  if (!item.value) return
+  if (!userStore.userId) {
+    void router.push({ name: 'login', query: { redirect: route.fullPath } })
+    return
+  }
+  try {
+    const orderId = await userOrderApi.create({ itemId: item.value.id })
+    ElMessage.success('订单已创建，去付款')
+    void router.push({ name: 'order-detail', params: { id: orderId } })
+  } catch {
+    // http 层已提示（商品不在售 / 库存等）
+  }
 }
 
 /**
@@ -158,6 +185,13 @@ async function onShare(): Promise<void> {
   } finally {
     sharing.value = false
   }
+}
+
+/** 评论头像加载失败（如 MinIO 离线）退回 demo 渐变占位，保证头像区始终有图 */
+function avatarFallback(e: Event, userId: string): void {
+  const img = e.target as HTMLImageElement
+  img.onerror = null
+  img.src = `/api/file/demo/avatar/${userId}.png`
 }
 
 /** 拉评论：一次取 50 条，商品评论量小不分页 */
@@ -319,7 +353,10 @@ function goSeller(): void {
             <el-button type="primary" size="large" @click="onEdit">编辑商品</el-button>
           </template>
           <template v-else>
-            <el-button type="primary" size="large" @click="onChat">聊一聊</el-button>
+            <el-button type="primary" size="large" @click="onBuy" :disabled="!onSale">
+              {{ onSale ? '立即购买' : '已下架' }}
+            </el-button>
+            <el-button size="large" @click="onChat">聊一聊</el-button>
             <el-button size="large" :type="selected ? 'warning' : 'default'" @click="onCompare">
               {{ selected ? '已加入对比' : '加入对比' }}
             </el-button>
@@ -337,7 +374,8 @@ function goSeller(): void {
 
         <!-- 卖家卡：点击进 TA 的主页（资料 + 在售闲置） -->
         <div class="seller seller--link" @click="goSeller">
-          <span class="avatar" :style="{ background: bg(false) }" />
+          <img v-if="sellerAvatarUrl" class="avatar" :src="sellerAvatarUrl" :alt="item.sellerNick ?? '卖家'" />
+          <span v-else class="avatar" :style="{ background: bg(false) }" />
           <div class="seller__meta">
             <span class="nick">{{ item.sellerNick ?? '卖家' }}</span>
             <span class="sub">信用 {{ item.sellerCredit ?? 100 }} 分 · 进主页 →</span>
@@ -373,7 +411,14 @@ function goSeller(): void {
 
       <ul v-else class="cmt__list">
         <li v-for="c in comments" :key="c.id" class="cmt__row">
-          <span class="cmt__ava" :style="{ background: bg(false) }" />
+          <img
+            v-if="c.author?.avatarUrl"
+            class="cmt__ava cmt__ava--img"
+            :src="c.author.avatarUrl"
+            :alt="c.author?.nickname"
+            @error="avatarFallback($event, c.userId)"
+          />
+          <span v-else class="cmt__ava" :style="{ background: bg(false) }" />
           <div class="cmt__body">
             <div class="cmt__top">
               <span class="cmt__nick">{{ c.author?.nickname ?? '同学' }}</span>
@@ -607,6 +652,7 @@ function goSeller(): void {
   height: 36px;
   border-radius: 50%;
   flex: none;
+  object-fit: cover;
 }
 
 .seller__meta {
@@ -724,6 +770,7 @@ function goSeller(): void {
   width: 36px;
   height: 36px;
   border-radius: 50%;
+  object-fit: cover;
 }
 
 .cmt__body {

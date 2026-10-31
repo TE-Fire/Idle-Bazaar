@@ -113,7 +113,9 @@ const cover = (it: GoodsItem): string => it.images?.[0] ?? ''
 
       <div class="acts">
         <el-button @click="compare.clear()">清空对比篮</el-button>
-        <RouterLink :to="{ name: 'home' }"><el-button type="primary">继续挑选</el-button></RouterLink>
+        <RouterLink :to="{ name: 'home', query: { cat: compare.lockedCategoryId || undefined } }">
+          <el-button type="primary">继续挑选</el-button>
+        </RouterLink>
       </div>
     </template>
   </div>

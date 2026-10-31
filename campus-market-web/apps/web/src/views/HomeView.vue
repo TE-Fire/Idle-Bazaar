@@ -39,6 +39,8 @@ import { userDictApi, userItemApi, userNoticeApi, type BulletinVO } from '@campu
 import ProductCard from '@/components/ProductCard.vue'
 import FilterGroup from '@/components/FilterGroup.vue'
 import { toGoodsItem } from '@/utils/item-map'
+import { useCompareStore } from '@/stores/compare'
+import { ElMessage } from 'element-plus'
 
 type SortKey = 'default' | 'price-asc' | 'price-desc' | 'time' | 'hot'
 type ViewMode = 'grid' | 'list'
@@ -49,6 +51,7 @@ const KEYWORD_MAX = 50
 
 const route = useRoute()
 const router = useRouter()
+const compare = useCompareStore()
 
 /* ── 筛选条件 ───────────────────────────────────────────── */
 
@@ -245,12 +248,24 @@ watch(noticeVisible, (v) => {
 /** 左侧分类卡（顶栏分类条取消后的替代入口）：选项来自字典，不含「全部」——清空分类就是全部 */
 const CAT_LIST = computed(() => catOptions.value)
 
+/** 对比篮锁定时，分类切换被限制为锁定分类——选品只给同类入口，从界面上堵死选别的类型 */
+const compareLocked = computed(() => compare.count > 0)
+
 /** 当前分类名：URL 里存的是 id，chips 与空态文案要显示人话 */
 const categoryName = computed(
   () => catOptions.value.find((c) => c.id === category.value)?.name ?? ''
 )
 
 function pickCat(id: string): void {
+  // 对比篮已锁定时，只允许停在锁定分类：换到别的类型会打破「仅限同类」约束；
+  // 先清空对比篮才能恢复自由选类（提示里说清原因，不静默拦截）
+  if (compareLocked.value && id !== compare.lockedCategoryId) {
+    ElMessage.warning({
+      message: `对比已锁定「${compare.lockedCategoryName}」类，清空对比篮后可换分类`,
+      duration: 2200
+    })
+    return
+  }
   // 走 URL 而不是直改 category.value：与顶栏 / 促销卡的入口共用同一份 watch 同步。
   // 带着当前关键词跳，换分类不等于放弃刚才搜的词
   void router.push({
@@ -463,18 +478,21 @@ watch([filtered], () => {
     <div class="body">
       <!-- ── 左侧常驻 240px：分类卡 + 筛选，sticky ──────── -->
       <aside class="side">
-        <nav class="cats">
-          <h4 class="cats__hd">全部分类</h4>
-          <a
-            v-for="c in CAT_LIST"
-            :key="c.id"
-            :class="{ on: category === c.id }"
-            href="javascript:void(0)"
-            @click="pickCat(c.id)"
-          >
-            {{ c.name }}
-          </a>
-        </nav>
+          <nav class="cats">
+            <h4 class="cats__hd">全部分类</h4>
+            <p v-if="compareLocked" class="cats__lock">
+              对比已锁定「{{ compare.lockedCategoryName }}」类 · 清空对比篮可换分类
+            </p>
+            <a
+              v-for="c in CAT_LIST"
+              :key="c.id"
+              :class="{ on: category === c.id, lock: compareLocked && c.id !== compare.lockedCategoryId }"
+              href="javascript:void(0)"
+              @click="pickCat(c.id)"
+            >
+              {{ c.name }}
+            </a>
+          </nav>
 
         <div class="filters cm-card">
           <FilterGroup
@@ -531,7 +549,7 @@ watch([filtered], () => {
             v-for="h in HERO"
             :key="h.title"
             class="hero__card"
-            :class="h.cls"
+            :class="[h.cls, { lock: compareLocked }]"
             @click="pickCatByName(h.cat)"
           >
             <div class="hero__txt">
@@ -557,7 +575,7 @@ watch([filtered], () => {
             :key="q.value"
             type="button"
             class="quick__item"
-            :class="{ on: category === q.value }"
+            :class="{ on: category === q.value, lock: compareLocked && q.value !== compare.lockedCategoryId }"
             @click="pickCat(q.value)"
           >
             {{ q.label }}
@@ -754,6 +772,27 @@ watch([filtered], () => {
   margin: 0 0 var(--cm-space-2);
   font-size: var(--cm-font-size-base);
   font-weight: 800;
+}
+
+/* 对比锁定提示：占住分类卡顶部，告知用户为何不能换类 */
+.cats__lock {
+  margin: 0 0 var(--cm-space-2);
+  padding: var(--cm-space-2) var(--cm-space-3);
+  font-size: var(--cm-font-size-xs);
+  line-height: 1.5;
+  color: var(--cm-color-text-2);
+  background: var(--cm-color-brand-bg);
+  border: 1px solid var(--cm-color-brand-border);
+  border-radius: var(--cm-radius-md);
+}
+
+/* 锁定时非锁定分类：置灰 + 禁点，从界面上移除选别的类型的入口 */
+.cats a.lock,
+.quick__item.lock,
+.hero__card.lock {
+  opacity: 0.4;
+  pointer-events: none;
+  cursor: not-allowed;
 }
 
 .cats a {
