@@ -4,13 +4,13 @@
  *
  * <p>动作按「状态 × 角色」给出，与后端各接口的准入一一对应：
  * - 待付款：买家付款 / 取消（取消即作废，不产生退款单）；卖家只读；
- * - 待面交：任一方出示或输入核销码 → 已验货；买家可申请退款，卖家只读；
+ * - 待面交：卖家持有核销码并向买家出示，买家输入后 → 已验货；买家可申请退款，卖家只读；
  * - 已验货：买家确认收货 → 已完成；卖家只读；
  * - 退款中：**卖家同意退款（已退款，商品恢复在售）/ 拒绝（纠纷中，转管理端裁决）**；
  *   买家只读，等卖家处理，24 小时未处理系统自动同意；
  * - 纠纷中与终态：双方只读，等平台裁决。
  *
- * <p>核销码不隐藏：一单一码，买卖任一方都能出示或输入，藏起来面交现场就验不了。
+ * <p>防单方核销：核销码只向卖家暴露（卖家持有），只能由买家录入核销；任一方都无法单独完成。
  *
  * <p>role 从 query 带入：同一单两个视角，动作集合不同，后端也按角色校验
  * （卖家去点付款会被拒），所以不能靠页面猜。
@@ -347,25 +347,35 @@ onMounted(load)
             <p class="tip">面交现场请核对对方身份，确认无误再出示核销码。</p>
           </section>
 
-          <!-- 核销码 -->
+          <!-- 核销：卖家持码出示 / 买家输入核销（防单方核销） -->
           <section v-if="order.status === 'WAIT_MEET' || order.status === 'VERIFIED'" class="card">
-            <h2 class="card__h">面交核销码</h2>
-            <div class="code">
-              <span class="code__v">{{ order.verifyCode || '——' }}</span>
-              <el-button size="small" @click="copy(order.verifyCode, '核销码')">复制</el-button>
-            </div>
-            <p class="tip">面交时向对方出示此码，或输入对方提供的码完成核销。一单一码，任一方核销即成立。</p>
+            <h2 class="card__h">面交核销</h2>
 
-            <div v-if="order.status === 'WAIT_MEET'" class="verify">
-              <el-input
-                v-model="verifyCode"
-                class="verify__in"
-                maxlength="6"
-                placeholder="输入对方的 6 位核销码"
-                @keyup.enter="onVerify"
-              />
-              <el-button type="primary" :loading="acting" @click="onVerify">核销</el-button>
-            </div>
+            <!-- 卖家：持有核销码，向买家出示 -->
+            <template v-if="!isBuyer && order.status === 'WAIT_MEET'">
+              <div class="code">
+                <span class="code__v">{{ order.verifyCode || '——' }}</span>
+                <el-button size="small" @click="copy(order.verifyCode, '核销码')">复制</el-button>
+              </div>
+              <p class="tip">向买家出示此码，买家在你的页面输入后即可完成核销。码仅你可见，买家看不到。</p>
+            </template>
+
+            <!-- 买家：输入卖家出示的码 -->
+            <template v-else-if="isBuyer && order.status === 'WAIT_MEET'">
+              <div class="verify">
+                <el-input
+                  v-model="verifyCode"
+                  class="verify__in"
+                  maxlength="6"
+                  placeholder="输入卖家出示的 6 位核销码"
+                  @keyup.enter="onVerify"
+                />
+                <el-button type="primary" :loading="acting" @click="onVerify">核销</el-button>
+              </div>
+              <p class="tip">请当面核对卖家身份，输入卖家出示的核销码完成核销。</p>
+            </template>
+
+            <p v-else class="tip">本单已核销，等待买家确认收货。</p>
           </section>
 
           <!-- 订单信息 -->

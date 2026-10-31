@@ -25,6 +25,8 @@ public enum OrderErrorCode implements IErrorCode {
     VERIFY_CODE_INVALID(2008, "核销码不正确"),
     /** 核销不鉴权谁扫的码（一单一码），但扫码人必须是这笔订单的当事人 */
     NOT_ORDER_PARTY(2009, "不是该订单的买卖双方，无权操作"),
+    /** 防单方核销：核销码由卖家持有，只能由买家执行核销，卖家调用一律拒绝 */
+    VERIFY_ONLY_BUYER(2013, "仅买家可核销，请让买家输入卖家出示的核销码"),
 
     /* ── 交易互评（2026-10-30 新增，notes/13 O18）── */
     REVIEW_NOT_ALLOWED(2010, "仅已完成的订单可以评价"),

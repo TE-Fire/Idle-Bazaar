@@ -318,14 +318,17 @@ public class OrderService {
     /**
      * 扫码核销：待面交 → 已验货。
      *
-     * <p>核销码一单一张（`uk_verify_code` 唯一约束），所以只要码对得上，**任一方扫码即成立**；
-     * `verify_by` 记的是实际扫码的人，用于复盘而不是授权——当初若是「各持一码」的设计，
-     * 那个唯一约束就不该存在（notes/13 第二节）。
+     * <p><b>防单方核销</b>：核销码由卖家持有（仅卖家侧的 {@link OrderVO} 携带，买家侧永远拿不到），
+     * 执行核销的却只能是买家——`verify_by` 恒为买家。于是任一方都无法单独完成：
+     * 卖家握着码但本接口拒绝卖家调用，买家能调本接口却看不到码，必须双方见面、卖家出示码、买家输入。
+     *
+     * <p>核销码一单一张（`uk_verify_code` 唯一约束），码对得上才放行。
      */
     @Transactional(rollbackFor = Exception.class)
     public void verify(Long orderId, String code, Long userId) {
         TradeOrder order = requireOrder(orderId);
-        BizAssert.isTrue(isParty(order, userId), OrderErrorCode.NOT_ORDER_PARTY);
+        // 硬不变量：只有买家能核销。卖家是当事人但不能核销，故不能用 isParty 代替。
+        BizAssert.isTrue(userId.equals(order.getBuyerId()), OrderErrorCode.VERIFY_ONLY_BUYER);
         BizAssert.isTrue(order.getVerifyCode() != null && order.getVerifyCode().equals(code),
                 OrderErrorCode.VERIFY_CODE_INVALID);
 
@@ -594,19 +597,23 @@ public class OrderService {
         q.orderByDesc(TradeOrder::getCreateTime).orderByDesc(TradeOrder::getId);
 
         Page<TradeOrder> page = orderMapper.selectPage(new Page<>(pageNum, pageSize), q);
-        List<OrderVO> list = page.getRecords().stream().map(this::toVO).toList();
+        List<OrderVO> list = page.getRecords().stream().map(o -> toVO(o, userId)).toList();
         return PageResult.of(list, page.getTotal(), pageNum, pageSize);
     }
 
     public OrderVO detail(Long orderId, Long userId) {
         TradeOrder order = requireOrder(orderId);
         BizAssert.isTrue(isParty(order, userId), OrderErrorCode.ORDER_NOT_OWNER);
-        OrderVO vo = toVO(order);
+        OrderVO vo = toVO(order, userId);
         fillPartyAndMeetPoint(vo);
         return vo;
     }
 
-    private OrderVO toVO(TradeOrder o) {
+    /**
+     * 核销码只向卖家暴露：买家侧永远拿不到码，也就无法独自核销（配合 {@link #verify} 只允许买家调用，
+     * 形成「卖家持码、买家核销、任一方都做不完」的闭环）。viewer 为卖家时才回填 verifyCode。
+     */
+    private OrderVO toVO(TradeOrder o, Long viewerId) {
         OrderVO vo = new OrderVO();
         vo.setId(o.getId());
         vo.setOrderNo(o.getOrderNo());
@@ -617,7 +624,10 @@ public class OrderService {
         vo.setStatus(OrderStatusEnum.fromCode(o.getStatus()));
         vo.setMeetPointId(o.getMeetPointId());
         vo.setMeetTime(o.getMeetTime());
-        vo.setVerifyCode(o.getVerifyCode());
+        // 仅卖家可见核销码；买家侧留空，前端据此隐藏并只展示输入框
+        if (viewerId != null && viewerId.equals(o.getSellerId())) {
+            vo.setVerifyCode(o.getVerifyCode());
+        }
         vo.setVerifyTime(o.getVerifyTime());
         vo.setExpireTime(o.getExpireTime());
         vo.setPayTime(o.getPayTime());
