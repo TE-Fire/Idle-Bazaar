@@ -13,6 +13,7 @@
 import { computed, ref } from 'vue'
 import { MAIL_CODE_SCENE, userAuthApi } from '@/api/user'
 import { saveSession } from '@/utils/session'
+import { rememberRegisteredUser } from '@/utils/test-accounts'
 import { accountKind, MAIL_RE, PHONE_RE, useCodeSender } from '@/utils/verify-code'
 
 const phone = ref('')
@@ -88,6 +89,8 @@ async function submit(): Promise<void> {
       tokenValue: vo.tokenValue ?? '',
       authStatus: vo.authStatus
     })
+    // 顺手记进本机测试清单：注册完想切回新号看一眼，不必再手输手机号等验证码
+    rememberRegisteredUser(vo)
     uni.showToast({ title: '注册成功', icon: 'success' })
     setTimeout(() => uni.reLaunch({ url: '/pages/index/index' }), 800)
   } catch {

@@ -129,7 +129,7 @@ public class AdminAccountService {
 
         String code = sixDigitCode();
         stringRedisTemplate.opsForValue().set(MailRedisKeys.buildCodeKey(scene, email), code, CODE_TTL);
-        mailService.sendVerifyCode(email, code, scene.getDesc());
+        mailService.sendVerifyCode(email, code, scene);
     }
 
     /* ── 找回密码：两步 ────────────────────────────────────── */

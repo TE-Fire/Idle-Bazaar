@@ -68,6 +68,16 @@ pnpm dev:mp-weixin    # 产出 dist/dev/mp-weixin，用微信开发者工具打�
 **自己隐藏**（本地联调不想每次都输四位码）；答辩前把它改成 `true` 即可。
 `campus.mail.enabled=false` 同理：验证码不真发邮件，只打进后端日志，联调时从控制台取。
 
+## 用户端联调：测试账号面板
+
+dev 构建下，用户 Web 端与小程序 H5 的角落各有一个「测试账号」浮层
+（`components/DevLoginSwitcher.vue`，生产不挂载）。点条目即 `send-code → 取 devCode → login`
+自动登录，免手填验证码。
+
+面板分两组：**刚注册 · 本机** 与 **演示账号**。前者由注册页在成功后写入本机存储
+（key `campus-test-accounts`，Web 用 localStorage、小程序用 uni.storage，最多 8 条），
+条目右侧的 `×` 只删本机记录、不动数据库。所以注册完一个新号，立刻能在面板里切过去。
+
 ## 三条硬约定
 
 1. **业务代码禁止写死色值**，一律 `var(--cm-*)`；令牌改在 `packages/tokens/src/*.json`。

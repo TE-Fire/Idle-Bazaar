@@ -67,7 +67,7 @@ public class UserMailService {
         String code = sixDigitCode();
         stringRedisTemplate.opsForValue()
                 .set(UserRedisKeys.buildMailCodeKey(scene.name(), email), code, CODE_TTL);
-        mailService.sendVerifyCode(email, code, scene.getDesc());
+        mailService.sendVerifyCode(email, code, scene);
 
         VerifyCodeVO vo = new VerifyCodeVO();
         vo.setResendAfter((int) THROTTLE_TTL.toSeconds());

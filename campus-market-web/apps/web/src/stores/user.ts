@@ -87,9 +87,14 @@ export const useUserStore = defineStore('user', () => {
     applySession(await userAuthApi.login(account, type, credential))
   }
 
-  /** 注册：邮箱已验证，后端直接下发令牌，不必再输一次验证码 */
-  const register = async (req: UserRegisterReq): Promise<void> => {
-    applySession(await userAuthApi.register(req))
+  /**
+   * 注册：邮箱已验证，后端直接下发令牌，不必再输一次验证码。
+   * 返回 VO 而不是 void：注册页要拿它把新账号记进本机测试清单。
+   */
+  const register = async (req: UserRegisterReq): Promise<UserLoginVO> => {
+    const vo = await userAuthApi.register(req)
+    applySession(vo)
+    return vo
   }
 
   /**

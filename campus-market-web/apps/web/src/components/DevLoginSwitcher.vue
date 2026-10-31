@@ -11,18 +11,37 @@ import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi } from '@campus/api'
 import { useUserStore } from '@/stores/user'
-import { DEMO_USERS, authLabel, type DemoUser } from '@campus/shared'
+import { DEMO_USERS, authLabel, type TestAccount } from '@campus/shared'
+import { forgetTestAccount, listTestAccounts } from '@/utils/test-accounts'
 
 const session = useUserStore()
 const open = ref(false)
 const loadingPhone = ref('')
 const error = ref('')
 
+/** 刚注册的账号：打开面板时重读，注册后不必刷新页面就能看到 */
+const recent = ref<TestAccount[]>(listTestAccounts())
+
 const current = computed(() =>
   session.isLogin ? session.nickname || '已登录' : '未登录'
 )
 
-async function quickLogin(u: DemoUser): Promise<void> {
+function toggle(): void {
+  if (open.value) {
+    open.value = false
+    return
+  }
+  recent.value = listTestAccounts()
+  error.value = ''
+  open.value = true
+}
+
+function isCurrent(id: string): boolean {
+  return session.isLogin && session.userId === id
+}
+
+/** 两组的条目形态一致，只取昵称与手机号：演示账号与刚注册账号共用一条切换路径 */
+async function quickLogin(u: { nickname: string; phone: string }): Promise<void> {
   loadingPhone.value = u.phone
   error.value = ''
   try {
@@ -41,6 +60,11 @@ async function quickLogin(u: DemoUser): Promise<void> {
   }
 }
 
+function forget(id: string): void {
+  forgetTestAccount(id)
+  recent.value = listTestAccounts()
+}
+
 function logout(): void {
   void session.logout()
   open.value = false
@@ -49,7 +73,7 @@ function logout(): void {
 
 <template>
   <div class="dev-sw">
-    <button v-if="!open" type="button" class="dev-sw__fab" @click="open = true">
+    <button v-if="!open" type="button" class="dev-sw__fab" @click="toggle">
       <span class="dev-sw__dot" />
       测试账号 · {{ current }}
       <span class="dev-sw__caret">▴</span>
@@ -57,16 +81,41 @@ function logout(): void {
 
     <div v-else class="dev-sw__panel">
       <header class="dev-sw__head">
-        <span>切换登录账号（演示）</span>
+        <span>切换登录账号（测试）</span>
         <button type="button" class="dev-sw__close" @click="open = false">▾</button>
       </header>
 
       <ul class="dev-sw__list">
+        <template v-if="recent.length">
+          <li class="dev-sw__group">刚注册 · 本机</li>
+          <li v-for="u in recent" :key="u.id">
+            <button
+              type="button"
+              class="dev-sw__item"
+              :class="{ 'is-current': isCurrent(u.id) }"
+              :disabled="loadingPhone === u.phone"
+              @click="quickLogin(u)"
+            >
+              <span class="dev-sw__avatar">{{ u.nickname.slice(0, 1) }}</span>
+              <span class="dev-sw__meta">
+                <span class="dev-sw__name">
+                  {{ u.nickname }}
+                  <em class="dev-sw__new">新</em>
+                </span>
+                <span class="dev-sw__sub">{{ u.phone }} · 信用 {{ u.creditScore }}</span>
+              </span>
+              <span v-if="loadingPhone === u.phone" class="dev-sw__spin">登录中…</span>
+              <span v-else class="dev-sw__del" title="从清单移除" @click.stop="forget(u.id)">×</span>
+            </button>
+          </li>
+        </template>
+
+        <li class="dev-sw__group">演示账号</li>
         <li v-for="u in DEMO_USERS" :key="u.id">
           <button
             type="button"
             class="dev-sw__item"
-            :class="{ 'is-current': session.isLogin && session.userId === String(u.id) }"
+            :class="{ 'is-current': isCurrent(String(u.id)) }"
             :disabled="loadingPhone === u.phone"
             @click="quickLogin(u)"
           >
@@ -175,6 +224,15 @@ function logout(): void {
   overflow-y: auto;
 }
 
+/* 分组小标题：刚注册 与 演示账号 之间靠它分隔，不用分割线（两行之间已有留白） */
+.dev-sw__group {
+  padding: 8px 8px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: var(--cm-color-text-3);
+}
+
 .dev-sw__item {
   display: flex;
   align-items: center;
@@ -235,10 +293,41 @@ function logout(): void {
   border-radius: 4px;
 }
 
+/* 「新」标：品牌黄底深字，与封禁的红色区分开 */
+.dev-sw__new {
+  margin-left: 4px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-style: normal;
+  color: #1a1a1a;
+  background: var(--cm-color-brand);
+  border-radius: 4px;
+}
+
+.dev-sw__del {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  line-height: 18px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--cm-color-text-3);
+  border-radius: 50%;
+
+  &:hover {
+    color: #e54d42;
+    background: #fef0ef;
+  }
+}
+
 .dev-sw__sub {
   display: block;
   font-size: 11px;
   color: var(--cm-color-text-3);
+  /* 一行放不下就截断：手机号与信用分比这行字重要，别让它折成两行把条目撑高 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dev-sw__spin {

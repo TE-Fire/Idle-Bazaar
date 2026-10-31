@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<!--
+  验证码邮件模板（注册 / 找回密码 / 登录）
+
+  与站内主题同一套色：品牌黄 #FFD100、纸底 #FFF8DB、描边 #F2DFA0、正文 #1F1F26、次要 #5E5E68。
+  邮件客户端会剥掉 <style> 与 class，故全部内联；布局用 table，不用 flex（QQ 邮箱网页版与
+  Outlook 都不认）。占位符由 MailService 直接字符串替换，本文件也可当静态预览打开看效果。
+-->
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light" />
+  <title>校园二手交易平台 · 验证码</title>
+</head>
+<body style="margin:0;padding:0;background:#F4F5F6;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="background:#F4F5F6;padding:32px 12px;">
+  <tr>
+    <td align="center">
+
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"
+             style="width:600px;max-width:100%;background:#FFFFFF;border:1px solid #E8E8EC;border-radius:14px;overflow:hidden;font-family:-apple-system,'PingFang SC','Microsoft YaHei',Arial,sans-serif;">
+
+        <!-- 品牌顶条：整封邮件唯一的实色块，黄色是主色 -->
+        <tr>
+          <td height="6" style="height:6px;line-height:6px;font-size:0;background:#FFD100;">&nbsp;</td>
+        </tr>
+
+        <!-- 品牌行 -->
+        <tr>
+          <td style="padding:26px 32px 6px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="38" style="width:38px;">
+                  <div style="width:34px;height:34px;line-height:34px;text-align:center;background:#FFD100;border-radius:10px;color:#1F1F26;font-size:16px;font-weight:700;">校</div>
+                </td>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:15px;font-weight:700;color:#1F1F26;letter-spacing:0.5px;">校园二手交易平台</div>
+                  <div style="font-size:12px;color:#9A9AA4;margin-top:2px;">学生闲置 · 校园面交</div>
+                </td>
+                <td align="right" style="vertical-align:middle;font-size:12px;color:#9A9AA4;">{{desc}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- 标题与说明 -->
+        <tr>
+          <td style="padding:18px 32px 0 32px;">
+            <h1 style="margin:0;font-size:22px;line-height:32px;font-weight:700;color:#1F1F26;">{{desc}}验证码</h1>
+            <p style="margin:10px 0 0 0;font-size:14px;line-height:24px;color:#5E5E68;">
+              你好，你正在{{desc}}校园二手交易平台账号，请在页面中填入下方验证码完成校验。
+            </p>
+          </td>
+        </tr>
+
+        <!-- 验证码 -->
+        <tr>
+          <td style="padding:22px 32px 0 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="background:#FFF8DB;border:1px solid #F2DFA0;border-radius:12px;">
+              <tr>
+                <td align="center" style="padding:20px 12px 22px 12px;">
+                  <div style="font-size:12px;color:#9A9AA4;letter-spacing:2px;">验 证 码</div>
+                  <div style="margin-top:8px;font-size:34px;line-height:42px;font-weight:700;color:#1F1F26;letter-spacing:9px;font-family:Consolas,Menlo,'Courier New',monospace;">{{code}}</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- 有效期 -->
+        <tr>
+          <td style="padding:14px 32px 0 32px;">
+            <p style="margin:0;font-size:13px;line-height:22px;color:#9A9AA4;">
+              验证码 <strong style="color:#5E5E68;font-weight:600;">10 分钟内有效</strong>，仅限本次{{desc}}使用，连续输入错误 5 次将作废。
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:20px 32px 0 32px;">
+            <div style="height:1px;line-height:1px;font-size:0;background:#E8E8EC;">&nbsp;</div>
+          </td>
+        </tr>
+
+        <!-- 提示 -->
+        <tr>
+          <td style="padding:16px 32px 24px 32px;">
+            <p style="margin:0 0 6px 0;font-size:12px;line-height:20px;color:#9A9AA4;">{{tip}}</p>
+            <p style="margin:0;font-size:12px;line-height:20px;color:#9A9AA4;">
+              验证码请勿告知他人。此邮件由系统自动发送，请勿直接回复。
+            </p>
+          </td>
+        </tr>
+
+        <!-- 页脚 -->
+        <tr>
+          <td style="padding:14px 32px;background:#FFF8DB;border-top:1px solid #F2DFA0;font-size:12px;line-height:20px;color:#9A9AA4;">
+            校园二手交易平台 · 让闲置在校园里流动
+          </td>
+        </tr>
+
+      </table>
+
+      <p style="margin:14px 0 0 0;font-size:11px;line-height:18px;color:#9A9AA4;font-family:-apple-system,'PingFang SC','Microsoft YaHei',Arial,sans-serif;">
+        本邮件发送至 {{email}}　·　{{year}}
+      </p>
+
+    </td>
+  </tr>
+</table>
+</body>
+</html>

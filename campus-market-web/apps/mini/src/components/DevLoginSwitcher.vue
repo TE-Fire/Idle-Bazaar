@@ -10,7 +10,8 @@
 import { ref } from 'vue'
 import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi } from '@/api/user'
 import { saveSession, getSession, clearSession } from '@/utils/session'
-import { DEMO_USERS, authLabel, type DemoUser } from '@campus/shared'
+import { DEMO_USERS, authLabel, type TestAccount } from '@campus/shared'
+import { forgetTestAccount, listTestAccounts } from '@/utils/test-accounts'
 
 /** 浮层停靠侧：默认右下；首页右下有发布 FAB，传 left 错开 */
 const props = withDefaults(
@@ -21,8 +22,22 @@ const props = withDefaults(
 const open = ref(false)
 const loadingPhone = ref('')
 const current = ref(getSession().nickname || '')
+const currentId = ref(getSession().userId || '')
 
-async function quickLogin(u: DemoUser): Promise<void> {
+/** 刚注册的账号：打开面板时重读，注册完不必重启小程序就能看到 */
+const recent = ref<TestAccount[]>(listTestAccounts())
+
+function toggle(): void {
+  if (open.value) {
+    open.value = false
+    return
+  }
+  recent.value = listTestAccounts()
+  open.value = true
+}
+
+/** 两组的条目形态一致，只取昵称与手机号：演示账号与刚注册账号共用一条切换路径 */
+async function quickLogin(u: { id?: string; nickname: string; phone: string }): Promise<void> {
   loadingPhone.value = u.phone
   try {
     const sms = await userAuthApi.sendCode(u.phone, MAIL_CODE_SCENE.login)
@@ -39,6 +54,7 @@ async function quickLogin(u: DemoUser): Promise<void> {
       tokenValue: vo.tokenValue ?? ''
     })
     current.value = vo.nickname ?? ''
+    currentId.value = vo.userId ?? ''
     open.value = false
     uni.showToast({ title: `已切换为 ${u.nickname}`, icon: 'success' })
   } catch (e: any) {
@@ -48,9 +64,15 @@ async function quickLogin(u: DemoUser): Promise<void> {
   }
 }
 
+function forget(id: string): void {
+  forgetTestAccount(id)
+  recent.value = listTestAccounts()
+}
+
 function logout(): void {
   clearSession()
   current.value = ''
+  currentId.value = ''
   open.value = false
   uni.showToast({ title: '已退出', icon: 'none' })
 }
@@ -58,7 +80,7 @@ function logout(): void {
 
 <template>
   <view class="dev-sw" :class="{ 'dev-sw--left': position === 'left' }">
-    <view v-if="!open" class="dev-sw__fab" @click="open = true">
+    <view v-if="!open" class="dev-sw__fab" @click="toggle">
       <text class="dev-sw__dot" />
       <text>测试账号 · {{ current || '未登录' }}</text>
       <text class="dev-sw__caret">▲</text>
@@ -66,16 +88,39 @@ function logout(): void {
 
     <view v-else class="dev-sw__panel">
       <view class="dev-sw__head">
-        <text>切换登录账号（演示）</text>
+        <text>切换登录账号（测试）</text>
         <text class="dev-sw__close" @click="open = false">▼</text>
       </view>
 
       <scroll-view class="dev-sw__list" scroll-y>
+        <template v-if="recent.length">
+          <view class="dev-sw__group">刚注册 · 本机</view>
+          <view
+            v-for="u in recent"
+            :key="u.id"
+            class="dev-sw__item"
+            :class="{ 'is-current': currentId && currentId === u.id }"
+            @click="quickLogin(u)"
+          >
+            <text class="dev-sw__avatar">{{ u.nickname.slice(0, 1) }}</text>
+            <view class="dev-sw__meta">
+              <text class="dev-sw__name">
+                {{ u.nickname }}
+                <text class="dev-sw__new">新</text>
+              </text>
+              <text class="dev-sw__sub">{{ u.phone }} · 信用{{ u.creditScore }}</text>
+            </view>
+            <text v-if="loadingPhone === u.phone" class="dev-sw__spin">登录中…</text>
+            <text v-else class="dev-sw__del" @click.stop="forget(u.id)">×</text>
+          </view>
+        </template>
+
+        <view class="dev-sw__group">演示账号</view>
         <view
           v-for="u in DEMO_USERS"
           :key="u.id"
           class="dev-sw__item"
-          :class="{ 'is-current': current && current === u.nickname }"
+          :class="{ 'is-current': currentId && currentId === String(u.id) }"
           @click="quickLogin(u)"
         >
           <text class="dev-sw__avatar">{{ u.nickname.slice(0, 1) }}</text>
@@ -170,6 +215,14 @@ function logout(): void {
   padding: 8rpx;
 }
 
+/* 分组小标题：刚注册 与 演示账号 靠它分隔 */
+.dev-sw__group {
+  padding: 12rpx 16rpx 4rpx;
+  font-size: 18rpx;
+  font-weight: 600;
+  color: $cm-color-text-3;
+}
+
 .dev-sw__item {
   display: flex;
   align-items: center;
@@ -218,10 +271,32 @@ function logout(): void {
   border-radius: 6rpx;
 }
 
+/* 「新」标：品牌黄底深字，与封禁的红色区分开 */
+.dev-sw__new {
+  margin-left: 8rpx;
+  padding: 0 8rpx;
+  font-size: 18rpx;
+  color: #1a1a1a;
+  background: $cm-color-brand;
+  border-radius: 6rpx;
+}
+
+.dev-sw__del {
+  flex: none;
+  padding: 0 10rpx;
+  font-size: 30rpx;
+  line-height: 1;
+  color: $cm-color-text-3;
+}
+
 .dev-sw__sub {
   display: block;
   font-size: 20rpx;
   color: $cm-color-text-3;
+  /* 一行放不下就截断：别让它折成两行把条目撑高 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dev-sw__spin {

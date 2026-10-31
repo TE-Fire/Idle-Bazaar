@@ -15,8 +15,10 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { MAIL_CODE_SCENE } from '@campus/api'
+import type { UserLoginVO } from '@campus/api'
 import { useUserStore } from '@/stores/user'
 import { accountKind, MAIL_RE, PHONE_RE, useVerifyCode } from '@/composables/useVerifyCode'
+import { rememberRegisteredUser } from '@/utils/test-accounts'
 import AuthShell from '@/components/AuthShell.vue'
 
 const router = useRouter()
@@ -79,8 +81,9 @@ async function submit(): Promise<void> {
     ElMessage.warning({ message: '请检查填写的信息是否完整正确', duration: 2000 })
     return
   }
+  let vo: UserLoginVO
   try {
-    await session.register({
+    vo = await session.register({
       phone: phone.value.trim(),
       email: email.value.trim(),
       nickname: nickname.value.trim(),
@@ -91,6 +94,8 @@ async function submit(): Promise<void> {
     // http 层已按错误码提示（邮箱已注册 / 手机号已注册 / 验证码错误等）
     return
   }
+  // 顺手记进本机测试清单：注册完想切回新号看一眼，不必再手输手机号等验证码
+  rememberRegisteredUser(vo)
   ElMessage.success({ message: '注册成功，已自动登录', duration: 1800 })
   const redirect = router.currentRoute.value.query.redirect
   void router.push(typeof redirect === 'string' ? redirect : '/')
