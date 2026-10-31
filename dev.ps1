@@ -65,11 +65,13 @@ $Jar     = Join-Path $Backend 'campus-admin-api\target\campus-admin-api-1.0.0-SN
 
 $BackendPort = 8080
 
-# 前端三端：端口与包名。mini 是独立工程（不进 pnpm workspace），脚本名也不同。
+# 前端三端：端口、包名、启动超时。mini 是独立工程（不进 pnpm workspace），脚本名也不同。
+# Timeout 必须按端给：mini 的 uni-app H5 首次编译实测 126 秒（未压缩 + sourcemap + 按需编译），
+# web / admin 是 4～40 秒。统一用一个 60 秒会把「还在编译」误判成「启动失败」。
 $FrontApps = @{
-    web   = @{ Label = '学生端 Web';   Port = 5174; Filter = '@campus/web';   Dir = $Front }
-    admin = @{ Label = '管理后台';     Port = 5173; Filter = '@campus/admin'; Dir = $Front }
-    mini  = @{ Label = '小程序 H5';    Port = 5175; Filter = $null;           Dir = (Join-Path $Front 'apps\mini') }
+    web   = @{ Label = '学生端 Web';   Port = 5174; Filter = '@campus/web';   Dir = $Front;                      Timeout = 120 }
+    admin = @{ Label = '管理后台';     Port = 5173; Filter = '@campus/admin'; Dir = $Front;                      Timeout = 120 }
+    mini  = @{ Label = '小程序 H5';    Port = 5175; Filter = $null;           Dir = (Join-Path $Front 'apps\mini'); Timeout = 240 }
 }
 
 # 展开 all、过滤 none、去重（保序）：-App all,web 与 -App all 等价
@@ -238,10 +240,13 @@ function Start-FrontApp {
     Set-Content -Path (Join-Path $RunDir ($Key + '.pid')) -Value $proc.Id -Encoding ascii
     Write-Host ("  [start] {0} PID {1}，等 {2} 就绪…" -f $meta.Label, $proc.Id, $meta.Port) -ForegroundColor Gray
 
-    if (Wait-Port -Port $meta.Port -TimeoutSec 60 -Label $Key) {
+    if (Wait-Port -Port $meta.Port -TimeoutSec $meta.Timeout -Label $Key) {
         Write-Host ("  [ok] {0} http://localhost:{1}" -f $meta.Label, $meta.Port) -ForegroundColor Green
     } else {
-        Write-Host ("  [warn] 60 秒内未见 {0}，检查 {1}" -f $meta.Port, $err) -ForegroundColor Red
+        # 到这个分支不代表进程死了（mini 首编可能真超过 4 分钟），所以给出复查方式而不是判死
+        Write-Host ("  [warn] {0} 秒内未见 {1}：{2} 可能还在编译" -f $meta.Timeout, $meta.Port, $meta.Label) -ForegroundColor DarkYellow
+        Write-Host ("         复查 .\dev.ps1 status；仍在编译看 {0}" -f $out) -ForegroundColor DarkGray
+        Write-Host ("         报错看 {0}" -f $err) -ForegroundColor DarkGray
     }
 }
 
@@ -378,6 +383,7 @@ switch ($Action) {
         Write-Host '  .\dev.ps1 help                  本帮助'
         Write-Host ''
         Write-Host '日志：logs\dev\（控制台输出）、campus-market\backend\logs\campus-market.log（业务日志）' -ForegroundColor DarkGray
+        Write-Host '小程序 H5 首次编译约 2 分钟（uni-app 边编译边加载），脚本等它 240 秒，别按 60 秒判失败' -ForegroundColor DarkGray
         Write-Host ''
     }
 
