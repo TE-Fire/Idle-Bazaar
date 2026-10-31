@@ -50,6 +50,13 @@ campus:
     # 想演示真发信：复制本文件为 application-dev.yml（已 gitignore）后填 spring.mail.*。
     enabled: false
     from:
+  user:
+    # 学生端注册 / 找回 / 验证码登录的码：演示期无短信商、不发真邮件，
+    # 因此两个 echo 都开，验证码随响应回显。上线前在 prod 配置里关掉。
+    sms:
+      echo: true
+    mail:
+      echo: true
 
 logging:
   level:
