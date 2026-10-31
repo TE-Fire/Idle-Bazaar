@@ -1,7 +1,7 @@
 /**
  * 小程序端 Vite 配置
  *
- * <p>两个「为什么」：
+ * <p>三个「为什么」：
  * ① **vite 锁 5.2.8**——`@dcloudio/vite-plugin-uni` 的 peer 就是这个精确版本，
  *    而 admin / web 用 Vite 8。这就是小程序必须做独立工程（不进 pnpm workspace）的原因，
  *    否则 pnpm 会在同一棵依赖树里装两个 vite，构建链直接打架。
@@ -9,6 +9,11 @@
  *    不预构建的话小程序端编译时可能拿到未转译的 .ts。
  * ③ **h5 代理 /api 到 8080**——学生端与管理端同 jar，靠 /api 与 /admin 前缀分流；
  *    H5 预览走同源代理避免 CORS。微信小程序端不经过 vite devServer，无此问题。
+ *
+ * <p>**warmup 不是优化项而是正确性项**：uni-app h5 的页面是 `defineAsyncComponent`
+ * 懒加载，`__uniConfig.async.timeout` 为 60 秒；本机单页按需编译（SFC + Sass）常常
+ * 几十秒，点开一个没编译过的页面若超过 60 秒就渲染「连接服务器超时，点击屏幕重试」，
+ * 页面组件根本没 mount，一条 API 请求都不会发。启动时把页面全部预热掉，就不会再出现。
  */
 
 import { fileURLToPath, URL } from 'node:url'
@@ -36,6 +41,10 @@ export default defineConfig({
     port: 5175,
     proxy: {
       '/api': { target: 'http://localhost:8080', changeOrigin: true }
+    },
+    // 启动即编译全部页面：页面组件有 60 秒加载上限，点开才编译很容易超时
+    warmup: {
+      clientFiles: ['./src/main.ts', './src/App.vue', './src/pages/**/*.vue', './src/components/*.vue']
     }
   },
   optimizeDeps: {
