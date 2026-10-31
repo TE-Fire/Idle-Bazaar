@@ -77,8 +77,18 @@ function reload(): void {
   void fetchPage(true)
 }
 
+/** 未登录提示并去登录页，登录后回落到广场；返回 true 表示已拦下 */
+function needLogin(): boolean {
+  if (getSession().tokenValue) return false
+  // 不要自己 encodeURIComponent：navigateTo 会再编一次，redirect 变成 %252F 解码不回来
+  void uni.navigateTo({ url: '/pages/login/index?redirect=/pages/moments/index' })
+  return true
+}
+
 function switchScope(next: MomentScope): void {
   if (scope.value === next) return
+  // 关注流是「我关注的人」，没登录无从谈起，先拦住再切
+  if (next === 'following' && needLogin()) return
   scope.value = next
   list.value = []
   pageNum.value = 1
@@ -89,6 +99,7 @@ function switchScope(next: MomentScope): void {
 
 /** 点赞 / 取消：乐观翻转，失败按原值回滚 */
 async function toggleLike(m: MomentVO): Promise<void> {
+  if (needLogin()) return
   if (likePend.value === m.id) return
   likePend.value = m.id
   const wasLiked = m.liked
@@ -113,6 +124,7 @@ async function toggleLike(m: MomentVO): Promise<void> {
 /* ── 发布面板 ─────────────────────────────────────────── */
 
 function openComposer(): void {
+  if (needLogin()) return
   composerOpen.value = true
 }
 
@@ -179,10 +191,8 @@ async function submit(): Promise<void> {
 }
 
 onShow(() => {
-  if (!getSession().tokenValue) {
-    void uni.navigateTo({ url: '/pages/login/index?redirect=moments' })
-    return
-  }
+  // 广场不拦登录：未登录照样能翻，点赞/发布/关注流再引导登录
+  if (!getSession().tokenValue) scope.value = 'square'
   reload()
 })
 

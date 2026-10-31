@@ -29,7 +29,9 @@ function goLogin(): void {
   clearSession()
   const pages = getCurrentPages()
   const current = pages[pages.length - 1]
-  const redirect = current ? `?redirect=${encodeURIComponent(current.route || '')}` : ''
+  // route 不带前导斜杠；redirectTo 只认绝对路径，这里补齐。别再 encodeURIComponent，
+  // navigateTo 自己会编一次，编两次会变成 %252F 解不回来。
+  const redirect = current && current.route ? `?redirect=/${current.route}` : ''
   uni.reLaunch({ url: `/pages/login/index${redirect}` })
 }
 

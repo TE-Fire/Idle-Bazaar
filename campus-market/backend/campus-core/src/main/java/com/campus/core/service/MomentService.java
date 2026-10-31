@@ -88,8 +88,10 @@ public class MomentService {
     /**
      * 加载公共视图时用的假 viewer：`liked` 恒为 false，命中后由 {@link #patchLiked} 按
      * 当前用户补。不能传真实 userId —— 第一个访问者的点赞态会被烤进共享缓存。
+     *
+     * <p>也用于未登录访问广场：{@link #patchLiked} 对非正数直接返回，不会去查点赞表。
      */
-    private static final long ANON_VIEWER = 0L;
+    public static final long ANON_VIEWER = 0L;
 
     private final UserMomentMapper momentMapper;
     private final MomentLikeMapper likeMapper;

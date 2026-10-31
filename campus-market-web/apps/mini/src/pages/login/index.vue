@@ -10,7 +10,7 @@ import { ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userAuthApi } from '@/api/user'
 import { saveSession } from '@/utils/session'
-import { goTab } from '@/utils/tab-nav'
+import { goTab, TAB_URL } from '@/utils/tab-nav'
 import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
 
 /** dev 构建才挂载测试账号切换器 */
@@ -88,7 +88,9 @@ async function submit(): Promise<void> {
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
       if (redirect.value) {
-        uni.redirectTo({ url: redirect.value })
+        // redirectTo 指向 tab 页会静默失败并停在本页，tab 页必须用 reLaunch
+        const isTab = Object.values<string>(TAB_URL).includes(redirect.value)
+        void (isTab ? uni.reLaunch({ url: redirect.value }) : uni.redirectTo({ url: redirect.value }))
       } else {
         goTab('home')
       }

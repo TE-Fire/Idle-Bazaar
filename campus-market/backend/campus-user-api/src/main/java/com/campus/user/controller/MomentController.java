@@ -39,11 +39,14 @@ public class MomentController {
         return Result.ok(momentService.publish(UserContext.getUserId(), req));
     }
 
-    @Operation(summary = "广场流", description = "全站正常动态，时间倒序")
+    @Operation(summary = "广场流", description = "全站正常动态，时间倒序；未登录可看，liked 恒为 false")
     @GetMapping("/square")
     public Result<MomentPageVO> square(@RequestParam(defaultValue = "1") int pageNum,
                                        @RequestParam(defaultValue = "10") int pageSize) {
-        return Result.ok(momentService.square(UserContext.getUserId(), pageNum, pageSize));
+        // 广场是引流页，未登录也给看；点赞态按匿名视角（liked 全 false）算
+        Long viewerId = UserContext.getUserIdOrNull();
+        return Result.ok(momentService.square(
+                viewerId == null ? MomentService.ANON_VIEWER : viewerId, pageNum, pageSize));
     }
 
     @Operation(summary = "关注流", description = "只看已关注作者的正常动态，时间倒序")
