@@ -41,6 +41,35 @@ const review = ref<OrderReviewVO | null>(null)
 const role = computed<OrderRole>(() => (route.query.role === 'seller' ? 'seller' : 'buyer'))
 const isBuyer = computed(() => role.value === 'buyer')
 
+/**
+ * 交易对方（与当前视角相对的另一方）：买家视角的对方是卖家，卖家视角是买家。
+ * 头像优先用后端下发的真实 URL，缺失时按 id 派生 demo 占位图，避免裂图。
+ */
+const peer = computed(() => {
+  const o = order.value
+  if (!o) return { id: '', nick: '', avatar: '', role: '' }
+  const id = isBuyer.value ? o.sellerId : o.buyerId
+  const nick = isBuyer.value ? o.sellerNick || '卖家' : o.buyerNick || '买家'
+  const avatar = isBuyer.value ? o.sellerAvatar : o.buyerAvatar
+  return { id, nick, avatar: avatar || '', role: isBuyer.value ? '卖家' : '买家' }
+})
+const peerAvatarUrl = computed(() =>
+  peer.value.avatar || (peer.value.id ? `/api/file/demo/avatar/${peer.value.id}.png` : '')
+)
+
+/** 找对方聊一聊：带商品与对方身份参数，让聊天页直接开起对应会话（首条消息才建会话） */
+const chatTo = computed(() => ({
+  name: 'chat' as const,
+  query: {
+    itemId: order.value?.itemId,
+    peerId: isBuyer.value ? order.value?.sellerId : order.value?.buyerId,
+    itemTitle: order.value?.itemTitle || undefined,
+    itemImage: order.value?.itemMainImage || undefined,
+    itemPrice: order.value?.itemPrice || undefined,
+    peerNick: peer.value.nick || undefined
+  }
+}))
+
 const STATUS_TEXT: Record<UserOrderStatus, string> = {
   WAIT_PAY: '等待买家付款',
   WAIT_MEET: '已付款，等待面交核销',
@@ -301,6 +330,23 @@ onMounted(load)
             <p class="tip">快照是纠纷取证依据：卖家事后改价改描述，不影响这里的记录。</p>
           </section>
 
+          <!-- 交易对方：与当前视角相对的另一方，头像 + 昵称 -->
+          <section class="card">
+            <h2 class="card__h">交易对方</h2>
+            <div class="party">
+              <img v-if="peerAvatarUrl" class="party__ava" :src="peerAvatarUrl" :alt="peer.nick" />
+              <span v-else class="party__ava party__ava--empty" />
+              <div class="party__meta">
+                <p class="party__nick">{{ peer.nick }}</p>
+                <p class="party__role">
+                  <span class="party__tag">{{ peer.role }}</span>
+                  <span class="party__id">ID {{ peer.id }}</span>
+                </p>
+              </div>
+            </div>
+            <p class="tip">面交现场请核对对方身份，确认无误再出示核销码。</p>
+          </section>
+
           <!-- 核销码 -->
           <section v-if="order.status === 'WAIT_MEET' || order.status === 'VERIFIED'" class="card">
             <h2 class="card__h">面交核销码</h2>
@@ -336,6 +382,14 @@ onMounted(load)
               <div class="info__row"><dt>下单时间</dt><dd>{{ formatTime(order.createTime) }}</dd></div>
               <div v-if="order.payTime" class="info__row"><dt>付款时间</dt><dd>{{ formatTime(order.payTime) }}</dd></div>
               <div v-if="order.meetTime" class="info__row"><dt>约定面交</dt><dd>{{ formatTime(order.meetTime) }}</dd></div>
+              <div v-if="order.meetPointName" class="info__row">
+                <dt>面交点</dt>
+                <dd>
+                  {{ order.meetPointName }}
+                  <template v-if="order.meetPointCampus">（{{ order.meetPointCampus }}）</template>
+                </dd>
+              </div>
+              <div v-else-if="order.meetPointId" class="info__row"><dt>面交点</dt><dd>面交点 #{{ order.meetPointId }}</dd></div>
               <div v-if="order.verifyTime" class="info__row"><dt>核销时间</dt><dd>{{ formatTime(order.verifyTime) }}</dd></div>
               <div v-if="order.expireTime && order.status === 'WAIT_PAY'" class="info__row">
                 <dt>付款截止</dt><dd>{{ formatTime(order.expireTime) }}</dd>
@@ -403,7 +457,7 @@ onMounted(load)
             </template>
           </section>
 
-          <RouterLink :to="{ name: 'chat' }" class="card card--link">找对方聊一聊 →</RouterLink>
+          <RouterLink :to="chatTo" class="card card--link">找对方聊一聊 →</RouterLink>
 
           <!-- 互评：只有已完成的单才有这一块（notes/13 O18） -->
           <section v-if="order.status === 'COMPLETED'" class="card card--review">
@@ -754,6 +808,59 @@ onMounted(load)
   &:hover {
     color: var(--cm-color-text-1);
   }
+}
+
+/* ── 交易对方 ─────────────────────────────────────────── */
+
+.party {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-3);
+}
+
+.party__ava {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--cm-color-bg);
+
+  &--empty {
+    background: var(--cm-color-border);
+  }
+}
+
+.party__meta {
+  min-width: 0;
+}
+
+.party__nick {
+  margin: 0 0 4px;
+  font-size: var(--cm-font-size-md);
+  font-weight: 600;
+  color: var(--cm-color-text-1);
+}
+
+.party__role {
+  display: flex;
+  align-items: center;
+  gap: var(--cm-space-2);
+  margin: 0;
+}
+
+.party__tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 8px;
+  color: #fff;
+  background: var(--cm-color-brand);
+  border-radius: var(--cm-radius-pill);
+}
+
+.party__id {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
 }
 
 /* ── 交易评价 ─────────────────────────────────────────── */

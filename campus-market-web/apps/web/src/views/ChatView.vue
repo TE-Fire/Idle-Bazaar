@@ -43,7 +43,7 @@ onMounted(async () => {
       await openConversation(hit)
     } else {
       // 没有会话记录也进得去：首条消息发出时才建会话，这里给个空对话壳；
-      // 商品摘要取自 query（详情页带上来的），顶部卡片才能显示
+      // 商品摘要与对方昵称取自 query（详情页带上来的），顶部卡片与标题才能显示
       selected.value = {
         itemId,
         peerUserId: peerId,
@@ -51,7 +51,7 @@ onMounted(async () => {
         itemMainImage: (route.query.itemImage as string | undefined) || undefined,
         price: (route.query.itemPrice as string | undefined) || undefined,
         status: (route.query.itemStatus as ChatConversationVO['status']) || undefined,
-        peerNick: '',
+        peerNick: (route.query.peerNick as string | undefined) || '',
         lastContent: '',
         unread: 0
       }

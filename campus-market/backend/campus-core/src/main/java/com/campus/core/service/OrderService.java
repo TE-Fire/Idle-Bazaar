@@ -9,6 +9,9 @@ import com.campus.common.exception.CommonErrorCode;
 import com.campus.common.result.PageResult;
 import com.campus.core.dto.resp.OrderVO;
 import com.campus.core.entity.Appeal;
+import com.campus.core.entity.AppUser;
+import com.campus.core.entity.DictCampus;
+import com.campus.core.entity.DictMeetPoint;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.TradeOrder;
 import com.campus.core.enums.AppealBizTypeEnum;
@@ -18,6 +21,9 @@ import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.errcode.OrderErrorCode;
 import com.campus.core.mapper.AppealMapper;
+import com.campus.core.mapper.AppUserMapper;
+import com.campus.core.mapper.DictCampusMapper;
+import com.campus.core.mapper.DictMeetPointMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.TradeOrderMapper;
 import com.campus.core.redis.ItemRedisKeys;
@@ -112,6 +118,13 @@ public class OrderService {
     private final ItemMapper itemMapper;
 
     private final AppealMapper appealMapper;
+
+    /** 订单详情补交易对方昵称 / 头像、面交点名称与校区时用 */
+    private final AppUserMapper appUserMapper;
+
+    private final DictMeetPointMapper meetPointMapper;
+
+    private final DictCampusMapper campusMapper;
 
     private final CategoryAvgPriceCache categoryAvgPriceCache;
 
@@ -588,7 +601,9 @@ public class OrderService {
     public OrderVO detail(Long orderId, Long userId) {
         TradeOrder order = requireOrder(orderId);
         BizAssert.isTrue(isParty(order, userId), OrderErrorCode.ORDER_NOT_OWNER);
-        return toVO(order);
+        OrderVO vo = toVO(order);
+        fillPartyAndMeetPoint(vo);
+        return vo;
     }
 
     private OrderVO toVO(TradeOrder o) {
@@ -614,6 +629,38 @@ public class OrderService {
         vo.setItemMainImage(o.getItemMainImage());
         vo.setCreateTime(o.getCreateTime());
         return vo;
+    }
+
+    /**
+     * 详情页专属的冗余字段：交易对方的昵称 / 头像、面交点名称与校区。
+     *
+     * <p>故意只挂在 {@link #detail} 上、不进 {@link #mine}（列表）：列表一页多条，
+     * 逐单查用户与面交点会变成 N+1，而列表本就用商品快照展示，不需要对方信息。
+     * 头像为空时前端会按 id 派生占位图，所以这里只负责把库里真实值透传出来。
+     */
+    private void fillPartyAndMeetPoint(OrderVO vo) {
+        AppUser seller = appUserMapper.selectById(vo.getSellerId());
+        if (seller != null) {
+            vo.setSellerNick(seller.getNickname());
+            vo.setSellerAvatar(seller.getAvatarUrl());
+        }
+        AppUser buyer = appUserMapper.selectById(vo.getBuyerId());
+        if (buyer != null) {
+            vo.setBuyerNick(buyer.getNickname());
+            vo.setBuyerAvatar(buyer.getAvatarUrl());
+        }
+        if (vo.getMeetPointId() != null) {
+            DictMeetPoint mp = meetPointMapper.selectById(vo.getMeetPointId());
+            if (mp != null) {
+                vo.setMeetPointName(mp.getName());
+                if (mp.getCampusId() != null) {
+                    DictCampus campus = campusMapper.selectById(mp.getCampusId());
+                    if (campus != null) {
+                        vo.setMeetPointCampus(campus.getName());
+                    }
+                }
+            }
+        }
     }
 
     /* ══ 七、内部工具 ═════════════════════════════════════════ */

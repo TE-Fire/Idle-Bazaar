@@ -37,10 +37,22 @@ export interface UserOrderVO {
   itemId: string
   buyerId: string
   sellerId: string
+  /** 买家昵称（详情页展示交易对方用，可能为空） */
+  buyerNick?: string
+  /** 买家头像 URL，空时前端按 buyerId 派生 */
+  buyerAvatar?: string
+  /** 卖家昵称 */
+  sellerNick?: string
+  /** 卖家头像 URL */
+  sellerAvatar?: string
   /** 2 位小数字符串 */
   amount: string
   status: UserOrderStatus
   meetPointId?: string
+  /** 面交点名称，如「一食堂门口」 */
+  meetPointName?: string
+  /** 面交点所属校区名，如「主校区」 */
+  meetPointCampus?: string
   /** 约定面交时间 */
   meetTime?: string
   /** 核销码：一单一码，买卖任一方出示或输入即成立 */

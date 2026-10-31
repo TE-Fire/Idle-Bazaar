@@ -31,12 +31,30 @@ public class OrderVO {
 
     private Long sellerId;
 
+    /** 买家昵称（详情页展示交易对方用） */
+    private String buyerNick;
+
+    /** 买家头像（绝对或相对 URL，空时前端按 buyerId 派生） */
+    private String buyerAvatar;
+
+    /** 卖家昵称 */
+    private String sellerNick;
+
+    /** 卖家头像 */
+    private String sellerAvatar;
+
     private BigDecimal amount;
 
     /** 输出枚举名，前端不必维护 1–8 的映射 */
     private OrderStatusEnum status;
 
     private Long meetPointId;
+
+    /** 面交点名称（约定面交地点，如「一食堂门口」） */
+    private String meetPointName;
+
+    /** 面交点所属校区名（如「主校区」），从 dict_campus 冗余取出省二次查询 */
+    private String meetPointCampus;
 
     private LocalDateTime meetTime;
 
