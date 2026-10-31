@@ -1,63 +1,65 @@
 <script setup lang="ts">
 /**
- * 登录（手机号 + 短信验证码）
+ * 登录（验证码登录 / 密码登录）
  *
  * <p>为什么单独一页、不走 MainLayout：闲鱼的登录是**全屏独立页**，没有导航干扰。
  * 路由挂在顶层（`/login`），不走 MainLayout 那条 children，天然没有顶栏与悬浮工具栏。
  *
- * <p>只有短信一种方式：学生端口径就是手机号 + 验证码（`app_user` 没有密码体系），
- * 不做密码 tab。演示期验证码随发码响应回显，上线前关掉 `campus.user.sms.echo`
- * 后只进日志。登录成功按 redirect 回跳，没有则回首页。
+ * <p>两种方式：验证码登录（手机号走短信 / QQ 邮箱走邮件）、密码登录。密码只对新注册
+ * 用户存在——老账号没设过密码，走「找回密码」设一个即可，所以密码登录失败时
+ * 错误提示要能指向那条路（4038 的文案已写清楚）。
+ *
+ * <p>演示期验证码随发码响应回显，上线前关掉 `campus.user.*.echo` 后只进日志。
+ * 登录成功按 redirect 回跳，没有则回首页。
  */
 
-import { computed, onBeforeUnmount, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userAuthApi } from '@campus/api'
+import { MAIL_CODE_SCENE, USER_LOGIN_TYPE } from '@campus/api'
 import { useUserStore } from '@/stores/user'
+import { accountKind, useVerifyCode } from '@/composables/useVerifyCode'
 
+const route = useRoute()
 const router = useRouter()
 const session = useUserStore()
 
-const phone = ref('')
+/** 方式：1 验证码 2 密码，值与后端约定一致 */
+const mode = ref<number>(USER_LOGIN_TYPE.code)
+
+/** 从「找回密码」跳过来时带 ?account=，预填省一次输入 */
+const account = ref(typeof route.query.account === 'string' ? route.query.account : '')
 const code = ref('')
+const password = ref('')
 const agreed = ref(false)
 
-/** 获取验证码后的 60s 冷却：倒计时期间按钮不可点，避免误以为"没点上"而狂点 */
-const cooldown = ref(0)
-let timer: ReturnType<typeof setInterval> | null = null
+const { cooldown, counting, send: sendCode } = useVerifyCode(MAIL_CODE_SCENE.login)
 
-const PHONE_RE = /^1[3-9]\d{9}$/
+const kind = computed(() => accountKind(account.value))
 
-const canGetCode = computed(() => PHONE_RE.test(phone.value) && cooldown.value === 0)
+const canGetCode = computed(() => Boolean(kind.value) && !counting.value)
 
-const canSubmit = computed(
-  () => agreed.value && PHONE_RE.test(phone.value) && /^\d{6}$/.test(code.value)
-)
+const canSubmit = computed(() => {
+  if (!agreed.value || !kind.value) return false
+  return mode.value === USER_LOGIN_TYPE.code
+    ? /^\d{6}$/.test(code.value)
+    : password.value.length >= 8
+})
 
-async function sendCode(): Promise<void> {
-  if (!canGetCode.value) {
-    ElMessage.warning({ message: '请填写正确的手机号', duration: 2000 })
+/** 切换方式时清掉上一种方式的凭证，避免「验证码框里的值被当密码提交」这类串台 */
+function switchMode(next: number): void {
+  if (mode.value === next) return
+  mode.value = next
+  code.value = ''
+  password.value = ''
+}
+
+function onSend(): void {
+  if (!kind.value) {
+    ElMessage.warning({ message: '请输入手机号或 QQ 邮箱', duration: 2000 })
     return
   }
-  try {
-    const vo = await userAuthApi.sendCode(phone.value)
-    // 演示期回显：没有短信商，验证码在响应里；开关关闭后 devCode 为 null
-    ElMessage.success({
-      message: vo.devCode ? `演示验证码：${vo.devCode}` : '验证码已发送',
-      duration: 4000
-    })
-    cooldown.value = vo.resendAfter || 60
-    timer = setInterval(() => {
-      cooldown.value -= 1
-      if (cooldown.value <= 0 && timer) {
-        clearInterval(timer)
-        timer = null
-      }
-    }, 1000)
-  } catch {
-    // http 层已提示（节流 4016 等）；冷却不启动，用户可立即重试
-  }
+  void sendCode(account.value)
 }
 
 async function submit(): Promise<void> {
@@ -66,19 +68,21 @@ async function submit(): Promise<void> {
     return
   }
   if (!canSubmit.value) {
-    ElMessage.warning({ message: '请填写手机号与 6 位验证码', duration: 2000 })
+    ElMessage.warning({
+      message:
+        mode.value === USER_LOGIN_TYPE.code
+          ? '请填写账号与 6 位验证码'
+          : '请填写账号与至少 8 位的密码',
+      duration: 2000
+    })
     return
   }
-  await session.login(phone.value, code.value)
+  const credential = mode.value === USER_LOGIN_TYPE.code ? code.value : password.value
+  await session.login(account.value.trim(), mode.value as 1 | 2, credential)
   ElMessage.success({ message: '登录成功', duration: 1500 })
   const redirect = router.currentRoute.value.query.redirect
   void router.push(typeof redirect === 'string' ? redirect : '/')
 }
-
-/** 组件卸载时清掉定时器，否则倒计时挂在 window 上继续跑 */
-onBeforeUnmount(() => {
-  if (timer) clearInterval(timer)
-})
 </script>
 
 <template>
@@ -90,26 +94,74 @@ onBeforeUnmount(() => {
       <div class="login__cols">
         <!-- ── 左：表单 ────────────────────────────── -->
         <section class="form" @keyup.enter="submit">
-          <label class="field">
-            <span class="field__pre">+86</span>
-            <input v-model="phone" class="field__input" maxlength="11" placeholder="请输入手机号" />
+          <div class="tabs">
+            <button
+              type="button"
+              class="tab"
+              :class="{ 'tab--on': mode === 1 }"
+              @click="switchMode(1)"
+            >
+              验证码登录
+            </button>
+            <button
+              type="button"
+              class="tab"
+              :class="{ 'tab--on': mode === 2 }"
+              @click="switchMode(2)"
+            >
+              密码登录
+            </button>
+          </div>
+
+          <label class="cm-auth-field">
+            <span class="cm-auth-field__key">账号</span>
+            <input
+              v-model="account"
+              class="cm-auth-field__input"
+              maxlength="64"
+              placeholder="手机号或 QQ 邮箱"
+              autocomplete="username"
+            />
           </label>
 
-          <label class="field">
-            <input v-model="code" class="field__input" maxlength="6" placeholder="6 位验证码" />
-            <button type="button" class="field__act" :disabled="!canGetCode" @click="sendCode">
-              {{ cooldown > 0 ? `${cooldown}s 后重发` : '获取验证码' }}
+          <label v-if="mode === 1" class="cm-auth-field">
+            <span class="cm-auth-field__key">验证码</span>
+            <input
+              v-model="code"
+              class="cm-auth-field__input"
+              maxlength="6"
+              inputmode="numeric"
+              placeholder="6 位数字"
+            />
+            <button type="button" class="cm-auth-field__act" :disabled="!canGetCode" @click="onSend">
+              {{ counting ? `${cooldown}s 后重发` : '获取验证码' }}
             </button>
           </label>
 
-          <button type="button" class="submit" :disabled="!canSubmit" @click="submit">登录</button>
+          <label v-else class="cm-auth-field">
+            <span class="cm-auth-field__key">密码</span>
+            <input
+              v-model="password"
+              class="cm-auth-field__input"
+              type="password"
+              maxlength="32"
+              placeholder="8–32 位，不含空格"
+              autocomplete="current-password"
+            />
+          </label>
 
-          <label class="agree">
+          <button type="button" class="cm-auth-submit" :disabled="!canSubmit" @click="submit">登录</button>
+
+          <label class="cm-auth-agree">
             <input v-model="agreed" type="checkbox" />
             <span>已阅读并同意<a href="javascript:void(0)">《用户协议》</a>与<a href="javascript:void(0)">《隐私政策》</a></span>
           </label>
 
-          <div class="links">
+          <div class="cm-auth-links">
+            <RouterLink :to="{ name: 'register' }">注册账号</RouterLink>
+            <span class="cm-auth-links__sep">·</span>
+            <RouterLink :to="{ name: 'forgot' }">忘记密码</RouterLink>
+            <span class="cm-auth-links__sep">·</span>
             <RouterLink :to="{ name: 'home' }">先去逛逛</RouterLink>
           </div>
         </section>
@@ -123,7 +175,7 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <p class="foot">校园二手交易平台 · 演示环境（验证码为演示回显，非真实短信）</p>
+    <p class="foot">校园二手交易平台 · 演示环境（验证码为演示回显，非真实短信/邮件）</p>
   </div>
 </template>
 
@@ -183,109 +235,31 @@ onBeforeUnmount(() => {
   min-width: 0;
 }
 
-/* 灰填充输入框：闲鱼不用描边输入框，填充色本身界定边界 */
-.field {
+/* 方式切换：下划线式 tab，不与输入框抢视觉重量 */
+.tabs {
   display: flex;
-  align-items: center;
-  height: 46px;
-  padding: 0 var(--cm-space-3);
-  margin-bottom: var(--cm-space-3);
-  background: var(--cm-color-bg);
-  border-radius: var(--cm-radius-lg);
+  gap: var(--cm-space-6);
+  margin-bottom: var(--cm-space-4);
 }
 
-.field__pre {
-  padding-right: var(--cm-space-3);
-  margin-right: var(--cm-space-2);
-  border-right: 1px solid var(--cm-color-border-strong);
-  font-size: var(--cm-font-size-base);
-  color: var(--cm-color-text-2);
-}
-
-.field__input {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--cm-font-size-base);
-  color: var(--cm-color-text-1);
-  background: none;
-  border: none;
-  outline: none;
-
-  &::placeholder {
-    color: var(--cm-color-text-3);
-  }
-}
-
-.field__act {
-  flex: none;
-  font-size: var(--cm-font-size-sm);
-  font-weight: 600;
-  color: var(--cm-color-text-2);
-  background: none;
-  border: none;
-  cursor: pointer;
-
-  &:hover:not(:disabled) {
-    color: var(--cm-color-text-1);
-  }
-
-  &:disabled {
-    color: var(--cm-color-text-3);
-    cursor: not-allowed;
-  }
-}
-
-.submit {
-  width: 100%;
-  height: 44px;
-  margin-top: var(--cm-space-2);
+.tab {
+  padding: 0 0 var(--cm-space-2);
   font-size: var(--cm-font-size-md);
-  font-weight: 700;
-  color: var(--cm-color-text-1);
-  background: var(--cm-color-brand);
+  font-weight: 600;
+  color: var(--cm-color-text-3);
+  background: none;
   border: none;
-  border-radius: var(--cm-radius-pill);
+  border-bottom: 2px solid transparent;
   cursor: pointer;
 
-  &:hover:not(:disabled) {
-    background: var(--cm-color-brand-dark);
-  }
-
-  &:disabled {
-    background: var(--cm-color-brand-bg);
-    color: var(--cm-color-text-3);
-    cursor: not-allowed;
-  }
-}
-
-.agree {
-  display: flex;
-  align-items: center;
-  gap: var(--cm-space-2);
-  margin-top: var(--cm-space-4);
-  font-size: var(--cm-font-size-xs);
-  color: var(--cm-color-text-3);
-
-  input {
-    accent-color: var(--cm-color-brand);
-  }
-
-  a {
+  &:hover {
     color: var(--cm-color-text-2);
   }
 }
 
-.links {
-  display: flex;
-  align-items: center;
-  gap: var(--cm-space-2);
-  margin-top: var(--cm-space-4);
-  font-size: var(--cm-font-size-xs);
-  color: var(--cm-color-text-3);
-
-  a:hover {
-    color: var(--cm-color-text-1);
-  }
+.tab--on {
+  color: var(--cm-color-text-1);
+  border-bottom-color: var(--cm-color-brand);
 }
 
 /* ── 右：扫码区 ───────────────────────────────────────── */

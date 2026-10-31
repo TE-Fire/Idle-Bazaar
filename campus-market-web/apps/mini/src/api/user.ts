@@ -7,7 +7,7 @@
 
 import { request } from '../utils/request'
 
-/* ── 登录 ─────────────────────────────────────────────── */
+/* ── 登录 / 注册 / 找回密码 ─────────────────────────────── */
 
 export interface UserLoginVO {
   userId: string
@@ -15,8 +15,60 @@ export interface UserLoginVO {
   avatarUrl?: string
   authStatus?: number
   creditScore?: number
+  /** 本人可见的账号信息 */
+  phone?: string
+  email?: string
+  hasPassword?: boolean
   tokenName?: string
   tokenValue?: string
+}
+
+/** 验证码下发响应 */
+export interface VerifyCodeVO {
+  resendAfter: number
+  /** 1 短信 2 QQ 邮箱 */
+  channel: number
+  devCode?: string
+}
+
+/** 验证码渠道，与后端 CODE_CHANNEL 同源 */
+export const CODE_CHANNEL = {
+  sms: 1,
+  mail: 2
+} as const
+
+/** 验证码场景，与后端 MailCodeSceneEnum 的 code 一一对应 */
+export const MAIL_CODE_SCENE = {
+  register: 1,
+  reset: 2,
+  login: 3
+} as const
+
+export type MailCodeScene = (typeof MAIL_CODE_SCENE)[keyof typeof MAIL_CODE_SCENE]
+
+/** 登录方式：1 验证码 2 密码 */
+export const USER_LOGIN_TYPE = {
+  code: 1,
+  password: 2
+} as const
+
+export type UserLoginType = (typeof USER_LOGIN_TYPE)[keyof typeof USER_LOGIN_TYPE]
+
+export interface UserRegisterReq {
+  phone: string
+  /** 只接受 QQ 邮箱（@qq.com / @foxmail.com） */
+  email: string
+  nickname: string
+  /** 8–32 位且不含空格 */
+  password: string
+  mailCode: string
+}
+
+export interface UserResetPasswordReq {
+  /** 手机号或 QQ 邮箱，决定用哪个渠道的验证码 */
+  account: string
+  code: string
+  password: string
 }
 
 /** 资料编辑请求：两个字段都可选，至少传一个；字段不传 = 不修改 */
@@ -26,19 +78,36 @@ export interface UserProfileUpdateReq {
 }
 
 export const userAuthApi = {
-  /** 演示期验证码随响应回显（devCode） */
-  sendCode: (phone: string) =>
-    request<{ resendAfter: number; devCode?: string }>({
+  /** 发码：account 是手机号（短信）或 QQ 邮箱（邮件）；演示期验证码随响应回显 */
+  sendCode: (account: string, scene: MailCodeScene) =>
+    request<VerifyCodeVO>({
       url: '/api/auth/send-code',
       method: 'POST',
-      data: { phone }
+      data: { account, scene }
     }),
 
-  login: (phone: string, code: string) =>
+  /** 登录：type=1 验证码登录（account 决定渠道）/ type=2 密码登录 */
+  login: (account: string, type: UserLoginType, credential: string) =>
     request<UserLoginVO>({
       url: '/api/auth/login',
       method: 'POST',
-      data: { phone, code }
+      data: { account, type, credential }
+    }),
+
+  /** 注册：邮箱已验证，后端直接下发令牌 */
+  register: (req: UserRegisterReq) =>
+    request<UserLoginVO>({
+      url: '/api/auth/register',
+      method: 'POST',
+      data: { ...req }
+    }),
+
+  /** 找回密码：成功后该账号所有会话下线 */
+  resetPassword: (req: UserResetPasswordReq) =>
+    request<void>({
+      url: '/api/auth/reset-password',
+      method: 'POST',
+      data: { ...req }
     }),
 
   /** 编辑昵称 / 头像（局部更新）；成功返回最新用户信息，前端据此刷新会话 */

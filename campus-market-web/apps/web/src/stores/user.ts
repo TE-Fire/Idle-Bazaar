@@ -11,7 +11,7 @@
 
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { userAuthApi, setToken, clearToken, type UserLoginVO, type UserProfileUpdateReq } from '@campus/api'
+import { userAuthApi, setToken, clearToken, type UserLoginVO, type UserLoginType, type UserRegisterReq, type UserProfileUpdateReq } from '@campus/api'
 
 const STORAGE_KEY = 'campus-user-session'
 
@@ -82,9 +82,14 @@ export const useUserStore = defineStore('user', () => {
     persist()
   }
 
-  /** 登录：手机号 + 短信验证码 */
-  const login = async (phone: string, code: string): Promise<void> => {
-    applySession(await userAuthApi.login(phone, code))
+  /** 登录：account 为手机号或 QQ 邮箱，type=1 验证码登录 / 2 密码登录 */
+  const login = async (account: string, type: UserLoginType, credential: string): Promise<void> => {
+    applySession(await userAuthApi.login(account, type, credential))
+  }
+
+  /** 注册：邮箱已验证，后端直接下发令牌，不必再输一次验证码 */
+  const register = async (req: UserRegisterReq): Promise<void> => {
+    applySession(await userAuthApi.register(req))
   }
 
   /**
@@ -131,6 +136,7 @@ export const useUserStore = defineStore('user', () => {
     creditScore,
     isLogin,
     login,
+    register,
     updateProfile,
     refresh,
     logout,

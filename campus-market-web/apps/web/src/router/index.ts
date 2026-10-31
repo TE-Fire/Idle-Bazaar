@@ -100,8 +100,10 @@ const routes: RouteRecordRaw[] = [
       { path: 'chat', name: 'chat', component: () => import('@/views/ChatView.vue'), meta: { title: '消息' } }
     ]
   },
-  // 登录：独立全屏页（闲鱼口径），不走 MainLayout，因此没有顶栏与悬浮工具栏
+  // 登录 / 注册 / 找回密码：独立全屏页（闲鱼口径），不走 MainLayout，因此没有顶栏与悬浮工具栏
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { title: '登录' } },
+  { path: '/register', name: 'register', component: () => import('@/views/RegisterView.vue'), meta: { title: '注册' } },
+  { path: '/forgot', name: 'forgot', component: () => import('@/views/ForgotView.vue'), meta: { title: '找回密码' } },
   { path: '/:pathMatch(.*)*', redirect: '/' }
 ]
 

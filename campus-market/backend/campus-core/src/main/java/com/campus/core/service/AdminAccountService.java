@@ -11,6 +11,7 @@ import com.campus.core.mapper.AdminRoleMapper;
 import com.campus.core.mapper.AdminUserMapper;
 import com.campus.core.redis.MailRedisKeys;
 import com.campus.core.satoken.StpAdminUtil;
+import com.campus.core.support.QqMail;
 import com.campus.core.dto.req.AdminRegisterReq;
 import com.campus.core.dto.req.AdminResetReq;
 import com.campus.core.dto.req.AdminSendCodeReq;
@@ -41,8 +42,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class AdminAccountService {
 
-    /** 只允许 QQ 系：与 design/03「注册不限 / 仅 QQ 系」的决策一致 */
-    private static final List<String> MAIL_SUFFIXES = List.of("@qq.com", "@foxmail.com");
     private static final Duration CODE_TTL = Duration.ofMinutes(10);
     private static final Duration THROTTLE_TTL = Duration.ofSeconds(60);
     private static final String SUPER_ROLE_CODE = "SUPER";
@@ -61,8 +60,8 @@ public class AdminAccountService {
     public void register(AdminRegisterReq req) {
         captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
 
-        String email = normalize(req.getEmail());
-        BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
+        String email = QqMail.normalize(req.getEmail());
+        BizAssert.isTrue(QqMail.isQqMail(email), UserErrorCode.EMAIL_INVALID);
         BizAssert.isTrue(adminUserMapper.selectByEmail(email) == null, UserErrorCode.EMAIL_ALREADY_REGISTERED);
 
         verifyMailCode(email, MailCodeSceneEnum.REGISTER, req.getMailCode());
@@ -102,8 +101,8 @@ public class AdminAccountService {
     public void sendCode(AdminSendCodeReq req) {
         captchaService.verify(req.getCaptchaKey(), req.getCaptchaCode());
 
-        String email = normalize(req.getEmail());
-        BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
+        String email = QqMail.normalize(req.getEmail());
+        BizAssert.isTrue(QqMail.isQqMail(email), UserErrorCode.EMAIL_INVALID);
 
         MailCodeSceneEnum scene = MailCodeSceneEnum.fromCodeOrNull(req.getType());
         BizAssert.notNull(scene, CommonErrorCode.PARAM_ERROR);
@@ -137,8 +136,8 @@ public class AdminAccountService {
 
     /** 第二步：校验验证码并重置密码 */
     public void resetPassword(AdminResetReq req) {
-        String email = normalize(req.getEmail());
-        BizAssert.isTrue(isQqMail(email), UserErrorCode.EMAIL_INVALID);
+        String email = QqMail.normalize(req.getEmail());
+        BizAssert.isTrue(QqMail.isQqMail(email), UserErrorCode.EMAIL_INVALID);
 
         AdminUser admin = adminUserMapper.selectByEmail(email);
         BizAssert.notNull(admin, UserErrorCode.MAIL_CODE_INVALID);
@@ -213,16 +212,6 @@ public class AdminAccountService {
 
     private String sixDigitCode() {
         return String.format("%06d", random.nextInt(1_000_000));
-    }
-
-    private static String normalize(String email) {
-        return email == null ? "" : email.trim().toLowerCase();
-    }
-
-    /** QQ 系邮箱校验（应用层，数据库只保证唯一——将来放开域名不用改表） */
-    private static boolean isQqMail(String email) {
-        String e = normalize(email);
-        return MAIL_SUFFIXES.stream().anyMatch(e::endsWith);
     }
 
     /** 登录账号取邮箱前缀（3037749727@qq.com → 3037749727），冲突时补 4 位随机后缀 */

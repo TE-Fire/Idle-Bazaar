@@ -9,7 +9,7 @@
 
 import { computed, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { userAuthApi } from '@campus/api'
+import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi } from '@campus/api'
 import { useUserStore } from '@/stores/user'
 import { DEMO_USERS, authLabel, type DemoUser } from '@campus/shared'
 
@@ -26,12 +26,12 @@ async function quickLogin(u: DemoUser): Promise<void> {
   loadingPhone.value = u.phone
   error.value = ''
   try {
-    const sms = await userAuthApi.sendCode(u.phone)
+    const sms = await userAuthApi.sendCode(u.phone, MAIL_CODE_SCENE.login)
     if (!sms.devCode) {
       error.value = 'devCode 未回显，请确认 campus.user.sms.echo=true'
       return
     }
-    await session.login(u.phone, sms.devCode)
+    await session.login(u.phone, USER_LOGIN_TYPE.code, sms.devCode)
     open.value = false
     ElMessage.success({ message: `已切换为 ${u.nickname}`, duration: 1500 })
   } catch (e) {

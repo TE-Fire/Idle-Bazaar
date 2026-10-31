@@ -1,35 +1,49 @@
 <script setup lang="ts">
 /**
- * 登录（手机号 + 短信验证码）
+ * 登录（验证码登录 / 密码登录）
  *
- * <p>学生端口径只有短信一种方式（app_user 没有密码体系）。演示期验证码随发码
- * 响应回显，上线前关掉 campus.user.sms.echo 后只进日志。登录成功按 redirect 回跳。
+ * <p>验证码登录的账号可以是手机号（短信）或 QQ 邮箱（邮件），渠道由后端按账号形态判定。
+ * 密码只对新注册用户存在——老账号没设过密码，走「找回密码」设一个，所以 4038 的
+ * 提示要能指向那条路（后端文案已写明）。
+ *
+ * <p>演示期验证码随发码响应回显，上线前关掉 campus.user.*.echo 后只进日志。
+ * 登录成功按 redirect 回跳，tab 页必须 reLaunch（redirectTo 对 tab 页静默失败）。
  */
 
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
-import { userAuthApi } from '@/api/user'
+import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi } from '@/api/user'
 import { saveSession } from '@/utils/session'
 import { goTab, TAB_URL } from '@/utils/tab-nav'
+import { accountKind, useCodeSender } from '@/utils/verify-code'
 import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
 
 /** dev 构建才挂载测试账号切换器 */
 const isDev = import.meta.env.DEV
 
-const phone = ref('')
+const mode = ref<number>(USER_LOGIN_TYPE.code)
+const account = ref('')
 const code = ref('')
-const cooldown = ref(0)
-let timer: number | null = null
+const password = ref('')
+
+const { cooldown, counting, send } = useCodeSender(MAIL_CODE_SCENE.login)
 
 /** 登录成功后回跳的页面路径（从哪跳来的） */
 const redirect = ref('')
 
-const PHONE_RE = /^1[3-9]\d{9}$/
-const canGetCode = (): boolean => PHONE_RE.test(phone.value) && cooldown.value === 0
-const canSubmit = (): boolean => PHONE_RE.test(phone.value) && /^\d{6}$/.test(code.value)
+const kind = computed(() => accountKind(account.value))
+const canGetCode = computed(() => Boolean(kind.value) && !counting.value)
+const canSubmit = computed(() => {
+  if (!kind.value) return false
+  return mode.value === USER_LOGIN_TYPE.code
+    ? /^\d{6}$/.test(code.value)
+    : password.value.length >= 8
+})
 
 onLoad((query) => {
   if (query?.redirect) redirect.value = query.redirect
+  // 找回密码跳回来时带 ?account=，预填省一次输入
+  if (query?.account) account.value = query.account
 })
 
 /** 返回：有上一页则 navigateBack，冷启动（无栈）则回首页 */
@@ -41,42 +55,41 @@ function goBack(): void {
   }
 }
 
-function startCooldown(seconds: number): void {
-  cooldown.value = seconds
-  timer = setInterval(() => {
-    cooldown.value -= 1
-    if (cooldown.value <= 0 && timer !== null) {
-      clearInterval(timer)
-      timer = null
-    }
-  }, 1000)
+/** 切换方式时清掉另一种方式的凭证，避免串台提交 */
+function switchMode(next: number): void {
+  if (mode.value === next) return
+  mode.value = next
+  code.value = ''
+  password.value = ''
 }
 
-async function sendCode(): Promise<void> {
-  if (!canGetCode()) {
-    uni.showToast({ title: '请填写正确的手机号', icon: 'none' })
+function onSend(): void {
+  if (!kind.value) {
+    uni.showToast({ title: '请输入手机号或 QQ 邮箱', icon: 'none' })
     return
   }
-  try {
-    const vo = await userAuthApi.sendCode(phone.value)
-    uni.showToast({
-      title: vo.devCode ? `演示验证码：${vo.devCode}` : '验证码已发送',
-      icon: 'none',
-      duration: 2500
-    })
-    startCooldown(vo.resendAfter || 60)
-  } catch {
-    // request 层已提示（节流 4016）；冷却不启动，可立即重试
-  }
+  void send(account.value)
+}
+
+function goRegister(): void {
+  uni.navigateTo({ url: '/pages/register/index' })
+}
+
+function goForgot(): void {
+  uni.navigateTo({ url: '/pages/forgot/index' })
 }
 
 async function submit(): Promise<void> {
-  if (!canSubmit()) {
-    uni.showToast({ title: '请填写手机号与 6 位验证码', icon: 'none' })
+  if (!canSubmit.value) {
+    uni.showToast({
+      title: mode.value === USER_LOGIN_TYPE.code ? '请填写账号与 6 位验证码' : '请填写账号与至少 8 位密码',
+      icon: 'none'
+    })
     return
   }
+  const credential = mode.value === USER_LOGIN_TYPE.code ? code.value : password.value
   try {
-    const vo = await userAuthApi.login(phone.value, code.value)
+    const vo = await userAuthApi.login(account.value.trim(), mode.value as 1 | 2, credential)
     saveSession({
       userId: vo.userId,
       nickname: vo.nickname ?? '',
@@ -88,7 +101,6 @@ async function submit(): Promise<void> {
     uni.showToast({ title: '登录成功', icon: 'success' })
     setTimeout(() => {
       if (redirect.value) {
-        // redirectTo 指向 tab 页会静默失败并停在本页，tab 页必须用 reLaunch
         const isTab = Object.values<string>(TAB_URL).includes(redirect.value)
         void (isTab ? uni.reLaunch({ url: redirect.value }) : uni.redirectTo({ url: redirect.value }))
       } else {
@@ -96,9 +108,10 @@ async function submit(): Promise<void> {
       }
     }, 800)
   } catch {
-    // request 层已提示
+    // request 层已按错误码提示
   }
 }
+
 </script>
 
 <template>
@@ -122,29 +135,45 @@ async function submit(): Promise<void> {
     </view>
 
     <view class="card cm-card">
-      <text class="card__t">手机号登录</text>
-      <text class="card__s">未注册的手机号将自动创建账号</text>
+      <text class="card__t">登录</text>
+      <text class="card__s">支持手机号与 QQ 邮箱</text>
 
-      <view class="field">
-        <text class="field__k">手机号</text>
-        <input v-model="phone" class="input" type="number" maxlength="11" placeholder="请输入手机号" />
+      <view class="tabs">
+        <view class="tab" :class="{ 'tab--on': mode === 1 }" @click="switchMode(1)">验证码登录</view>
+        <view class="tab" :class="{ 'tab--on': mode === 2 }" @click="switchMode(2)">密码登录</view>
       </view>
 
       <view class="field">
+        <text class="field__k">账号</text>
+        <input v-model="account" class="input" maxlength="64" placeholder="手机号或 QQ 邮箱" />
+      </view>
+
+      <view v-if="mode === 1" class="field">
         <text class="field__k">验证码</text>
         <view class="row">
           <input v-model="code" class="input" type="number" maxlength="6" placeholder="6 位验证码" />
-          <text class="code-btn" :class="{ 'code-btn--off': !canGetCode() }" @click="sendCode">
-            {{ cooldown > 0 ? `${cooldown}s 后重发` : '获取验证码' }}
+          <text class="code-btn" :class="{ 'code-btn--off': !canGetCode }" @click="onSend">
+            {{ counting ? `${cooldown}s 后重发` : '获取验证码' }}
           </text>
         </view>
+      </view>
+
+      <view v-else class="field">
+        <text class="field__k">密码</text>
+        <input v-model="password" class="input" password maxlength="32" placeholder="8–32 位密码" />
       </view>
 
       <view class="submit cm-btn cm-btn--primary" hover-class="cm-btn--on" @click="submit">
         <text>登录</text>
       </view>
 
-      <text class="foot">演示环境：验证码为演示回显，非真实短信</text>
+      <view class="links">
+        <text class="link" @click="goRegister">注册账号</text>
+        <text class="links__sep">·</text>
+        <text class="link" @click="goForgot">忘记密码</text>
+      </view>
+
+      <text class="foot">演示环境：验证码为演示回显，非真实短信/邮件</text>
     </view>
 
     <DevLoginSwitcher v-if="isDev" />
@@ -273,9 +302,29 @@ async function submit(): Promise<void> {
 .card__s {
   display: block;
   margin-top: 6rpx;
-  margin-bottom: $cm-space-5;
+  margin-bottom: $cm-space-4;
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;
+}
+
+/* 方式切换：下划线式 tab，不与输入框抢视觉重量 */
+.tabs {
+  display: flex;
+  gap: $cm-space-6;
+  margin-bottom: $cm-space-4;
+}
+
+.tab {
+  padding-bottom: $cm-space-2;
+  font-size: $cm-font-size-md;
+  font-weight: $cm-font-weight-bold;
+  color: $cm-color-text-3;
+  border-bottom: 4rpx solid transparent;
+}
+
+.tab--on {
+  color: $cm-color-text-1;
+  border-bottom-color: $cm-color-brand;
 }
 
 .field {
@@ -336,9 +385,27 @@ async function submit(): Promise<void> {
   font-size: $cm-font-size-md;
 }
 
+.links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $cm-space-2;
+  margin-top: $cm-space-4;
+}
+
+.link {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-brand-text;
+}
+
+.links__sep {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
 .foot {
   display: block;
-  margin-top: $cm-space-4;
+  margin-top: $cm-space-3;
   text-align: center;
   font-size: $cm-font-size-xs;
   color: $cm-color-text-3;

@@ -94,6 +94,18 @@
       }
     },
     {
+      "path": "pages/register/index",
+      "style": {
+        "navigationBarTitleText": "新用户注册"
+      }
+    },
+    {
+      "path": "pages/forgot/index",
+      "style": {
+        "navigationBarTitleText": "重置密码"
+      }
+    },
+    {
       "path": "pages/category/index",
       "style": {
         "navigationBarTitleText": "全部分类"

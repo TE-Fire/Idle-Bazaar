@@ -62,6 +62,18 @@ public enum UserErrorCode implements IErrorCode {
 
     /** 平台公告（notes/22 S12）：5000 是防误触「全员公告」的闸门，不是性能上限 */
     NOTICE_AUDIENCE_TOO_LARGE(4034, "接收人数超过 5000 上限，请缩小范围后分批发布"),
+
+    /* ── 学生端注册 / 找回密码 / 密码登录（2026-10-31 新增，notes/26）── */
+    EMAIL_NOT_REGISTERED(4035, "该邮箱未注册"),
+    USER_PHONE_REGISTERED(4036, "该手机号已注册，可直接登录"),
+    USER_PASSWORD_WRONG(4037, "密码不正确"),
+    USER_PASSWORD_NOT_SET(4038, "该账号未设置密码，请用验证码登录或找回密码"),
+    USER_PASSWORD_LOCKED(4039, "密码错误次数过多，请 10 分钟后重试，或改用验证码登录"),
+    USER_ACCOUNT_INVALID(4040, "请输入手机号或 QQ 邮箱"),
+    USER_PASSWORD_INVALID(4041, "密码需 8–32 位，且不能包含空格"),
+    REGISTER_REQUIRE_MAIL(4042, "注册需使用 QQ 邮箱验证码"),
+    /** 注册昵称上限 16，与资料编辑的 64（4020）不同：注册是唯一一次定名，短一点更像「昵称」 */
+    USER_NICKNAME_LENGTH_INVALID(4043, "昵称需 2–16 个字符"),
     ;
 
     @Override

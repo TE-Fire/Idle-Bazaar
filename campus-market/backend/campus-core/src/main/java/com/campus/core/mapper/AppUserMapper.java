@@ -14,6 +14,10 @@ public interface AppUserMapper extends BaseMapper<AppUser> {
     @Select("SELECT * FROM app_user WHERE phone = #{phone} AND deleted = 0 LIMIT 1")
     AppUser selectByPhone(@Param("phone") String phone);
 
+    /** 邮箱登录 / 找回密码用；库里存小写，调用方须先 normalize */
+    @Select("SELECT * FROM app_user WHERE email = #{email} AND deleted = 0 LIMIT 1")
+    AppUser selectByEmail(@Param("email") String email);
+
     /** 信用分变动前读当前值并锁行（须在事务内调用），保证流水前后值准确 */
     @Select("SELECT credit_score FROM app_user WHERE id = #{userId} AND deleted = 0 FOR UPDATE")
     Integer selectCreditForUpdate(@Param("userId") long userId);

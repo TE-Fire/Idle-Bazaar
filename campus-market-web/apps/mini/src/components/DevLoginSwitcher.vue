@@ -8,7 +8,7 @@
  */
 
 import { ref } from 'vue'
-import { userAuthApi } from '@/api/user'
+import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi } from '@/api/user'
 import { saveSession, getSession, clearSession } from '@/utils/session'
 import { DEMO_USERS, authLabel, type DemoUser } from '@campus/shared'
 
@@ -25,12 +25,12 @@ const current = ref(getSession().nickname || '')
 async function quickLogin(u: DemoUser): Promise<void> {
   loadingPhone.value = u.phone
   try {
-    const sms = await userAuthApi.sendCode(u.phone)
+    const sms = await userAuthApi.sendCode(u.phone, MAIL_CODE_SCENE.login)
     if (!sms.devCode) {
       uni.showToast({ title: 'devCode 未回显，请确认 echo=true', icon: 'none' })
       return
     }
-    const vo = await userAuthApi.login(u.phone, sms.devCode)
+    const vo = await userAuthApi.login(u.phone, USER_LOGIN_TYPE.code, sms.devCode)
     saveSession({
       userId: vo.userId ?? '',
       nickname: vo.nickname ?? '',

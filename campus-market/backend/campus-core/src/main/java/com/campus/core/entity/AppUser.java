@@ -34,8 +34,17 @@ public class AppUser {
 
     private String avatarUrl;
 
-    /** 手机号（Web 端验证码登录） */
+    /** 手机号（验证码登录 / 找回密码） */
     private String phone;
+
+    /** QQ 邮箱（注册 / 邮箱登录 / 找回密码）；注册时必填，历史数据为空 */
+    private String email;
+
+    /**
+     * BCrypt 密码摘要。为空表示该账号没有设过密码——密码登录必须单独报「未设置密码」，
+     * 不能当成密码错误，否则老用户会一直以为自己记错了。
+     */
+    private String passwordHash;
 
     /** 真实姓名（认证后写入，不公开展示） */
     private String realName;

@@ -2,7 +2,7 @@ package com.campus.core.dto.resp;
 
 import lombok.Data;
 
-/** 登录响应（发码接口的响应另见 {@link SmsCodeVO}） */
+/** 登录 / 当前用户响应（发码接口的响应另见 {@link VerifyCodeVO}） */
 @Data
 public class UserLoginVO {
 
@@ -16,6 +16,15 @@ public class UserLoginVO {
     private Integer authStatus;
 
     private Integer creditScore;
+
+    /** 手机号（本人可见，用于账号展示与找回入口预填） */
+    private String phone;
+
+    /** QQ 邮箱（同上） */
+    private String email;
+
+    /** 是否已设密码：为 false 时前端在账号安全处提示「设置密码」 */
+    private Boolean hasPassword;
 
     /** 与请求头同名的令牌字段（satoken-user），前端原样带回 */
     private String tokenName;
