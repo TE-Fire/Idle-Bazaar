@@ -228,22 +228,34 @@ a {
   }
 }
 
-/* 邮箱后缀下拉：与浅灰输入底形成对比——品牌纸底 + 品牌描边，自绘箭头 */
+/* 邮箱后缀下拉：取字段底色加深一档，避免抢焦点；深字保证对比度，自绘箭头 */
 .cm-auth-field__select {
   flex: none;
-  height: 30px;
+  height: 28px;
   margin-left: var(--cm-space-2);
-  padding: 0 26px 0 10px;
+  padding: 0 20px 0 9px;
   font-size: var(--cm-font-size-sm);
   color: var(--cm-color-text-1);
-  background: var(--cm-color-brand-bg)
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%235E5E68'/%3E%3C/svg%3E")
-    no-repeat right 9px center;
-  border: 1px solid var(--cm-color-brand-border);
+  background: var(--cm-color-border-strong)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%234A4A52'/%3E%3C/svg%3E")
+    no-repeat right 8px center;
+  border: none;
   border-radius: var(--cm-radius-md);
   outline: none;
   appearance: none;
   cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--cm-color-text-3);
+    outline-offset: 1px;
+  }
+}
+
+/* 邮箱输入：圆润字形 + 略大于常规输入（14px 阶之上、16px 阶之下），与内嵌下拉形成主次 */
+.cm-auth-field__input--mail {
+  font-family: ui-rounded, 'Hiragino Maru Gothic ProN', 'Yuanti SC', 'YouYuan', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  font-size: 15px;
 }
 
 .cm-auth-submit {

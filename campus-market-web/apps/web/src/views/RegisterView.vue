@@ -134,7 +134,7 @@ async function submit(): Promise<void> {
         <span class="cm-auth-field__key">邮箱</span>
         <input
           v-model="email"
-          class="cm-auth-field__input"
+          class="cm-auth-field__input cm-auth-field__input--mail"
           maxlength="64"
           placeholder="邮箱账号，如 3037749727"
           autocomplete="email"
