@@ -40,6 +40,15 @@ const NICK_MAX = 16
 const PWD_MIN = 8
 const PWD_MAX = 32
 
+/** 后端 QqMail 只放行这两个域名，选择器只列支持的 */
+const EMAIL_DOMAINS = ['@qq.com', '@foxmail.com'] as const
+
+function applyDomain(domain: string): void {
+  const local = email.value.split('@')[0]
+  if (!local) return
+  email.value = local + domain
+}
+
 const canGetCode = computed(() => accountKind(email.value) === 'mail' && !counting.value)
 
 const nickBad = computed(
@@ -123,10 +132,22 @@ async function submit(): Promise<void> {
           v-model="email"
           class="cm-auth-field__input"
           maxlength="64"
-          placeholder="@qq.com / @foxmail.com"
+          placeholder="邮箱账号，如 3037749727"
           autocomplete="email"
         />
       </label>
+      <div class="mail-suffixes">
+        <button
+          v-for="d in EMAIL_DOMAINS"
+          :key="d"
+          type="button"
+          class="mail-suffixes__item"
+          :class="{ 'is-active': email.endsWith(d) }"
+          @click="applyDomain(d)"
+        >
+          {{ d }}
+        </button>
+      </div>
 
       <label class="cm-auth-field">
         <span class="cm-auth-field__key">验证码</span>
@@ -201,6 +222,33 @@ async function submit(): Promise<void> {
 /* 校验不通过时的字段描边：只提示，不阻止继续输入 */
 .cm-auth-field--bad {
   box-shadow: inset 0 0 0 1px var(--cm-color-err);
+}
+
+/* 邮箱后缀快捷选择：贴着邮箱字段下方，选中态用品牌黄描边 */
+.mail-suffixes {
+  display: flex;
+  gap: var(--cm-space-2);
+  margin: calc(var(--cm-space-2) * -1) 0 var(--cm-space-3);
+
+  &__item {
+    padding: 2px 10px;
+    font-size: var(--cm-font-size-xs);
+    color: var(--cm-color-text-2);
+    background: var(--cm-color-bg);
+    border: 1px solid transparent;
+    border-radius: 999px;
+    cursor: pointer;
+
+    &:hover {
+      color: var(--cm-color-text);
+    }
+
+    &.is-active {
+      color: var(--cm-color-text);
+      background: var(--cm-color-brand-bg);
+      border-color: var(--cm-color-brand);
+    }
+  }
 }
 
 .hint {
