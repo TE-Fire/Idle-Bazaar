@@ -43,7 +43,8 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
     campus: vo.campusName ?? '',
     meetPoint: vo.meetPointName ?? '',
     negotiable: vo.negotiable === 1,
-    delivery: vo.deliveryIncluded === 1,
+    // 只有「送货上门(3)」算含配送；自提(2)与面交(1)都需买家到场，卡片不亮「包邮」标
+    delivery: vo.deliveryType === 3,
     status: vo.status,
     wantCount: 0,
     seller: {

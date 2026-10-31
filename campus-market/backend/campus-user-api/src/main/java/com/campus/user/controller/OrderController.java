@@ -39,11 +39,12 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    @Operation(summary = "下单", description = "只插待付款订单，商品不锁定；金额一律按标价，不可自定义")
+    @Operation(summary = "下单", description = "只插待付款订单，商品不锁定；金额一律按标价，不可自定义。送货上门须传 addressId（买家收货地址）")
     @PostMapping("/create")
     public Result<Long> create(@Valid @RequestBody OrderCreateReq req) {
         long userId = UserContext.getUserId();
-        return Result.ok(orderService.create(userId, req.getItemId(), req.getMeetPointId(), req.getMeetTime()));
+        return Result.ok(orderService.create(userId, req.getItemId(), req.getMeetPointId(),
+                req.getAddressId(), req.getMeetTime()));
     }
 
     @Operation(summary = "模拟支付", description = "两级占位校验后转待面交，并批量取消同商品其余待付款订单")
@@ -81,7 +82,14 @@ public class OrderController {
         return Result.ok();
     }
 
-    @Operation(summary = "确认收货", description = "已验货 → 已完成；必须先核销，不能跳过面交环节")
+    @Operation(summary = "卖家发货", description = "仅送货上门：待发货 → 已发货，之后等买家确认收货")
+    @PostMapping("/{id}/ship")
+    public Result<Void> ship(@PathVariable Long id) {
+        orderService.ship(id, UserContext.getUserId());
+        return Result.ok();
+    }
+
+    @Operation(summary = "确认收货", description = "已验货/已发货/待自提 → 已完成；面交必须先核销，不能跳过")
     @PostMapping("/{id}/receive")
     public Result<Void> receive(@PathVariable Long id) {
         orderService.receive(id, UserContext.getUserId());

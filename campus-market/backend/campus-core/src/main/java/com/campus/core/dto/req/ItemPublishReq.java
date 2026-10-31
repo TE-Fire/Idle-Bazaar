@@ -53,7 +53,16 @@ public class ItemPublishReq {
     /** 可议价标签（仅展示，无议价流程） */
     private Integer negotiable;
 
-    private Integer deliveryIncluded;
+    /**
+     * 收货方式：1面交 2自提 3送货上门（见 DeliveryTypeEnum），决定下单时的地址交互。
+     *
+     * <p>不设 {@code @NotNull}：老客户端（小程序）尚未接入该字段，缺省按面交(1)兜底，
+     * 避免旧版本一发布就报参错。自提必须带 pickupAddressId 的硬校验在 Service 里。
+     */
+    private Integer deliveryType;
+
+    /** 自提地址 id：deliveryType=2 时必填，引用 user_address(kind=PICKUP)；其余方式留空 */
+    private Long pickupAddressId;
 
     /**
      * 暂存草稿标志：true = 落草稿(1)、不进审核队列、豁免图片与描述；空/false = 提交送审。

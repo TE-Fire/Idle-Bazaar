@@ -78,8 +78,17 @@ const STATUS_TEXT: Record<UserOrderStatus, string> = {
   CANCELED: '订单已取消',
   REFUNDING: '退款申请处理中',
   REFUNDED: '已退款',
-  DISPUTING: '纠纷处理中，平台将介入裁决'
+  DISPUTING: '纠纷处理中，平台将介入裁决',
+  WAIT_SHIP: '已付款，等待卖家发货',
+  SHIPPED: '卖家已发货，等待确认收货',
+  WAIT_PICKUP: '已付款，等待到店自提'
 }
+
+/** 收货方式文案：面交 / 自提 / 送货上门 */
+const DELIVERY_TEXT: Record<string, string> = { MEET: '面交', PICKUP: '自提', DELIVERY: '送货上门' }
+const deliveryText = computed(() => DELIVERY_TEXT[order.value?.deliveryType ?? 'MEET'] ?? '面交')
+/** 有地址快照才展示地址块（面交无地址，只有面交点） */
+const hasAddress = computed(() => !!order.value?.addressDetail)
 
 /** 待付款剩余分钟数；负数表示已被超时任务扫掉 */
 const expireLeft = computed(() => {
@@ -243,6 +252,20 @@ async function onVerify(): Promise<void> {
   verifyCode.value = ''
 }
 
+/** 卖家发货（仅送货上门）：待发货 → 已发货 */
+async function onShip(): Promise<void> {
+  try {
+    await ElMessageBox.confirm('确认已发货？买家收到后会确认收货，交易完成。', '标记已发货', {
+      type: 'warning',
+      confirmButtonText: '确认发货',
+      cancelButtonText: '取消'
+    })
+  } catch {
+    return
+  }
+  await run(() => userOrderApi.ship(orderId.value), '已标记发货')
+}
+
 async function onReceive(): Promise<void> {
   try {
     await ElMessageBox.confirm('确认收货后交易完成，货款归卖家，不可再申请退款。确定收到货了？', '确认收货', {
@@ -400,6 +423,16 @@ onMounted(load)
                 </dd>
               </div>
               <div v-else-if="order.meetPointId" class="info__row"><dt>面交点</dt><dd>面交点 #{{ order.meetPointId }}</dd></div>
+              <div class="info__row"><dt>收货方式</dt><dd>{{ deliveryText }}</dd></div>
+              <div v-if="hasAddress" class="info__row">
+                <dt>{{ order.deliveryType === 'PICKUP' ? '提货地址' : '收货地址' }}</dt>
+                <dd>
+                  {{ order.addressDetail }}
+                  <template v-if="order.addressContact">
+                    （{{ order.addressContact }}<template v-if="order.addressPhone"> {{ order.addressPhone }}</template>）
+                  </template>
+                </dd>
+              </div>
               <div v-if="order.verifyTime" class="info__row"><dt>核销时间</dt><dd>{{ formatTime(order.verifyTime) }}</dd></div>
               <div v-if="order.expireTime && order.status === 'WAIT_PAY'" class="info__row">
                 <dt>付款截止</dt><dd>{{ formatTime(order.expireTime) }}</dd>
@@ -440,6 +473,39 @@ onMounted(load)
                 <p class="tip">必须先面交核销才能确认收货，不能跳过这一步。</p>
               </template>
               <p v-else class="tip">已核销，等待买家确认收货。</p>
+            </template>
+
+            <!-- 送货上门·待发货：卖家发货，买家可退款/纠纷 -->
+            <template v-else-if="order.status === 'WAIT_SHIP'">
+              <template v-if="!isBuyer">
+                <el-button type="primary" class="act" :loading="acting" @click="onShip">标记已发货</el-button>
+                <p class="tip">买家已选收货地址并付款，发货后由买家确认收货。</p>
+              </template>
+              <template v-else>
+                <el-button class="act" :loading="acting" @click="onRefund">申请退款</el-button>
+                <el-button class="act" :loading="acting" @click="onDispute">发起纠纷</el-button>
+                <p class="tip">等待卖家发货；发货前可申请退款或发起纠纷。</p>
+              </template>
+            </template>
+
+            <!-- 送货上门·已发货：买家确认收货 -->
+            <template v-else-if="order.status === 'SHIPPED'">
+              <template v-if="isBuyer">
+                <el-button type="primary" class="act" :loading="acting" @click="onReceive">确认收货</el-button>
+                <el-button class="act" :loading="acting" @click="onRefund">申请退款</el-button>
+                <p class="tip">收到货且确认无误后点确认收货，交易完成。</p>
+              </template>
+              <p v-else class="tip">已发货，等待买家确认收货。</p>
+            </template>
+
+            <!-- 自提·待自提：买家到店取货后确认 -->
+            <template v-else-if="order.status === 'WAIT_PICKUP'">
+              <template v-if="isBuyer">
+                <el-button type="primary" class="act" :loading="acting" @click="onReceive">确认已自提</el-button>
+                <el-button class="act" :loading="acting" @click="onRefund">申请退款</el-button>
+                <p class="tip">到提货地址取货后点确认，交易完成。</p>
+              </template>
+              <p v-else class="tip">等待买家到提货地址自取。</p>
             </template>
 
             <!-- 卖家处理退款：这一条就是卖家侧的退款入口 -->
@@ -579,7 +645,10 @@ onMounted(load)
 }
 
 .banner--wait_meet,
-.banner--verified {
+.banner--verified,
+.banner--wait_ship,
+.banner--shipped,
+.banner--wait_pickup {
   background: linear-gradient(135deg, #34a853, #1e8e3e);
 }
 

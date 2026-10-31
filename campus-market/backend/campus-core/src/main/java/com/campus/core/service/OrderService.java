@@ -14,9 +14,12 @@ import com.campus.core.entity.DictCampus;
 import com.campus.core.entity.DictMeetPoint;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.TradeOrder;
+import com.campus.core.entity.UserAddress;
+import com.campus.core.enums.AddressKindEnum;
 import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.CancelTypeEnum;
+import com.campus.core.enums.DeliveryTypeEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import com.campus.core.errcode.OrderErrorCode;
@@ -26,6 +29,7 @@ import com.campus.core.mapper.DictCampusMapper;
 import com.campus.core.mapper.DictMeetPointMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.TradeOrderMapper;
+import com.campus.core.mapper.UserAddressMapper;
 import com.campus.core.redis.ItemRedisKeys;
 import com.campus.core.redis.LuaScripts;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
@@ -126,6 +130,8 @@ public class OrderService {
 
     private final DictCampusMapper campusMapper;
 
+    private final UserAddressMapper userAddressMapper;
+
     private final CategoryAvgPriceCache categoryAvgPriceCache;
 
     /** 批量逐笔取消用：单笔独立事务，失败不牵连同批已提交的（见 cancelOne） */
@@ -145,12 +151,38 @@ public class OrderService {
      * @return 新订单 id
      */
     @Transactional(rollbackFor = Exception.class)
-    public Long create(Long buyerId, Long itemId, Long meetPointId, LocalDateTime meetTime) {
+    public Long create(Long buyerId, Long itemId, Long meetPointId, Long addressId, LocalDateTime meetTime) {
         Item item = itemMapper.selectById(itemId);
         BizAssert.notNull(item, CommonErrorCode.NOT_FOUND);
         BizAssert.isTrue(ItemStatusEnum.fromCode(item.getStatus()) == ItemStatusEnum.ON_SALE,
                 OrderErrorCode.ITEM_NOT_ON_SALE);
         BizAssert.isTrue(!buyerId.equals(item.getSellerId()), OrderErrorCode.BUY_SELF);
+
+        // 收货方式决定后续的地址交互与付款后状态：面交走面交点、自提用卖家提货地址、送货上门用买家收货地址。
+        // deliveryType 在创建时从商品抄入订单并固化，之后不再随商品改动。
+        DeliveryTypeEnum deliveryType = DeliveryTypeEnum.fromCode(item.getDeliveryType());
+        Long orderAddressId = null;
+        String contact = null, phone = null, detail = null;
+
+        if (deliveryType == DeliveryTypeEnum.DELIVERY) {
+            // 送货上门：收货地址必须由买家自己选，且是其 SHIP 地址，不得代选他人地址
+            UserAddress addr = requireAddress(buyerId, addressId, AddressKindEnum.SHIP.getCode(),
+                    "送货上门订单必须选择收货地址");
+            orderAddressId = addr.getId();
+            contact = addr.getContactName();
+            phone = addr.getContactPhone();
+            detail = addressDetailOf(addr);
+        } else if (deliveryType == DeliveryTypeEnum.PICKUP) {
+            // 自提：提货地址由卖家在商品上预设，买家不可选；抄入订单并快照
+            BizAssert.notNull(item.getPickupAddressId(), OrderErrorCode.ORDER_STATUS_INVALID,
+                    "该自提商品未设置提货地址");
+            UserAddress addr = requireAddress(item.getSellerId(), item.getPickupAddressId(),
+                    AddressKindEnum.PICKUP.getCode(), "提货地址不存在或不属于当前卖家");
+            orderAddressId = addr.getId();
+            contact = addr.getContactName();
+            phone = addr.getContactPhone();
+            detail = addressDetailOf(addr);
+        }
 
         LocalDateTime now = LocalDateTime.now();
         TradeOrder order = new TradeOrder()
@@ -160,7 +192,12 @@ public class OrderService {
                 .setSellerId(item.getSellerId())
                 .setAmount(item.getPrice())
                 .setStatus(OrderStatusEnum.WAIT_PAY.getCode())
-                .setMeetPointId(meetPointId)
+                .setDeliveryType(deliveryType.getCode())
+                .setAddressId(orderAddressId)
+                .setAddressContact(contact)
+                .setAddressPhone(phone)
+                .setAddressDetail(detail)
+                .setMeetPointId(deliveryType == DeliveryTypeEnum.MEET ? meetPointId : null)
                 .setMeetTime(meetTime)
                 .setVerifyCode(newVerifyCode())
                 .setExpireTime(now.plusMinutes(PAY_TIMEOUT_MINUTES))
@@ -203,10 +240,16 @@ public class OrderService {
         try {
             claimItem(order.getItemId());
             LocalDateTime now = LocalDateTime.now();
+            // 付款后状态由收货方式决定：面交→待面交、自提→待自提、送货上门→待发货
+            OrderStatusEnum afterPay = switch (DeliveryTypeEnum.fromCode(order.getDeliveryType())) {
+                case MEET -> OrderStatusEnum.WAIT_MEET;
+                case PICKUP -> OrderStatusEnum.WAIT_PICKUP;
+                case DELIVERY -> OrderStatusEnum.WAIT_SHIP;
+            };
             int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                     .eq(TradeOrder::getId, orderId)
                     .eq(TradeOrder::getStatus, OrderStatusEnum.WAIT_PAY.getCode())
-                    .set(TradeOrder::getStatus, OrderStatusEnum.WAIT_MEET.getCode())
+                    .set(TradeOrder::getStatus, afterPay.getCode())
                     .set(TradeOrder::getPayTime, now));
             BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
 
@@ -342,21 +385,47 @@ public class OrderService {
     }
 
     /**
-     * 买家确认收货：已验货 → 已完成。
+     * 卖家发货（仅送货上门）：待发货 → 已发货。
      *
-     * <p>必须先经过核销。跳过这一步直接确认收货，订单就会缺失「双方确实碰过面」的记录，
-     * 后续纠纷就只剩双方各执一词——那正是 {@code verify_by} / {@code verify_time} 存在的意义。
+     * <p>其它收货方式没有发货动作——面交靠线下核销、自提靠买家到店自取，
+     * 都不经过「卖家发货」这一态，故 {@code delivery_type} 非送货上门时直接拒绝。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void ship(Long orderId, Long sellerId) {
+        TradeOrder order = requireOrder(orderId);
+        BizAssert.isTrue(sellerId.equals(order.getSellerId()), OrderErrorCode.ORDER_NOT_OWNER);
+        BizAssert.isTrue(DeliveryTypeEnum.fromCode(order.getDeliveryType()) == DeliveryTypeEnum.DELIVERY,
+                OrderErrorCode.ORDER_STATUS_INVALID, "只有送货上门订单需要发货");
+        int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                .eq(TradeOrder::getId, orderId)
+                .eq(TradeOrder::getStatus, OrderStatusEnum.WAIT_SHIP.getCode())
+                .set(TradeOrder::getStatus, OrderStatusEnum.SHIPPED.getCode()));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有待发货订单可以标记发货");
+    }
+
+    /**
+     * 买家确认收货：已验货 / 已发货 / 待自提 → 已完成。
+     *
+     * <p>三种收货方式共用同一个「确认收货」终态入口，区别只是进入它的前置态不同：
+     * 面交要先验货（VERIFIED）、送货上门要先发货（SHIPPED）、自提则付款后直接待自提（WAIT_PICKUP）。
+     * 无论哪种，确认收货都统一置 {@code verify_time}（评价窗口起算点）并让均价缓存失效。
      */
     @Transactional(rollbackFor = Exception.class)
     public void receive(Long orderId, Long buyerId) {
         TradeOrder order = requireOrder(orderId);
         BizAssert.isTrue(buyerId.equals(order.getBuyerId()), OrderErrorCode.ORDER_NOT_OWNER);
 
+        OrderStatusEnum status = OrderStatusEnum.fromCode(order.getStatus());
+        BizAssert.isTrue(status == OrderStatusEnum.VERIFIED || status == OrderStatusEnum.SHIPPED
+                || status == OrderStatusEnum.WAIT_PICKUP, OrderErrorCode.ORDER_STATUS_INVALID,
+                "当前状态不能确认收货");
+
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                 .eq(TradeOrder::getId, orderId)
-                .eq(TradeOrder::getStatus, OrderStatusEnum.VERIFIED.getCode())
-                .set(TradeOrder::getStatus, OrderStatusEnum.COMPLETED.getCode()));
-        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有已验货的订单可以确认收货");
+                .eq(TradeOrder::getStatus, order.getStatus())
+                .set(TradeOrder::getStatus, OrderStatusEnum.COMPLETED.getCode())
+                .set(TradeOrder::getVerifyTime, LocalDateTime.now()));
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "当前状态不能确认收货");
         // 成交成立：status=4 正是 avgPriceByCategory 的统计口径，均价缓存立即失效
         categoryAvgPriceCache.evict();
     }
@@ -385,7 +454,11 @@ public class OrderService {
             BizAssert.isTrue(cancelOne(order, by, text) == 1, OrderErrorCode.ORDER_STATUS_INVALID);
             return;
         }
-        if (status == OrderStatusEnum.WAIT_MEET || status == OrderStatusEnum.VERIFIED) {
+        // 已付款但未完成的任一态（待面交/已验货/待发货/已发货/待自提）取消，都视作发起退款申请，
+        // 落到退款中等卖家处理——逻辑与既有「付款后取消即退款申请」一致，仅把新态并入同一分支。
+        if (status == OrderStatusEnum.WAIT_MEET || status == OrderStatusEnum.VERIFIED
+                || status == OrderStatusEnum.WAIT_SHIP || status == OrderStatusEnum.SHIPPED
+                || status == OrderStatusEnum.WAIT_PICKUP) {
             int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                     .eq(TradeOrder::getId, orderId)
                     .eq(TradeOrder::getStatus, order.getStatus())
@@ -442,12 +515,13 @@ public class OrderService {
         openDispute(order, userId, reason);
     }
 
-    /** 受理范围与 notes/13 O12 前置一致：待面交 / 已验货 / 退款中；终态与已冻结不可再起 */
+    /** 受理范围与 notes/13 O12 前置一致：待面交 / 已验货 / 退款中，另含三种收货方式的履约态；终态与已冻结不可再起 */
     private void openDispute(TradeOrder order, Long applicantId, String reason) {
         OrderStatusEnum status = OrderStatusEnum.fromCode(order.getStatus());
         BizAssert.isTrue(status == OrderStatusEnum.WAIT_MEET || status == OrderStatusEnum.VERIFIED
-                || status == OrderStatusEnum.REFUNDING, OrderErrorCode.ORDER_STATUS_INVALID,
-                "当前状态不能发起纠纷");
+                || status == OrderStatusEnum.REFUNDING || status == OrderStatusEnum.WAIT_SHIP
+                || status == OrderStatusEnum.SHIPPED || status == OrderStatusEnum.WAIT_PICKUP,
+                OrderErrorCode.ORDER_STATUS_INVALID, "当前状态不能发起纠纷");
 
         String text = trim(reason);
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
@@ -622,6 +696,11 @@ public class OrderService {
         vo.setSellerId(o.getSellerId());
         vo.setAmount(o.getAmount());
         vo.setStatus(OrderStatusEnum.fromCode(o.getStatus()));
+        vo.setDeliveryType(DeliveryTypeEnum.fromCode(o.getDeliveryType()));
+        vo.setAddressId(o.getAddressId());
+        vo.setAddressContact(o.getAddressContact());
+        vo.setAddressPhone(o.getAddressPhone());
+        vo.setAddressDetail(o.getAddressDetail());
         vo.setMeetPointId(o.getMeetPointId());
         vo.setMeetTime(o.getMeetTime());
         // 仅卖家可见核销码；买家侧留空，前端据此隐藏并只展示输入框
@@ -684,6 +763,41 @@ public class OrderService {
     /** 买卖双方任一方都算当事人：面交是双方行为，不能只认买家 */
     private boolean isParty(TradeOrder order, Long userId) {
         return userId.equals(order.getBuyerId()) || userId.equals(order.getSellerId());
+    }
+
+    /**
+     * 取用下单时的地址并校验归属（买家收货 / 卖家自提）。
+     *
+     * <p>校验「地址属于本人 + 类型对得上」是硬不变量：少了它，买家可以传卖家的自提地址当收货地址，
+     * 或把收货地址塞给自提订单，订单上的地址快照就成了别人的信息。
+     */
+    private UserAddress requireAddress(Long ownerId, Long addressId, Integer kind, String message) {
+        BizAssert.notNull(addressId, CommonErrorCode.PARAM_ERROR, message);
+        UserAddress addr = userAddressMapper.selectOne(new LambdaQueryWrapper<UserAddress>()
+                .eq(UserAddress::getId, addressId)
+                .eq(UserAddress::getUserId, ownerId)
+                .eq(UserAddress::getKind, kind)
+                .eq(UserAddress::getDeleted, 0));
+        return BizAssert.notNull(addr, CommonErrorCode.PARAM_ERROR, message);
+    }
+
+    /** 地址快照文本：省市区 + 详细地址拼接，缺哪段补哪段 */
+    private String addressDetailOf(UserAddress addr) {
+        StringBuilder sb = new StringBuilder();
+        appendIfNotBlank(sb, addr.getProvince());
+        appendIfNotBlank(sb, addr.getCity());
+        appendIfNotBlank(sb, addr.getDistrict());
+        appendIfNotBlank(sb, addr.getDetail());
+        return sb.toString();
+    }
+
+    private void appendIfNotBlank(StringBuilder sb, String part) {
+        if (part != null && !part.isBlank()) {
+            if (!sb.isEmpty()) {
+                sb.append(' ');
+            }
+            sb.append(part.trim());
+        }
     }
 
     /**

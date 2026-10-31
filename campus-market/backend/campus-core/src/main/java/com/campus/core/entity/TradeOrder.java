@@ -25,6 +25,9 @@ import java.time.LocalDateTime;
  * 使纠纷取证有可信数据源。卖家后续修改商品时，历史订单的快照必须保持下单时的原样。
  *
  * <p>`version` 服务于订单自身的乐观锁；商品侧的占位并发另有 `item.version` 承担，两者互相独立。
+ *
+ * <p><b>收货地址同样在下单时快照进 `address_contact/phone/detail`</b>：与商品快照同理，防止卖家改提货点、
+ * 买家改收货地址后双方对「货去哪了」各执一词。面交订单无地址快照，地址信息由 `meet_point_id` 承载。
  */
 @Data
 @Accessors(chain = true)
@@ -49,10 +52,25 @@ public class TradeOrder {
     /** 见 {@link com.campus.core.enums.OrderStatusEnum} */
     private Integer status;
 
+    /** 收货方式：1面交 2自提 3送货上门（见 DeliveryTypeEnum），下单时从商品抄入，之后不再随商品改动 */
+    private Integer deliveryType;
+
     private Long meetPointId;
 
     /** 约定面交时间，下单时由双方约定 */
     private LocalDateTime meetTime;
+
+    /** 地址引用：送货上门=买家收货地址；自提=卖家提货地址；面交为空 */
+    private Long addressId;
+
+    /** 地址快照·联系人（下单时固化，防止事后改地址引发纠纷取证困难） */
+    private String addressContact;
+
+    /** 地址快照·联系电话 */
+    private String addressPhone;
+
+    /** 地址快照·完整地址（省+市+区+详细） */
+    private String addressDetail;
 
     /** 核销码，一单一张（`uk_verify_code` 唯一），任一方扫码即成立 */
     private String verifyCode;

@@ -122,7 +122,8 @@ async function submitDraft(item: ApiItemVO): Promise<void> {
       description: detail.description ?? undefined,
       images: (detail.images ?? []).map((i) => i.url),
       negotiable: detail.negotiable ?? 0,
-      deliveryIncluded: detail.deliveryIncluded ?? 0,
+      deliveryType: detail.deliveryType ?? 1,
+      pickupAddressId: detail.pickupAddressId ?? undefined,
       draft: false
     })
     ElMessage.success({ message: '已提交审核', duration: 2000 })

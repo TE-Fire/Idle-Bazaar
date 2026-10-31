@@ -45,7 +45,8 @@ public class AdminOrderController {
 
     @Operation(summary = "订单列表",
             description = "分页；可按状态、只看纠纷、关键词（订单号 / 商品快照标题 / 买卖双方昵称）筛选。"
-                    + "status 传枚举名（WAIT_PAY/WAIT_MEET/VERIFIED/COMPLETED/CANCELED/REFUNDING/REFUNDED/DISPUTING）。")
+                    + "status 传枚举名（WAIT_PAY/WAIT_MEET/VERIFIED/COMPLETED/CANCELED/REFUNDING/REFUNDED/DISPUTING"
+                    + "/WAIT_SHIP/SHIPPED/WAIT_PICKUP）。")
     @GetMapping("/list")
     @SaCheckPermission(type = StpAdminUtil.TYPE, value = PermCodes.ORDER_VIEW)
     public Result<PageResult<AdminOrderVO>> list(AdminOrderQueryReq req) {

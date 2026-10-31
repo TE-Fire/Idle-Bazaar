@@ -1,5 +1,6 @@
 package com.campus.core.dto.resp;
 
+import com.campus.core.enums.DeliveryTypeEnum;
 import com.campus.core.enums.OrderStatusEnum;
 import lombok.Data;
 
@@ -45,8 +46,23 @@ public class OrderVO {
 
     private BigDecimal amount;
 
-    /** 输出枚举名，前端不必维护 1–8 的映射 */
+    /** 输出枚举名，前端不必维护 1–11 的映射 */
     private OrderStatusEnum status;
+
+    /** 收货方式（枚举名），决定履约动作与地址交互 */
+    private DeliveryTypeEnum deliveryType;
+
+    /** 地址 id（送货上门=买家收货地址；自提=卖家提货地址；面交为空） */
+    private Long addressId;
+
+    /** 地址快照·联系人 */
+    private String addressContact;
+
+    /** 地址快照·联系电话 */
+    private String addressPhone;
+
+    /** 地址快照·完整地址（省+市+区+详细） */
+    private String addressDetail;
 
     private Long meetPointId;
 

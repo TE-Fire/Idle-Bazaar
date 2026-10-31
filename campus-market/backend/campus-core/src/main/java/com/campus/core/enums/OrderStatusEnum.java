@@ -5,10 +5,14 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 /**
- * 订单状态（`trade_order.status`，八态，状态机见 notes/13 第二节）。
+ * 订单状态（`trade_order.status`，十一态，状态机见 notes/13 第二节）。
  *
  * <p><b>对外输出枚举名而不是数字</b>（同 {@link ItemStatusEnum} 的口径）：
- * 前端不必再维护一份 1–8 的映射表，后端改状态语义时前端编译期就会报错。
+ * 前端不必再维护一份 1–11 的映射表，后端改状态语义时前端编译期就会报错。
+ *
+ * <p><b>付款之后的分化由收货方式决定</b>（{@code DeliveryTypeEnum}）：面交走
+ * 待面交→(核销)→已验货；自提走 待自提→(买家确认)；送货上门走 待发货→(卖家发货)→已发货→(买家确认)。
+ * 三个新态（待发货/已发货/待自提）与既有态共享同一套终态与冻结语义。
  *
  * <p><b>没有「已预定」</b>：商品侧同样没有，两者是同一个决策的两处落地——
  * 拍下不锁货，付款成功才由 {@code OrderService} 转 `SOLD`。
@@ -31,7 +35,16 @@ public enum OrderStatusEnum {
     REFUNDING(6, "退款中"),
     REFUNDED(7, "已退款"),
     /** 冻结态，双方不可操作，等待管理端裁决 */
-    DISPUTING(8, "纠纷中");
+    DISPUTING(8, "纠纷中"),
+
+    /** 送货上门：付款成功后待卖家发货 */
+    WAIT_SHIP(9, "待发货"),
+
+    /** 送货上门：卖家已发货，待买家确认收货 */
+    SHIPPED(10, "已发货"),
+
+    /** 自提：付款成功后待买家到提货地址自取 */
+    WAIT_PICKUP(11, "待自提");
 
     private final Integer code;
 
@@ -59,9 +72,9 @@ public enum OrderStatusEnum {
         return this == COMPLETED || this == CANCELED || this == REFUNDED;
     }
 
-    /** 买家可在未线下碰面前直接取消的阶段 */
+    /** 买家可在履约动作发生前直接取消的阶段（面交前 / 发货前 / 自提前） */
     public boolean canBuyerCancel() {
-        return this == WAIT_PAY || this == WAIT_MEET;
+        return this == WAIT_PAY || this == WAIT_MEET || this == WAIT_SHIP || this == WAIT_PICKUP;
     }
 
     /** 冻结：纠纷中订单双方均不可操作 */

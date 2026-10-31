@@ -37,7 +37,10 @@ export interface ApiItemVO {
   sellerAuthStatus?: number | null
   /** 1 可议价；议价在聊天里进行，不进订单 */
   negotiable?: number | null
-  deliveryIncluded?: number | null
+  /** 收货方式：1面交 2自提 3送货上门 */
+  deliveryType?: number | null
+  /** 自提地址 id（deliveryType=2 时有效） */
+  pickupAddressId?: string | null
   description?: string | null
   status: ItemStatus
   /** 发布时间（草稿是创建时间） */
@@ -63,7 +66,10 @@ export interface ItemPublishReq {
   description?: string
   images?: string[]
   negotiable?: number
-  deliveryIncluded?: number
+  /** 收货方式：1面交 2自提 3送货上门（必填） */
+  deliveryType: number
+  /** 自提地址 id：deliveryType=2 时必填 */
+  pickupAddressId?: string
   /** true = 暂存草稿（不进队、豁免图片与描述）；已发布商品编辑时忽略 */
   draft?: boolean
 }

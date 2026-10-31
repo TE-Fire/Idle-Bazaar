@@ -56,6 +56,8 @@ const routes: RouteRecordRaw[] = [
       { path: 'verify', name: 'verify', component: () => import('@/views/VerifyView.vue'), meta: { title: '学号认证' } },
       // 我的订单：买 / 卖两个视角共用一页，状态筛服务端（notes/13 第七节）
       { path: 'orders', name: 'orders', component: () => import('@/views/OrdersView.vue'), meta: { title: '我的订单' } },
+      // 地址簿：收货地址（送货上门用）/ 自提地址（发布自提商品用），?kind=1|2 切换
+      { path: 'address', name: 'address', component: () => import('@/views/AddressView.vue'), meta: { title: '地址管理' } },
       // 关注 / 粉丝：/follow 看自己，/user/:id/follow 看他人；?tab=fans 切到粉丝
       { path: 'follow', name: 'follow', component: () => import('@/views/FollowListView.vue'), meta: { title: '关注与粉丝' } },
       {

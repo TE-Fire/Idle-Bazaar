@@ -19,7 +19,10 @@ import com.campus.core.entity.Favorite;
 import com.campus.core.entity.Item;
 import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.ItemImage;
+import com.campus.core.entity.UserAddress;
+import com.campus.core.enums.AddressKindEnum;
 import com.campus.core.enums.AuditStatusEnum;
+import com.campus.core.enums.DeliveryTypeEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.mapper.AppUserMapper;
@@ -28,6 +31,7 @@ import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
+import com.campus.core.mapper.UserAddressMapper;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.campus.core.service.cache.UserPubCache;
 import com.campus.core.service.cache.ViewCounterCache;
@@ -85,6 +89,8 @@ public class ItemService {
 
     private final ReportMapper reportMapper;
 
+    private final UserAddressMapper userAddressMapper;
+
     private final ItemImageJanitor itemImageJanitor;
 
     private final FavoriteMapper favoriteMapper;
@@ -117,7 +123,8 @@ public class ItemService {
                 .setMeetPointId(req.getMeetPointId())
                 .setDescription(req.getDescription())
                 .setNegotiable(nvl(req.getNegotiable()))
-                .setDeliveryIncluded(nvl(req.getDeliveryIncluded()))
+                .setDeliveryType(validateDelivery(sellerId, req.getDeliveryType(), req.getPickupAddressId()))
+                .setPickupAddressId(req.getPickupAddressId())
                 .setStatus((draft ? ItemStatusEnum.DRAFT : ItemStatusEnum.PENDING).getCode());
         if (!images.isEmpty()) {
             // 首张即主图，列表页免查图表
@@ -359,7 +366,8 @@ public class ItemService {
                 .set(Item::getMeetPointId, req.getMeetPointId())
                 .set(Item::getDescription, req.getDescription())
                 .set(Item::getNegotiable, nvl(req.getNegotiable()))
-                .set(Item::getDeliveryIncluded, nvl(req.getDeliveryIncluded()))
+                .set(Item::getDeliveryType, validateDelivery(sellerId, req.getDeliveryType(), req.getPickupAddressId()))
+                .set(Item::getPickupAddressId, req.getPickupAddressId())
                 .set(Item::getMainImage, images.isEmpty() ? null : images.get(0));
         if (reaudit) {
             u.set(Item::getStatus, ItemStatusEnum.PENDING.getCode());
@@ -487,7 +495,8 @@ public class ItemService {
         vo.setMeetPointName(ctx.meetPoints.get(item.getMeetPointId()));
         vo.setSellerId(item.getSellerId());
         vo.setNegotiable(item.getNegotiable());
-        vo.setDeliveryIncluded(item.getDeliveryIncluded());
+        vo.setDeliveryType(item.getDeliveryType());
+        vo.setPickupAddressId(item.getPickupAddressId());
         vo.setDescription(item.getDescription());
         vo.setStatus(ItemStatusEnum.fromCode(item.getStatus()));
         vo.setPublishAt(item.getPublishedAt());
@@ -597,6 +606,29 @@ public class ItemService {
 
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /**
+     * 校验收货方式并落到库值：非法 deliveryType 一律报参错；自提(deliveryType=2)必须带一个
+     * 归属当前卖家、类型为 PICKUP 的提货地址，否则发布/编辑都会被拦下——
+     * 「自提场景须由卖家设置提货地址」的硬约束就落在这一处，漏校验会让自提订单无提货点可去。
+     *
+     * @return 归一化后的 deliveryType 库值（缺省按面交 1 兜底）
+     */
+    private int validateDelivery(Long sellerId, Integer deliveryType, Long pickupAddressId) {
+        int dt = deliveryType == null ? DeliveryTypeEnum.MEET.getCode() : deliveryType;
+        BizAssert.isTrue(dt >= DeliveryTypeEnum.MEET.getCode() && dt <= DeliveryTypeEnum.DELIVERY.getCode(),
+                CommonErrorCode.PARAM_ERROR, "收货方式不合法");
+        if (dt == DeliveryTypeEnum.PICKUP.getCode()) {
+            BizAssert.notNull(pickupAddressId, CommonErrorCode.PARAM_ERROR, "自提商品必须设置提货地址");
+            UserAddress pickup = userAddressMapper.selectOne(new LambdaQueryWrapper<UserAddress>()
+                    .eq(UserAddress::getId, pickupAddressId)
+                    .eq(UserAddress::getUserId, sellerId)
+                    .eq(UserAddress::getKind, AddressKindEnum.PICKUP.getCode())
+                    .eq(UserAddress::getDeleted, 0));
+            BizAssert.notNull(pickup, CommonErrorCode.PARAM_ERROR, "提货地址不存在或不属于当前用户");
+        }
+        return dt;
     }
 
     /**

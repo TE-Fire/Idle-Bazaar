@@ -22,10 +22,29 @@ import {
   type GoodsItem,
   type ItemStatus
 } from '@campus/shared'
-import { userDictApi, userItemApi, uploadImage, type CategoryVO } from '@campus/api'
+import {
+  userDictApi,
+  userItemApi,
+  userAddressApi,
+  uploadImage,
+  ADDRESS_KIND,
+  fullAddress,
+  type CategoryVO,
+  type UserAddressVO
+} from '@campus/api'
 import ProductCard from '@/components/ProductCard.vue'
 
 const router = useRouter()
+
+/** 收货方式（与后端 DeliveryTypeEnum 的 code 一致）：1 面交 2 自提 3 送货上门 */
+const DELIVERY_TYPES = [
+  { code: 1, label: '面交', hint: '约定面交点，双方现场交易' },
+  { code: 2, label: '自提', hint: '买家到你设置的提货地址自取' },
+  { code: 3, label: '送货上门', hint: '买家下单时填收货地址，你负责送达' }
+] as const
+
+/** 卖家自己的自提地址（kind=2），只在收货方式选「自提」时需要 */
+const pickupAddresses = ref<UserAddressVO[]>([])
 
 /* ── 字典：分类 / 成色 / 校区 / 面交点 ─────────────────── */
 
@@ -64,6 +83,15 @@ onMounted(async () => {
   }
 })
 
+/** 自提地址簿：选「自提」时从这里挑一个作为提货点。未登录 / 拉取失败时留空，前端提示去添加 */
+onMounted(async () => {
+  try {
+    pickupAddresses.value = await userAddressApi.list(ADDRESS_KIND.PICKUP)
+  } catch {
+    // 无地址不影响发布面交 / 送货上门；选「自提」时会被必填校验拦下并提示先添加
+  }
+})
+
 /* ── 编辑模式：?edit={id} 回填已有商品 ─────────────────── */
 
 const editMode = ref(false)
@@ -87,6 +115,8 @@ onMounted(async () => {
     form.value.originPrice = item.originPrice ? Number(item.originPrice) : null
     form.value.campusId = item.campusId
     form.value.meetPointId = item.meetPointId ?? ''
+    form.value.deliveryType = item.deliveryType ?? 1
+    form.value.pickupAddressId = item.pickupAddressId ?? ''
     form.value.description = item.description ?? ''
     existingImages.value = (item.images ?? []).map((i) => i.url)
   } catch {
@@ -176,9 +206,10 @@ const form = ref({
   originPrice: null as number | null,
   campusId: '',
   meetPointId: '',
+  deliveryType: 1 as number,
+  pickupAddressId: '',
   description: '',
-  negotiable: false,
-  delivery: false
+  negotiable: false
 })
 
 /** 实时预览：把表单拼成一个 GoodsItem 喂给 ProductCard，预览与实际卡片永远一致 */
@@ -193,7 +224,7 @@ const preview = computed<GoodsItem>(() => ({
   campus: campuses.value.find((c) => c.id === form.value.campusId)?.name ?? '待选校区',
   meetPoint: meetPoints.value.find((m) => m.id === form.value.meetPointId)?.name ?? '待填面交点',
   negotiable: form.value.negotiable,
-  delivery: form.value.delivery,
+  delivery: form.value.deliveryType === 3,
   status: ITEM_STATUS.DRAFT,
   wantCount: 0,
   seller: { id: 'me', nick: '我', verified: true, credit: '良好', tints: ['#BFD4EA', '#8FA9C4'] },
@@ -213,7 +244,9 @@ const canSubmit = computed(
     form.value.title.trim().length <= 50 &&
     (form.value.price ?? 0) > 0 &&
     !!form.value.categoryId &&
-    !!form.value.campusId
+    !!form.value.campusId &&
+    // 自提必须选一个提货地址（后端硬校验，前端先拦一遍）
+    (form.value.deliveryType !== 2 || !!form.value.pickupAddressId)
 )
 
 /** Ctrl+Enter 提交（design/01 §七 键盘约定） */
@@ -252,12 +285,14 @@ async function save(draft: boolean): Promise<void> {
     price: form.value.price as number,
     originPrice: form.value.originPrice ?? undefined,
     campusId: form.value.campusId,
-    meetPointId: form.value.meetPointId || undefined,
+    // 面交点只对面交有意义；自提 / 送货上门带过去也会被后端忽略，这里干脆不发
+    meetPointId: form.value.deliveryType === 1 ? form.value.meetPointId || undefined : undefined,
+    deliveryType: form.value.deliveryType,
+    pickupAddressId: form.value.deliveryType === 2 ? form.value.pickupAddressId || undefined : undefined,
     description: form.value.description.trim() || undefined,
     // 编辑时已有图片原样带回 + 新上传的 accessUrl，整体替换（后端不传差量）
     images: [...existingImages.value, ...shots.value.map((s) => s.url)],
     negotiable: form.value.negotiable ? 1 : 0,
-    deliveryIncluded: form.value.delivery ? 1 : 0,
     draft
   }
   try {
@@ -348,10 +383,41 @@ async function save(draft: boolean): Promise<void> {
             </el-select>
           </el-form-item>
 
-          <el-form-item label="面交点">
+          <el-form-item label="收货方式">
+            <div class="delivery-pick">
+              <el-radio-group v-model="form.deliveryType">
+                <el-radio v-for="d in DELIVERY_TYPES" :key="d.code" :value="d.code">{{ d.label }}</el-radio>
+              </el-radio-group>
+              <p class="delivery-pick__hint">
+                {{ DELIVERY_TYPES.find((d) => d.code === form.deliveryType)?.hint }}
+              </p>
+            </div>
+          </el-form-item>
+
+          <el-form-item v-if="form.deliveryType === 1" label="面交点">
             <el-select v-model="form.meetPointId" placeholder="选择面交点" :disabled="!form.campusId">
               <el-option v-for="m in meetPointsOfCampus" :key="m.id" :label="m.name" :value="m.id" />
             </el-select>
+          </el-form-item>
+
+          <el-form-item v-if="form.deliveryType === 2" label="提货地址">
+            <div class="pickup-pick">
+              <el-select
+                v-model="form.pickupAddressId"
+                placeholder="选择自提地址"
+                :disabled="!pickupAddresses.length"
+              >
+                <el-option
+                  v-for="a in pickupAddresses"
+                  :key="a.id"
+                  :label="`${a.contactName} · ${fullAddress(a)}`"
+                  :value="a.id"
+                />
+              </el-select>
+              <router-link v-if="!pickupAddresses.length" class="pickup-pick__todo" to="/address?kind=2">
+                还没有自提地址，去添加 ›
+              </router-link>
+            </div>
           </el-form-item>
 
           <el-form-item label="描述">
@@ -360,7 +426,6 @@ async function save(draft: boolean): Promise<void> {
 
           <el-form-item label="交易选项">
             <el-checkbox v-model="form.negotiable">可议价</el-checkbox>
-            <el-checkbox v-model="form.delivery">包校园配送</el-checkbox>
           </el-form-item>
         </el-form>
 
@@ -392,6 +457,7 @@ async function save(draft: boolean): Promise<void> {
           <li :class="{ ok: (form.price ?? 0) > 0 }">已填价格</li>
           <li :class="{ ok: !!form.categoryId }">已选分类</li>
           <li :class="{ ok: !!form.campusId }">已选校区</li>
+          <li v-if="form.deliveryType === 2" :class="{ ok: !!form.pickupAddressId }">已选自提地址</li>
           <li :class="{ ok: form.grade !== 'D' || !!form.description.trim() }">成色 D 已写瑕疵</li>
         </ul>
       </aside>
@@ -554,6 +620,30 @@ async function save(draft: boolean): Promise<void> {
 .price-row__label {
   font-size: var(--cm-font-size-sm);
   color: var(--cm-color-text-3);
+}
+
+/* 收货方式：单选 + 一句说明，说明随选择变化，减少「选了不知道意味着什么」的困惑 */
+.delivery-pick__hint {
+  margin: var(--cm-space-1) 0 0;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+}
+
+.pickup-pick {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-1);
+  width: 100%;
+}
+
+.pickup-pick__todo {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-brand);
+  text-decoration: none;
+}
+
+.pickup-pick__todo:hover {
+  text-decoration: underline;
 }
 
 .submit {

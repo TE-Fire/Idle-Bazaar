@@ -132,6 +132,24 @@ CREATE TABLE app_user (
   KEY idx_status (status)
 ) ENGINE=InnoDB COMMENT='学生用户';
 
+CREATE TABLE user_address (
+  id            bigint       NOT NULL COMMENT '雪花ID',
+  user_id       bigint       NOT NULL COMMENT '所属用户（买家维护收货地址，卖家维护自提地址）',
+  kind          tinyint      NOT NULL COMMENT '1收货地址(SHIP) 2自提地址(PICKUP)',
+  contact_name  varchar(64)  NOT NULL COMMENT '联系人',
+  contact_phone varchar(32)  NOT NULL COMMENT '联系电话',
+  province      varchar(64)  DEFAULT NULL COMMENT '省',
+  city          varchar(64)  DEFAULT NULL COMMENT '市',
+  district      varchar(64)  DEFAULT NULL COMMENT '区/县',
+  detail        varchar(255) NOT NULL COMMENT '详细地址（门牌/楼栋/摊位号）',
+  is_default    tinyint      NOT NULL DEFAULT 0 COMMENT '是否默认地址（同类地址唯一默认）',
+  create_time   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time   datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted       bigint       NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  KEY idx_user (user_id, kind, deleted) COMMENT '我的收货地址 / 我的自提地址'
+) ENGINE=InnoDB COMMENT='用户地址（收货SHIP/自提PICKUP两类同表，下单时快照进订单）';
+
 CREATE TABLE user_auth (
   id             bigint       NOT NULL COMMENT '雪花ID',
   user_id        bigint       NOT NULL COMMENT '申请人',
@@ -170,7 +188,8 @@ CREATE TABLE item (
   main_image         varchar(255)   DEFAULT NULL COMMENT '主图，列表页免查图表',
   status             tinyint        NOT NULL DEFAULT 1 COMMENT '1草稿 2待审核 3在售 4已下架 5已售出 6审核未过 7已强制下架',
   negotiable         tinyint        NOT NULL DEFAULT 0 COMMENT '可议价标签（仅展示，无议价流程）',
-  delivery_included  tinyint        NOT NULL DEFAULT 0 COMMENT '是否包配送',
+  delivery_type      tinyint        NOT NULL DEFAULT 1 COMMENT '收货方式：1面交 2自提 3送货上门',
+  pickup_address_id  bigint         DEFAULT NULL COMMENT '自提地址（delivery_type=2时必填，引用 user_address）',
   reject_reason      varchar(255)   DEFAULT NULL COMMENT '驳回原因',
   version            int            NOT NULL DEFAULT 0 COMMENT '乐观锁（付款占位并发用）',
   view_count         int            NOT NULL DEFAULT 0 COMMENT '浏览量',
@@ -222,7 +241,12 @@ CREATE TABLE trade_order (
   buyer_id        bigint        NOT NULL COMMENT '买家',
   seller_id       bigint        NOT NULL COMMENT '卖家',
   amount          decimal(10,2) NOT NULL COMMENT '成交金额（一律按标价，议价不进订单）',
-  status          tinyint       NOT NULL DEFAULT 1 COMMENT '1待付款 2待面交 3已验货 4已完成 5已取消 6退款中 7已退款 8纠纷中',
+  status          tinyint       NOT NULL DEFAULT 1 COMMENT '1待付款 2待面交 3已验货 4已完成 5已取消 6退款中 7已退款 8纠纷中 9待发货 10已发货 11待自提',
+  delivery_type   tinyint       NOT NULL DEFAULT 1 COMMENT '收货方式：1面交 2自提 3送货上门（下单时从商品抄入）',
+  address_id      bigint        DEFAULT NULL COMMENT '地址引用：送货上门=买家收货地址；自提=卖家提货地址',
+  address_contact varchar(64)   DEFAULT NULL COMMENT '地址快照·联系人',
+  address_phone   varchar(32)   DEFAULT NULL COMMENT '地址快照·联系电话',
+  address_detail  varchar(255)  DEFAULT NULL COMMENT '地址快照·完整地址（省+市+区+详细）',
   meet_point_id   bigint        DEFAULT NULL COMMENT '面交点',
   meet_time       datetime      DEFAULT NULL COMMENT '约定面交时间',
   verify_code     varchar(32)   DEFAULT NULL COMMENT '核销码（二维码内容）',

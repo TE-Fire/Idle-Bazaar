@@ -55,7 +55,11 @@ public class ApiItemVO {
     /** 1 可议价；议价在聊天里进行，不进订单 */
     private Integer negotiable;
 
-    private Integer deliveryIncluded;
+    /** 收货方式：1面交 2自提 3送货上门 */
+    private Integer deliveryType;
+
+    /** 自提地址 id（deliveryType=2 时有效，引用 user_address.kind=PICKUP） */
+    private Long pickupAddressId;
 
     private String description;
 

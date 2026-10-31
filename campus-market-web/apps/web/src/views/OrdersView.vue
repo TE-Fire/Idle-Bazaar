@@ -28,6 +28,9 @@ const session = useUserStore()
 const FILTERS: Array<{ label: string; status?: UserOrderStatus }> = [
   { label: '全部' },
   { label: '待付款', status: 'WAIT_PAY' },
+  { label: '待发货', status: 'WAIT_SHIP' },
+  { label: '待自提', status: 'WAIT_PICKUP' },
+  { label: '已发货', status: 'SHIPPED' },
   { label: '待面交', status: 'WAIT_MEET' },
   { label: '已验货', status: 'VERIFIED' },
   { label: '退款中', status: 'REFUNDING' },
@@ -46,7 +49,10 @@ const STATUS_TEXT: Record<UserOrderStatus, { buyer: string; seller: string }> = 
   CANCELED: { buyer: '已取消', seller: '已取消' },
   REFUNDING: { buyer: '退款中', seller: '退款待处理' },
   REFUNDED: { buyer: '已退款', seller: '已退款' },
-  DISPUTING: { buyer: '纠纷中', seller: '纠纷中' }
+  DISPUTING: { buyer: '纠纷中', seller: '纠纷中' },
+  WAIT_SHIP: { buyer: '待发货', seller: '待发货' },
+  SHIPPED: { buyer: '已发货', seller: '已发货' },
+  WAIT_PICKUP: { buyer: '待自提', seller: '待自提' }
 }
 
 const role = ref<OrderRole>('buyer')
@@ -105,7 +111,8 @@ function statusText(s: UserOrderStatus): string {
 function statusClass(s: UserOrderStatus): string {
   if (s === 'WAIT_PAY' || s === 'REFUNDING') return 'warn'
   if (s === 'DISPUTING') return 'danger'
-  if (s === 'WAIT_MEET' || s === 'VERIFIED') return 'ok'
+  if (s === 'WAIT_MEET' || s === 'VERIFIED' || s === 'WAIT_SHIP' || s === 'SHIPPED' || s === 'WAIT_PICKUP')
+    return 'ok'
   return 'muted'
 }
 
@@ -186,7 +193,12 @@ onMounted(() => {
         <div class="card__right">
           <b class="card__amount">¥{{ o.amount }}</b>
           <!-- 退款中的单在列表上直接给卖家人口，省得进详情才发现要处理 -->
-          <span v-if="role === 'seller' && o.status === 'REFUNDING'" class="card__todo">待你处理</span>
+          <span
+            v-if="role === 'seller' && (o.status === 'REFUNDING' || o.status === 'WAIT_SHIP')"
+            class="card__todo"
+          >
+            待你处理
+          </span>
           <span v-else class="card__go">查看详情 →</span>
         </div>
       </article>

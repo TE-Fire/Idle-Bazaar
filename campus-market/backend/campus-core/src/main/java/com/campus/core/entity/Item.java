@@ -61,7 +61,11 @@ public class Item {
     /** 可议价标签（仅展示，无议价流程） */
     private Integer negotiable;
 
-    private Integer deliveryIncluded;
+    /** 收货方式：1面交 2自提 3送货上门（见 DeliveryTypeEnum） */
+    private Integer deliveryType;
+
+    /** 自提地址：delivery_type=2 时必填，引用 user_address(kind=PICKUP) */
+    private Long pickupAddressId;
 
     /** 驳回 / 强制下架原因，详情页与申诉复盘要看 */
     private String rejectReason;

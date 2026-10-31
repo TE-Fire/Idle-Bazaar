@@ -13,7 +13,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
 import {
+  ADDRESS_KIND,
   REPORT_TARGET,
+  fullAddress,
+  userAddressApi,
   userDictApi,
   userItemApi,
   userItemCommentApi,
@@ -21,7 +24,8 @@ import {
   userOrderApi,
   type ApiItemVO,
   type CategoryVO,
-  type ItemCommentVO
+  type ItemCommentVO,
+  type UserAddressVO
 } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
@@ -103,6 +107,12 @@ const selected = computed(() => (item.value ? compare.has(item.value.id) : false
 const isMine = computed(() => !!item.value && userStore.userId === item.value.sellerId)
 /** 仅在售可下单：下架 / 已售不开放购买入口 */
 const onSale = computed(() => item.value?.status === 'ON_SALE')
+
+/** 收货方式（与后端 DeliveryTypeEnum 的 code 一致）：1 面交 2 自提 3 送货上门 */
+const DELIVERY = { MEET: 1, PICKUP: 2, DELIVERY: 3 } as const
+const deliveryType = computed(() => item.value?.deliveryType ?? DELIVERY.MEET)
+const DELIVERY_LABELS: Record<number, string> = { 1: '面交', 2: '自提', 3: '送货上门' }
+const deliveryLabel = computed(() => DELIVERY_LABELS[deliveryType.value] ?? '面交')
 /** 卖家头像：按种子约定从 sellerId 派生 demo 头像（后端暂未下发 sellerAvatar） */
 const sellerAvatarUrl = computed(() => `/api/file/demo/avatar/${item.value?.sellerId}.png`)
 
@@ -120,7 +130,7 @@ function onCompare(): void {
     campus: item.value.campusName ?? '',
     meetPoint: item.value.meetPointName ?? '待定',
     negotiable: !!item.value.negotiable,
-    delivery: !!item.value.deliveryIncluded,
+    delivery: item.value.deliveryType === 3,
     status: item.value.status,
     wantCount: 0,
     description: item.value.description ?? '',
@@ -141,9 +151,18 @@ function onCompare(): void {
     ElMessage.warning({ message: `对比仅限同类商品（${compare.lockedCategoryName}）`, duration: 2200 })
 }
 
+/* ── 下单：送货上门需先选收货地址，面交 / 自提直接下单 ─── */
+
+const addressDialogVisible = ref(false)
+const addressLoading = ref(false)
+const shipAddresses = ref<UserAddressVO[]>([])
+const selectedAddressId = ref('')
+
 /**
  * 立即购买：登录后下单（待付款），跳订单详情页完成付款 / 面交核销。
- * 面交电商的入口——没有它用户只能「聊一聊」却下不了单。
+ *
+ * <p>三条收货方式分叉：面交直接下单（面交点下单后约）、自提直接用卖家提货地址、
+ * 送货上门必须先选收货地址——所以只有送货上门会先弹地址选择框。
  */
 async function onBuy(): Promise<void> {
   if (!item.value) return
@@ -151,13 +170,53 @@ async function onBuy(): Promise<void> {
     void router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
+  if (deliveryType.value === DELIVERY.DELIVERY) {
+    await openAddressPicker()
+    return
+  }
+  await createOrder()
+}
+
+async function createOrder(addressId?: string): Promise<void> {
+  if (!item.value) return
   try {
-    const orderId = await userOrderApi.create({ itemId: item.value.id })
+    const orderId = await userOrderApi.create({ itemId: item.value.id, addressId })
     ElMessage.success('订单已创建，去付款')
     void router.push({ name: 'order-detail', params: { id: orderId } })
   } catch {
-    // http 层已提示（商品不在售 / 库存等）
+    // http 层已提示（商品不在售 / 未选地址等）
   }
+}
+
+/** 打开收货地址选择框：默认选中默认地址，没有默认就选第一条 */
+async function openAddressPicker(): Promise<void> {
+  addressDialogVisible.value = true
+  addressLoading.value = true
+  try {
+    shipAddresses.value = await userAddressApi.list(ADDRESS_KIND.SHIP)
+    if (!shipAddresses.value.some((a) => a.id === selectedAddressId.value)) {
+      const def = shipAddresses.value.find((a) => a.isDefault === 1) ?? shipAddresses.value[0]
+      selectedAddressId.value = def?.id ?? ''
+    }
+  } catch {
+    // http 层已提示
+  } finally {
+    addressLoading.value = false
+  }
+}
+
+async function confirmAddressOrder(): Promise<void> {
+  if (!selectedAddressId.value) {
+    ElMessage.warning({ message: '请先选择收货地址', duration: 2000 })
+    return
+  }
+  addressDialogVisible.value = false
+  await createOrder(selectedAddressId.value)
+}
+
+function goAddressManage(): void {
+  addressDialogVisible.value = false
+  void router.push({ name: 'address', query: { kind: String(ADDRESS_KIND.SHIP) } })
 }
 
 /**
@@ -324,7 +383,18 @@ function goSeller(): void {
         <h1 class="title">{{ item.title }}</h1>
 
         <div class="tags">
-          <span v-if="item.deliveryIncluded" class="cm-tag cm-tag--red">包邮</span>
+          <span
+            class="cm-tag"
+            :class="
+              deliveryType === DELIVERY.DELIVERY
+                ? 'cm-tag--red'
+                : deliveryType === DELIVERY.PICKUP
+                  ? 'cm-tag--yellow'
+                  : 'cm-tag--blue'
+            "
+          >
+            {{ deliveryLabel }}
+          </span>
           <span v-if="item.negotiable" class="cm-tag cm-tag--yellow">可议价</span>
           <span class="cm-tag cm-tag--blue">信用 {{ item.sellerCredit ?? 100 }} 分</span>
         </div>
@@ -342,11 +412,22 @@ function goSeller(): void {
           <dd>{{ item.grade }} 级 · {{ CONDITION_LABELS[item.grade as 'A'] }}</dd>
           <dt>校区</dt>
           <dd>{{ item.campusName }}</dd>
-          <dt>面交点</dt>
-          <dd>{{ item.meetPointName ?? '待定' }}</dd>
+          <dt>收货方式</dt>
+          <dd>{{ deliveryLabel }}</dd>
+          <template v-if="deliveryType === DELIVERY.MEET">
+            <dt>面交点</dt>
+            <dd>{{ item.meetPointName ?? '待定' }}</dd>
+          </template>
           <dt>发布</dt>
           <dd>{{ formatRelativeTime(item.publishAt) }}</dd>
         </dl>
+
+        <p v-if="deliveryType === DELIVERY.DELIVERY" class="delivery-note">
+          送货上门：下单时选择你的收货地址，卖家发货后你确认收货。
+        </p>
+        <p v-else-if="deliveryType === DELIVERY.PICKUP" class="delivery-note">
+          自提：下单后到卖家设置的提货地址自取，付款后订单里可见具体地址。
+        </p>
 
         <div class="acts">
           <template v-if="isMine">
@@ -477,6 +558,28 @@ function goSeller(): void {
       <el-button type="primary" @click="router.push({ name: 'home' })">回首页逛逛</el-button>
     </el-empty>
   </div>
+
+  <!-- 送货上门：先选收货地址再下单 -->
+  <el-dialog v-model="addressDialogVisible" title="选择收货地址" width="460px" append-to-body>
+    <div v-loading="addressLoading" class="addr-pick">
+      <p v-if="!addressLoading && !shipAddresses.length" class="addr-pick__empty">
+        还没有收货地址，
+        <el-button link type="primary" @click="goAddressManage">去添加 ›</el-button>
+      </p>
+      <el-radio-group v-else v-model="selectedAddressId" class="addr-pick__group">
+        <el-radio v-for="a in shipAddresses" :key="a.id" :value="a.id" class="addr-pick__row">
+          <span class="addr-pick__name">{{ a.contactName }}</span>
+          <span class="addr-pick__phone">{{ a.contactPhone }}</span>
+          <span v-if="a.isDefault === 1" class="addr-pick__badge">默认</span>
+          <span class="addr-pick__detail">{{ fullAddress(a) }}</span>
+        </el-radio>
+      </el-radio-group>
+    </div>
+    <template #footer>
+      <el-button @click="addressDialogVisible = false">取消</el-button>
+      <el-button type="primary" :disabled="!selectedAddressId" @click="confirmAddressOrder">确认下单</el-button>
+    </template>
+  </el-dialog>
 
   <SharePoster v-if="posterOpen && item" :item="item" @close="posterOpen = false" />
   <ReportDialog v-model="reportOpen" :target-type="REPORT_TARGET.ITEM_COMMENT" :target-id="reportId" />
@@ -615,6 +718,73 @@ function goSeller(): void {
 .params dd {
   margin: 0;
   color: var(--cm-color-text-1);
+}
+
+.delivery-note {
+  margin: 0 0 var(--cm-space-4);
+  padding: var(--cm-space-2) var(--cm-space-3);
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-2);
+  background: var(--cm-color-bg);
+  border-radius: var(--cm-radius-md);
+}
+
+/* 收货地址选择：每行一条，选中态描边 */
+.addr-pick {
+  min-height: 60px;
+}
+
+.addr-pick__empty {
+  margin: var(--cm-space-3) 0;
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-3);
+}
+
+.addr-pick__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cm-space-2);
+  width: 100%;
+}
+
+.addr-pick__row {
+  display: flex;
+  align-items: center;
+  height: auto;
+  padding: var(--cm-space-3);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-lg);
+  margin-right: 0;
+}
+
+.addr-pick__row.is-checked {
+  border-color: var(--cm-color-brand);
+  background: var(--cm-color-brand-bg);
+}
+
+.addr-pick__name {
+  font-weight: 600;
+}
+
+.addr-pick__phone {
+  margin-left: var(--cm-space-2);
+  color: var(--cm-color-text-2);
+}
+
+.addr-pick__badge {
+  margin-left: var(--cm-space-2);
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-brand);
+  border-radius: var(--cm-radius-sm);
+  padding: 0 6px;
+}
+
+.addr-pick__detail {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
 }
 
 .acts {

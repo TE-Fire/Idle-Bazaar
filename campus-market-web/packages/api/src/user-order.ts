@@ -27,6 +27,15 @@ export type UserOrderStatus =
   | 'REFUNDING'
   | 'REFUNDED'
   | 'DISPUTING'
+  /** 送货上门：待卖家发货 */
+  | 'WAIT_SHIP'
+  /** 送货上门：卖家已发货，待买家确认收货 */
+  | 'SHIPPED'
+  /** 自提：待买家到提货地址自取 */
+  | 'WAIT_PICKUP'
+
+/** 与后端 `DeliveryTypeEnum` 枚举名逐字一致 */
+export type DeliveryType = 'MEET' | 'PICKUP' | 'DELIVERY'
 
 /** 买卖双方查同一个用户的两个方向，后端按 buyer_id / seller_id 走两个索引 */
 export type OrderRole = 'buyer' | 'seller'
@@ -48,6 +57,16 @@ export interface UserOrderVO {
   /** 2 位小数字符串 */
   amount: string
   status: UserOrderStatus
+  /** 收货方式：面交/自提/送货上门，决定履约动作与地址交互 */
+  deliveryType?: DeliveryType
+  /** 地址 id：送货上门=买家收货地址；自提=卖家提货地址；面交为空 */
+  addressId?: string
+  /** 地址快照·联系人 */
+  addressContact?: string
+  /** 地址快照·联系电话 */
+  addressPhone?: string
+  /** 地址快照·完整地址（省+市+区+详细） */
+  addressDetail?: string
   meetPointId?: string
   /** 面交点名称，如「一食堂门口」 */
   meetPointName?: string
@@ -75,6 +94,8 @@ export interface UserOrderVO {
 export interface OrderCreateReq {
   itemId: string
   meetPointId?: string
+  /** 送货上门时买家选定的收货地址 id（其余方式不传） */
+  addressId?: string
   meetTime?: string
 }
 
@@ -109,7 +130,10 @@ export const userOrderApi = {
   verify: (id: string, code: string) =>
     request<void>({ url: `/api/order/${id}/verify`, method: 'POST', params: { code } }),
 
-  /** 确认收货：已验货 → 已完成，必须先核销不能跳过面交 */
+  /** 卖家发货（仅送货上门）：待发货 → 已发货 */
+  ship: (id: string) => request<void>({ url: `/api/order/${id}/ship`, method: 'POST' }),
+
+  /** 确认收货：已验货/已发货/待自提 → 已完成；面交必须先核销不能跳过 */
   receive: (id: string) => request<void>({ url: `/api/order/${id}/receive`, method: 'POST' }),
 
   /**
