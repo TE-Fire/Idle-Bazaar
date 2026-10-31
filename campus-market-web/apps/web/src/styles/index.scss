@@ -228,6 +228,24 @@ a {
   }
 }
 
+/* 邮箱后缀下拉：与浅灰输入底形成对比——品牌纸底 + 品牌描边，自绘箭头 */
+.cm-auth-field__select {
+  flex: none;
+  height: 30px;
+  margin-left: var(--cm-space-2);
+  padding: 0 26px 0 10px;
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-brand-bg)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='6' viewBox='0 0 8 6'%3E%3Cpath d='M0 0l4 6 4-6z' fill='%235E5E68'/%3E%3C/svg%3E")
+    no-repeat right 9px center;
+  border: 1px solid var(--cm-color-brand-border);
+  border-radius: var(--cm-radius-md);
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
 .cm-auth-submit {
   width: 100%;
   height: 44px;
