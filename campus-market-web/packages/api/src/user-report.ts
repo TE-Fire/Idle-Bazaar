@@ -74,5 +74,8 @@ export const userNoticeApi = {
   /** 未读条数（字符串形式的数字） */
   unread: () => request<string>({ url: '/api/notice/unread' }),
 
+  /** 单条已读：点开一封时调用，幂等 */
+  readOne: (id: string) => request<void>({ url: `/api/notice/${id}/read`, method: 'POST' }),
+
   readAll: () => request<void>({ url: '/api/notice/read-all', method: 'POST' })
 }

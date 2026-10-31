@@ -16,8 +16,9 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowRight, Bell, ChatDotRound, Compass, CopyDocument, Edit, Goods, Position, Postcard, SwitchButton, Top } from '@element-plus/icons-vue'
-import { userDictApi, userNoticeApi } from '@campus/api'
+import { userDictApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
+import { useNoticeStore } from '@/stores/notice'
 import { useUserStore } from '@/stores/user'
 import CompareBar from '@/components/CompareBar.vue'
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
@@ -62,18 +63,14 @@ const campus = computed({
 })
 
 /** 系统通知未读：菜单里给个红点，用户才知道有事发生（不做成数字，个数没有意义） */
-const unread = ref(0)
+const notice = useNoticeStore()
 
-async function loadUnread(): Promise<void> {
+function loadUnread(): void {
   if (!session.isLogin) {
-    unread.value = 0
+    notice.reset()
     return
   }
-  try {
-    unread.value = Number(await userNoticeApi.unread()) || 0
-  } catch {
-    unread.value = 0
-  }
+  void notice.refresh()
 }
 
 onMounted(async () => {
@@ -222,7 +219,7 @@ async function logout(): Promise<void> {
                   </el-dropdown-item>
                   <el-dropdown-item @click="goNotices">
                     <el-icon><Bell /></el-icon>系统通知
-                    <span v-if="unread" class="udrop__dot" />
+                    <span v-if="notice.hasUnread" class="udrop__dot" />
                   </el-dropdown-item>
                   <el-dropdown-item v-if="session.authStatus !== 2" @click="goVerify">
                     <el-icon><Postcard /></el-icon>学号认证

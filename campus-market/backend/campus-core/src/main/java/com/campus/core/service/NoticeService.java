@@ -161,6 +161,25 @@ public class NoticeService {
         return n == null ? 0L : n;
     }
 
+    /**
+     * 单条已读：点开一封信时调用。
+     *
+     * <p>条件里带 `receiverId`，不能只按 id 改——那是拿别人的通知当自己的标本。
+     * 已读、已删、id 不属于自己一律静默成功，重复点开同一封不该报错。
+     */
+    @Transactional
+    public void markRead(long userId, long id) {
+        msgMapper.update(null, new LambdaUpdateWrapper<MsgMessage>()
+                .eq(MsgMessage::getId, id)
+                .eq(MsgMessage::getReceiverId, userId)
+                .eq(MsgMessage::getZone, ZONE_SYSTEM)
+                .eq(MsgMessage::getSenderId, SENDER_SYSTEM)
+                .eq(MsgMessage::getReadFlag, READ_NO)
+                .eq(MsgMessage::getDeleted, 0L)
+                .set(MsgMessage::getReadFlag, READ_YES)
+                .set(MsgMessage::getReadTime, LocalDateTime.now()));
+    }
+
     /** 全部标记已读（不按条点，系统通知没有逐条已读的必要） */
     @Transactional
     public void markAllRead(long userId) {

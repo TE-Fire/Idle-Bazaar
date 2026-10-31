@@ -16,11 +16,14 @@ import { onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { getSession, clearSession } from '@/utils/session'
 import { userAuthApi } from '@/api/user'
+import { noticeApi } from '@/api/social'
 import CmIcon from '@/components/CmIcon.vue'
 import TabBar from '@/components/TabBar.vue'
 
 const nick = ref('')
 const avatar = ref('')
+/** 系统通知未读：> 0 时「系统通知」格右上角亮红点 */
+const unreadNotice = ref(0)
 
 interface OrderEntry {
   key: string
@@ -51,11 +54,24 @@ const serviceEntries: ServiceEntry[] = [
   { key: 'verify', label: '学号认证', icon: 'shield', tint: 'teal' }
 ]
 
-/** onShow：从登录页 / 编辑页返回时要刷新昵称与头像 */
+/** onShow：从登录页 / 编辑页 / 通知页返回时要刷新昵称、头像与未读红点 */
 onShow(() => {
   const s = getSession()
   nick.value = s.nickname
   avatar.value = s.avatarUrl
+  if (!s.tokenValue) {
+    unreadNotice.value = 0
+    return
+  }
+  // 从通知页读完回来，这里必须重取，否则红点会一直亮到下次冷启动
+  noticeApi
+    .unread()
+    .then((n) => {
+      unreadNotice.value = Number(n) || 0
+    })
+    .catch(() => {
+      unreadNotice.value = 0
+    })
 })
 
 function open(e: { key: string; label: string }): void {
@@ -198,6 +214,8 @@ async function logout(): Promise<void> {
       >
         <view class="tile" :class="'tile--' + e.tint">
           <CmIcon :name="e.icon" size="sm" />
+          <!-- 系统通知未读：只给红点不给数字，条数在通知页里看（design/02 §5.8） -->
+          <view v-if="e.key === 'notice' && unreadNotice > 0" class="tile__dot" />
         </view>
         <text class="svc__label">{{ e.label }}</text>
         <CmIcon name="arrow" tone="muted" size="sm" class="svc__arrow" />
@@ -345,6 +363,19 @@ async function logout(): Promise<void> {
   align-items: center;
   justify-content: center;
   flex: none;
+  position: relative;
+}
+
+/* 未读红点压在图标块右上角，不占布局 */
+.tile__dot {
+  position: absolute;
+  top: -4rpx;
+  right: -4rpx;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: $cm-color-err;
+  box-shadow: 0 0 0 4rpx $cm-color-surface;
 }
 
 .tile--brand {
