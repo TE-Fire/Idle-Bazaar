@@ -107,6 +107,7 @@ function onCompare(): void {
   const goods: GoodsItem = {
     id: item.value.id,
     title: item.value.title,
+    categoryId: item.value.categoryId,
     category: item.value.categoryName ?? '其他',
     price: Number(item.value.price),
     originalPrice: item.value.originPrice ? Number(item.value.originPrice) : undefined,

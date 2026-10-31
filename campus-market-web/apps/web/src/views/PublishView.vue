@@ -185,6 +185,7 @@ const form = ref({
 const preview = computed<GoodsItem>(() => ({
   id: 'preview',
   title: form.value.title || '标题预览（填入标题后显示）',
+  categoryId: form.value.categoryId,
   category: categoryName.value || '其他闲置',
   price: form.value.price ?? 0,
   originalPrice: form.value.originPrice ?? undefined,

@@ -23,6 +23,14 @@ function startCompare(): void {
   if (compare.count < 2) return
   void router.push({ name: 'compare', query: { ids: compare.ids.join(',') } })
 }
+
+/**
+ * 空槽 `+`：带对比篮锁定的分类跳首页——服务端按 categoryId 过滤，
+ * 用户落在「只剩同类」的列表里，从源头防跨类挑选。
+ */
+function pickMore(): void {
+  void router.push({ name: 'home', query: { cat: compare.lockedCategoryId || undefined } })
+}
 </script>
 
 <template>
@@ -31,13 +39,26 @@ function startCompare(): void {
       <div class="cmpbar__in">
         <div class="slots">
           <div v-for="it in compare.items" :key="it.id" class="slot slot--fill">
-            <span class="thumb" :style="{ background: bg(it.tints) }" />
+            <img v-if="it.images?.[0]" class="thumb" :src="it.images[0]" :alt="it.title" />
+            <span v-else class="thumb" :style="{ background: bg(it.tints) }" />
             <button type="button" class="slot__x" aria-label="移出对比" @click="compare.remove(it.id)">×</button>
           </div>
-          <div v-for="i in slots" :key="`empty-${i}`" class="slot slot--empty">+</div>
+          <button
+            v-for="i in slots"
+            :key="`empty-${i}`"
+            type="button"
+            class="slot slot--empty"
+            title="继续挑选同类商品"
+            @click="pickMore"
+          >
+            +
+          </button>
         </div>
 
-        <span class="txt">已选 {{ compare.count }} / {{ COMPARE_MAX }} 件</span>
+        <span class="txt">
+          已选 {{ compare.count }} / {{ COMPARE_MAX }} 件
+          <em v-if="compare.count > 0" class="lock">仅限「{{ compare.lockedCategoryName }}」类</em>
+        </span>
 
         <div class="acts">
           <button type="button" class="btn" @click="compare.clear()">清空</button>
@@ -102,6 +123,8 @@ function startCompare(): void {
 .thumb {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .slot__x {
@@ -123,11 +146,26 @@ function startCompare(): void {
   border: 1px dashed var(--cm-color-border-strong);
   color: var(--cm-color-text-3);
   font-size: var(--cm-font-size-md);
+  background: none;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--cm-color-text-1);
+    border-color: var(--cm-color-text-3);
+  }
 }
 
 .txt {
   font-size: var(--cm-font-size-sm);
   color: var(--cm-color-text-2);
+}
+
+/* 同类锁定提示：跟在已选数后面的小字 */
+.lock {
+  margin-left: var(--cm-space-2);
+  font-size: var(--cm-font-size-xs);
+  font-style: normal;
+  color: var(--cm-color-text-3);
 }
 
 .acts {

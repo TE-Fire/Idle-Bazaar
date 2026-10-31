@@ -48,6 +48,11 @@ const secondImg = computed(() => props.item.images?.[1] || '')
 const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints[0]}, ${tints[1]})`
 
 const selected = computed(() => compare.has(props.item.id))
+
+/** 对比篮已有别的分类时，本卡禁用「＋对比」——引导用户只挑同类 */
+const mismatch = computed(
+  () => compare.count > 0 && !selected.value && props.item.categoryId !== compare.lockedCategoryId
+)
 const timeText = computed(() => formatRelativeTime(props.item.publishedAt))
 
 /**
@@ -66,12 +71,17 @@ function goDetail(): void {
 
 /**
  * 「＋对比」必须 stopPropagation（design/01 §七：卡片整体可点，但按钮要独立）。
- * 满了给提示，不静默失败。
+ * 满了 / 跨分类都给明确提示，不静默失败。
  */
 function onCompare(e: MouseEvent): void {
   e.stopPropagation()
-  const ok = compare.toggle(props.item)
-  if (!ok) ElMessage.warning({ message: `最多对比 4 件`, duration: 2000 })
+  const r = compare.toggle(props.item)
+  if (r === 'full') ElMessage.warning({ message: '最多对比 4 件', duration: 2000 })
+  else if (r === 'mismatch')
+    ElMessage.warning({
+      message: `对比仅限同类商品（${compare.lockedCategoryName}），已帮你锁定分类`,
+      duration: 2200
+    })
 }
 </script>
 
@@ -94,12 +104,14 @@ function onCompare(e: MouseEvent): void {
 
       <button
         class="card__cmp"
-        :class="{ 'card__cmp--on': selected }"
+        :class="{ 'card__cmp--on': selected, 'card__cmp--lock': mismatch }"
         type="button"
+        :disabled="mismatch"
+        :title="mismatch ? `对比仅限同类（${compare.lockedCategoryName}）` : ''"
         :aria-label="selected ? '取消对比' : '加入对比'"
         @click="onCompare"
       >
-        {{ selected ? '✓ 已加入' : '＋对比' }}
+        {{ selected ? '✓ 已加入' : mismatch ? '仅限同类' : '＋对比' }}
       </button>
     </div>
 
@@ -221,6 +233,15 @@ function onCompare(e: MouseEvent): void {
   opacity: 1;
   background: var(--cm-color-brand-bg);
   border-color: var(--cm-color-brand-border);
+}
+
+/* 对比篮已锁定其他分类：置灰禁用，文字换成「仅限同类」 */
+.card__cmp--lock {
+  opacity: 1;
+  color: var(--cm-color-text-3);
+  background: var(--cm-color-bg);
+  border-color: var(--cm-color-border);
+  cursor: not-allowed;
 }
 
 /* ── 文字区 ─────────────────────────────────────────────── */

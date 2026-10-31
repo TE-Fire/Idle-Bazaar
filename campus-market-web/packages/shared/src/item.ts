@@ -70,6 +70,8 @@ export type ItemTag = (typeof ITEM_TAGS)[number]
 export interface GoodsItem {
   id: string
   title: string
+  /** 分类 id（服务端过滤与「对比仅限同类」判定都用它） */
+  categoryId: string
   /** 分类名（字典下发，通常是二级分类，如「手机平板」） */
   category: string
   /** 现价（元） */

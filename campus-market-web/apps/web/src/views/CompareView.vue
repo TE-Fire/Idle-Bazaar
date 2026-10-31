@@ -74,6 +74,9 @@ const rows: Row[] = [
 ]
 
 const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints[0]}, ${tints[1]})`
+
+/** 首图真实 URL，没有图才退回占位渐变 */
+const cover = (it: GoodsItem): string => it.images?.[0] ?? ''
 </script>
 
 <template>
@@ -88,7 +91,8 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
           <tr>
             <th class="corner">对比项</th>
             <th v-for="it in items" :key="it.id">
-              <span class="thumb" :style="{ background: bg(it.tints) }" />
+              <img v-if="cover(it)" class="thumb" :src="cover(it)" :alt="it.title" />
+              <span v-else class="thumb" :style="{ background: bg(it.tints) }" />
               <RouterLink :to="{ name: 'item', params: { id: it.id } }" class="t">{{ it.title }}</RouterLink>
             </th>
           </tr>
@@ -128,8 +132,8 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
   border-collapse: separate;
   border-spacing: 0;
   background: var(--cm-color-surface);
-  border-radius: var(--cm-radius-2xl);
-  box-shadow: var(--cm-shadow-1);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-lg);
   overflow: hidden;
   font-size: var(--cm-font-size-sm);
 }
@@ -142,9 +146,20 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
   color: var(--cm-color-text-2);
 }
 
+/* 列分隔线：让「这是表格、列是商品」一眼可读 */
+.matrix thead th + th,
+.matrix tbody td + td {
+  border-left: 1px solid var(--cm-color-border);
+}
+
 .matrix tr:last-child th,
 .matrix tr:last-child td {
   border-bottom: none;
+}
+
+/* 行悬停：顺着行扫差异时有跟随感 */
+.matrix tbody tr:hover td {
+  background: var(--cm-color-bg);
 }
 
 /* 维度列：左对齐、灰底，视觉上从数据区里让出来 */
@@ -167,6 +182,7 @@ const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
+  object-fit: cover;
   border-radius: var(--cm-radius-md);
   margin-bottom: var(--cm-space-2);
 }
