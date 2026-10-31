@@ -15,8 +15,8 @@
 
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Bell, ChatDotRound, Collection, Compass, CopyDocument, Edit, Goods, Position, Postcard, Star, SwitchButton, Top, User } from '@element-plus/icons-vue'
-import { userDictApi } from '@campus/api'
+import { ArrowRight, Bell, ChatDotRound, Compass, CopyDocument, Edit, Goods, Position, Postcard, SwitchButton, Top } from '@element-plus/icons-vue'
+import { userDictApi, userNoticeApi } from '@campus/api'
 import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import CompareBar from '@/components/CompareBar.vue'
@@ -61,6 +61,21 @@ const campus = computed({
   }
 })
 
+/** 系统通知未读：菜单里给个红点，用户才知道有事发生（不做成数字，个数没有意义） */
+const unread = ref(0)
+
+async function loadUnread(): Promise<void> {
+  if (!session.isLogin) {
+    unread.value = 0
+    return
+  }
+  try {
+    unread.value = Number(await userNoticeApi.unread()) || 0
+  } catch {
+    unread.value = 0
+  }
+}
+
 onMounted(async () => {
   try {
     const dict = await userDictApi.all()
@@ -70,7 +85,11 @@ onMounted(async () => {
   } catch {
     // 字典不可用就只剩「全部校区」，不影响浏览
   }
+  void loadUnread()
 })
+
+/** 登录态变了要重取：登录后才有通知可数，退出后角标必须消失 */
+watch(() => session.isLogin, loadUnread)
 
 /** 热搜词：闲鱼把一批高频词铺在搜索框下面。这里写死一组校园高频词，点击即搜 */
 const HOT_WORDS = ['笔记本电脑', '考研资料', '自行车', 'iPad', '电动车', '台灯', '吉他', '篮球'] as const
@@ -91,12 +110,6 @@ function goMe(): void {
 }
 function goMyItems(): void {
   void router.push({ name: 'my-items' })
-}
-function goFavorites(): void {
-  void router.push({ name: 'favorites' })
-}
-function goFollow(): void {
-  void router.push({ name: 'follow' })
 }
 
 /** 系统通知：平台广播（举报处置结果等），与私信两个入口分开 */
@@ -184,7 +197,13 @@ async function logout(): Promise<void> {
               </span>
               <template #dropdown>
                 <el-dropdown-menu class="udrop">
-                  <div class="udrop__head">
+                  <div
+                    class="udrop__head udrop__head--link"
+                    role="button"
+                    tabindex="0"
+                    @click="goMe"
+                    @keyup.enter="goMe"
+                  >
                     <div class="udrop__ava">
                       <img v-if="session.avatarUrl" :src="session.avatarUrl" alt="" />
                       <span v-else>{{ initial }}</span>
@@ -196,29 +215,22 @@ async function logout(): Promise<void> {
                         <span>信用 {{ session.creditScore }} 分</span>
                       </p>
                     </div>
+                    <el-icon class="udrop__go"><ArrowRight /></el-icon>
                   </div>
-                  <el-dropdown-item @click="goMe">
-                    <el-icon><User /></el-icon>我的主页
-                  </el-dropdown-item>
                   <el-dropdown-item @click="goMyItems">
                     <el-icon><Goods /></el-icon>我的商品
                   </el-dropdown-item>
-                  <el-dropdown-item @click="goFavorites">
-                    <el-icon><Collection /></el-icon>我的收藏
-                  </el-dropdown-item>
-                  <el-dropdown-item @click="goFollow">
-                    <el-icon><Star /></el-icon>我的关注
-                  </el-dropdown-item>
                   <el-dropdown-item @click="goNotices">
                     <el-icon><Bell /></el-icon>系统通知
+                    <span v-if="unread" class="udrop__dot" />
                   </el-dropdown-item>
                   <el-dropdown-item v-if="session.authStatus !== 2" @click="goVerify">
                     <el-icon><Postcard /></el-icon>学号认证
                   </el-dropdown-item>
-                  <el-dropdown-item @click="openEdit">
+                  <el-dropdown-item divided @click="openEdit">
                     <el-icon><Edit /></el-icon>编辑资料
                   </el-dropdown-item>
-                  <el-dropdown-item divided @click="logout">
+                  <el-dropdown-item divided class="udrop__logout" @click="logout">
                     <el-icon><SwitchButton /></el-icon>退出登录
                   </el-dropdown-item>
                 </el-dropdown-menu>
@@ -474,20 +486,36 @@ async function logout(): Promise<void> {
 /* ── 头像悬停下拉菜单 ───────────────────────────────────── */
 
 .udrop {
-  padding: var(--cm-space-2) 0;
-  min-width: 184px;
+  padding: var(--cm-space-1) 0;
+  min-width: 236px;
 
-  /* 头部资料卡 */
+  /* 头部资料卡：整块可点进主页，所以「我的主页」不必再占一行 */
   .udrop__head {
     display: flex;
     align-items: center;
     gap: var(--cm-space-3);
-    padding: var(--cm-space-2) var(--cm-space-4) var(--cm-space-3);
+    margin: 0 var(--cm-space-1) var(--cm-space-1);
+    padding: var(--cm-space-2) var(--cm-space-3);
+    border-radius: var(--cm-radius-md);
+  }
+
+  .udrop__head--link {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--cm-color-brand-bg);
+    }
+  }
+
+  .udrop__go {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--cm-color-text-3);
   }
 
   .udrop__ava {
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
     flex: none;
     display: flex;
     align-items: center;
@@ -533,25 +561,53 @@ async function logout(): Promise<void> {
   :deep(.el-dropdown-menu__item) {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 9px;
+    height: 34px;
+    margin: 0 var(--cm-space-1);
+    padding: 0 var(--cm-space-3);
+    border-radius: var(--cm-radius-md);
     font-size: var(--cm-font-size-sm);
     color: var(--cm-color-text-1);
-    padding: 0 var(--cm-space-4);
+    line-height: 34px;
 
     .el-icon {
-      font-size: 16px;
+      font-size: 15px;
+      color: var(--cm-color-text-3);
+    }
+
+    &:hover {
+      background: var(--cm-color-brand-bg);
+
+      .el-icon {
+        color: var(--cm-color-text-1);
+      }
     }
   }
 
+  /* 分组靠分隔线，不靠留白堆 */
   :deep(.el-dropdown-menu__item--divided) {
-    margin-top: 4px;
+    margin-top: var(--cm-space-1);
     border-top: 1px solid var(--cm-color-border);
+    border-radius: 0 0 var(--cm-radius-md) var(--cm-radius-md);
   }
 
   /* 「退出登录」用红色，抬高特异性盖过上面统一的 item 颜色 */
   :deep(.el-dropdown-menu__item.udrop__logout) {
     color: var(--cm-color-danger, #cf1322);
+
+    .el-icon {
+      color: var(--cm-color-danger, #cf1322);
+    }
   }
+}
+
+/** 未读红点：只表示「有事」，不做数字（通知条数对用户没有决策价值） */
+.udrop__dot {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--cm-color-danger, #cf1322);
 }
 
 /* ── 内容区 ─────────────────────────────────────────────── */

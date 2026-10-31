@@ -3,6 +3,7 @@ package com.campus.user.controller;
 import com.campus.common.result.PageResult;
 import com.campus.common.result.Result;
 import com.campus.core.context.UserContext;
+import com.campus.core.dto.resp.BulletinVO;
 import com.campus.core.dto.resp.NoticeVO;
 import com.campus.core.service.NoticeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -13,6 +14,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 学生端系统通知（notes/22 批次 3）：复用 `msg_message` 的 `zone=2` 分区。
@@ -32,6 +35,12 @@ public class NoticeController {
     public Result<PageResult<NoticeVO>> list(@RequestParam(defaultValue = "1") int pageNum,
                                              @RequestParam(defaultValue = "20") int pageSize) {
         return Result.ok(noticeService.list(UserContext.getUserId(), pageNum, pageSize));
+    }
+
+    @Operation(summary = "公告播报", description = "首页顶部播报条，免登录，按批次去重")
+    @GetMapping("/bulletin")
+    public Result<List<BulletinVO>> bulletin(@RequestParam(defaultValue = "3") int limit) {
+        return Result.ok(noticeService.bulletins(limit));
     }
 
     @Operation(summary = "未读条数")

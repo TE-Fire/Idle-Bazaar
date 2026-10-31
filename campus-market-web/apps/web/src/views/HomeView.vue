@@ -26,7 +26,7 @@
  * - 排序从下拉换成闲鱼式的**排序胶囊组**（综合/最新/最热/价格）。
  */
 
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   CONDITION_GRADES,
@@ -35,7 +35,7 @@ import {
   type ConditionGrade,
   type GoodsItem
 } from '@campus/shared'
-import { userDictApi, userItemApi } from '@campus/api'
+import { userDictApi, userItemApi, userNoticeApi, type BulletinVO } from '@campus/api'
 import ProductCard from '@/components/ProductCard.vue'
 import FilterGroup from '@/components/FilterGroup.vue'
 import { toGoodsItem } from '@/utils/item-map'
@@ -127,6 +127,13 @@ async function fetchItems(): Promise<void> {
 onMounted(() => {
   void loadDict()
   void fetchItems()
+  void loadBulletins()
+  // 宽度变了要重新判断该不该滚（拖窗口 / 窄屏）
+  window.addEventListener('resize', measureNotice)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', measureNotice)
 })
 
 /** 顶栏搜索与分类条是 URL 驱动的，换 URL 要同步进筛选状态；切分类要重拉（服务端过滤） */
@@ -160,13 +167,80 @@ watch(
 
 /* ── 闲鱼式首页装饰层 ───────────────────────────────────── */
 
-/** 公告条：可关（闲鱼顶部的「网页版发布闲置功能升级啦！」） */
-const notice = ref(true)
-
 /** 纯首页（无分类 / 无关键词 / 无校区限制）才铺促销卡位；一进检索态就收掉，让位给结果 */
 const isPureHome = computed(
   () => route.name === 'home' && !route.query.cat && !route.query.q && !route.query.campus
 )
+
+/**
+ * 公告条：只说最新一条，超长才滚动，读过不影响（notes/22 S12）。
+ *
+ * <p>不逐条轮播：3 条 × 3.6 秒一轮，用户首页停留普遍不到 10 秒，等于必然漏看，
+ * 还让顶栏一直在动。多条时右侧给「共 N 条」入口，去通知页一次看完。
+ *
+ * <p>播报只念标题——正文上限 2000 字，滚一遍要四十秒，那不是播报是霸屏。
+ */
+const CLOSED_KEY = 'campus-bulletin-closed'
+const bulletins = ref<BulletinVO[]>([])
+const noticeClosed = ref(false)
+const noticeBox = ref<HTMLElement | null>(null)
+const noticeTxt = ref<HTMLElement | null>(null)
+/** 文本超出容器才挂滚动：能一眼读完的公告不该在眼前动 */
+const noticeOverflow = ref(false)
+
+const noticeLine = computed(() => {
+  const b = bulletins.value[0]
+  if (!b) return ''
+  const title = (b.title ?? '').trim()
+  if (title) return title
+  const body = (b.content ?? '').replace(/\s+/g, ' ').trim()
+  return body.length > 60 ? `${body.slice(0, 60)}…` : body
+})
+
+const noticeVisible = computed(() => isPureHome.value && !noticeClosed.value && !!noticeLine.value)
+
+/** 先复位再量：`::after` 的第二份文本只在超长时生成，否则量到的是两份宽度 */
+async function measureNotice(): Promise<void> {
+  const box = noticeBox.value
+  const txt = noticeTxt.value
+  if (!box || !txt) {
+    noticeOverflow.value = false
+    return
+  }
+  noticeOverflow.value = false
+  await nextTick()
+  noticeOverflow.value = txt.offsetWidth > box.clientWidth
+}
+
+async function loadBulletins(): Promise<void> {
+  try {
+    bulletins.value = (await userNoticeApi.bulletin(3)) ?? []
+    const latest = bulletins.value[0]
+    if (!latest) return
+    // 记的是「关掉的是哪一条」：出现更新的公告就重新露出来，不必等清缓存
+    noticeClosed.value = (localStorage.getItem(CLOSED_KEY) ?? '') === String(latest.id)
+    await nextTick()
+    await measureNotice()
+  } catch {
+    // 公告取不到就整条不显示：它是知会，不能挡住首页
+    bulletins.value = []
+  }
+}
+
+function closeNotice(): void {
+  noticeClosed.value = true
+  const latest = bulletins.value[0]
+  if (latest) localStorage.setItem(CLOSED_KEY, String(latest.id))
+}
+
+function goNotices(): void {
+  void router.push({ name: 'notices' })
+}
+
+/** 从结果页退回首页时公告条重新出现，此时容器才有宽度，补量一次 */
+watch(noticeVisible, (v) => {
+  if (v) void measureNotice()
+})
 
 /** 左侧分类卡（顶栏分类条取消后的替代入口）：选项来自字典，不含「全部」——清空分类就是全部 */
 const CAT_LIST = computed(() => catOptions.value)
@@ -364,10 +438,26 @@ watch([filtered], () => {
 
 <template>
   <div class="cm-shell home">
-    <!-- 公告条：白卡胶囊，可关闭 -->
-    <div v-if="notice && isPureHome" class="notice cm-card">
-      <span class="notice__txt">📢 网页版发布闲置功能升级啦！拖拽 9 张图 + 实时预览，快去试试</span>
-      <button type="button" class="notice__x" aria-label="关闭公告" @click="notice = false">×</button>
+    <!-- 公告条：平台公告，超长才滚动；关掉的是「这一条」，新公告会重新露出 -->
+    <div v-if="noticeVisible" class="notice">
+      <span class="notice__ico">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 16v-5a6 6 0 1 0-12 0v5l-2 2h16l-2-2Z" />
+          <path d="M10 21h4" />
+        </svg>
+      </span>
+      <div ref="noticeBox" class="notice__box" role="button" tabindex="0" @click="goNotices" @keyup.enter="goNotices">
+        <span
+          ref="noticeTxt"
+          class="notice__txt"
+          :class="{ 'notice__txt--run': noticeOverflow }"
+          :data-text="noticeOverflow ? noticeLine : null"
+        >{{ noticeLine }}</span>
+      </div>
+      <button v-if="bulletins.length > 1" type="button" class="notice__more" @click="goNotices">
+        共 {{ bulletins.length }} 条
+      </button>
+      <button type="button" class="notice__x" aria-label="关闭公告" @click.stop="closeNotice">×</button>
     </div>
 
     <div class="body">
@@ -543,28 +633,89 @@ watch([filtered], () => {
 .notice {
   display: flex;
   align-items: center;
-  gap: var(--cm-space-3);
-  height: 40px;
-  padding: 0 var(--cm-space-4);
-  margin-bottom: var(--cm-space-4);
+  gap: var(--cm-space-2);
+  height: 36px;
+  padding: 0 var(--cm-space-3);
+  margin-bottom: var(--cm-space-3);
+  color: #6b5330;
+  background: #fff9ee;
+  border: 1px solid #f3e2b6;
+  border-radius: var(--cm-radius-md);
+}
+
+.notice__ico {
+  display: flex;
+  flex: 0 0 auto;
+  color: #b07c2a;
+}
+
+.notice__box {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 .notice__txt {
+  display: inline-block;
   font-size: var(--cm-font-size-sm);
-  color: var(--cm-color-text-2);
+  line-height: 34px;
+  color: #6b5330;
+  white-space: nowrap;
+}
+
+/* 第二份文本靠 ::after 复制，位移到 -50% 正好无缝接上（间隙两侧各 40px 对齐） */
+.notice__txt--run {
+  padding-right: 40px;
+  animation: noticeRun 16s linear infinite;
+
+  &::after {
+    content: attr(data-text);
+    padding-left: 40px;
+  }
+}
+
+.notice:hover .notice__txt--run {
+  animation-play-state: paused;
+}
+
+@keyframes noticeRun {
+  from {
+    transform: translateX(0);
+  }
+
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice__txt--run {
+    animation: none;
+  }
+}
+
+.notice__more {
+  flex: 0 0 auto;
+  padding: 0;
+  font-size: var(--cm-font-size-xs);
+  color: #b07c2a;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 .notice__x {
-  margin-left: auto;
+  flex: 0 0 auto;
   font-size: var(--cm-font-size-lg);
   line-height: 1;
-  color: var(--cm-color-text-3);
+  color: #bcae8f;
   background: none;
   border: none;
   cursor: pointer;
 
   &:hover {
-    color: var(--cm-color-text-1);
+    color: #6b5330;
   }
 }
 

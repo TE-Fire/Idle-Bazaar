@@ -90,7 +90,13 @@ function open(e: { key: string; label: string }): void {
     return
   }
   if (e.key === 'fav') {
-    void uni.navigateTo({ url: '/pages/favorites/index' })
+    // 收藏已并入个人主页 Tab（notes/24）：入口统一到这里，不再有独立收藏页
+    const me = getSession().userId
+    if (!me) {
+      goLogin()
+      return
+    }
+    void uni.navigateTo({ url: `/pages/user/index?userId=${me}&tab=favorites` })
     return
   }
   if (e.key === 'verify') {

@@ -54,14 +54,6 @@
       }
     },
     {
-      "path": "pages/favorites/index",
-      "style": {
-        "navigationBarTitleText": "我的收藏",
-        "enablePullDownRefresh": true,
-        "onReachBottomDistance": 50
-      }
-    },
-    {
       "path": "pages/verify/index",
       "style": {
         "navigationBarTitleText": "学号认证"

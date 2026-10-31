@@ -42,7 +42,36 @@ const rightColumn = computed(() => goods.value.filter((_, i) => i % 2 === 1))
 
 /* ── Tab 与动态 ────────────────────────────────────────── */
 
-const tab = ref<'items' | 'moments' | 'reviews'>('items')
+const tab = ref<'items' | 'moments' | 'reviews' | 'favorites'>('items')
+
+/* ── 收藏 tab（notes/24）：仅本人可见，接口只返回登录人自己的收藏 ── */
+const favItems = ref<ApiItemVO[]>([])
+const favPage = ref(1)
+const favTotal = ref(0)
+const favLoading = ref(false)
+const favLoaded = ref(false)
+
+async function fetchFavPage(reset: boolean): Promise<void> {
+  if (favLoading.value) return
+  if (!reset && favItems.value.length >= favTotal.value) return
+  favLoading.value = true
+  const p = reset ? 1 : favPage.value + 1
+  try {
+    const res = await userItemApi.favorites(p, PAGE)
+    const rows: ApiItemVO[] = res.list ?? []
+    favItems.value = reset ? rows : [...favItems.value, ...rows]
+    favPage.value = p
+    favTotal.value = Number(res.total ?? favItems.value.length)
+    favLoaded.value = true
+  } catch {
+    if (reset) {
+      favItems.value = []
+      favTotal.value = 0
+    }
+  } finally {
+    favLoading.value = false
+  }
+}
 
 /* ── 评价 tab：汇总 + 列表，与动态同样懒加载 ── */
 const reviews = ref<MiniReviewVO[]>([])
@@ -104,11 +133,12 @@ async function fetchMomentPage(reset: boolean): Promise<void> {
   }
 }
 
-function switchTab(next: 'items' | 'moments' | 'reviews'): void {
+function switchTab(next: 'items' | 'moments' | 'reviews' | 'favorites'): void {
   if (tab.value === next) return
   tab.value = next
   if (next === 'moments' && !momentsLoaded.value) void fetchMomentPage(true)
   if (next === 'reviews' && !reviewsLoaded.value) void fetchReviewPage(true)
+  if (next === 'favorites' && !favLoaded.value) void fetchFavPage(true)
 }
 
 async function toggleLike(m: MomentVO): Promise<void> {
@@ -167,12 +197,17 @@ function reload(): void {
   pageNum.value = 1
   finished.value = false
   void fetchPage(true)
-  // 换人或重进：动态全部作废，回到「未加载」按需再拉
+  // 换人或重进：动态与收藏全部作废，回到「未加载」按需再拉
   moments.value = []
   momentPage.value = 1
   momentTotal.value = 0
   momentsLoaded.value = false
+  favItems.value = []
+  favPage.value = 1
+  favTotal.value = 0
+  favLoaded.value = false
   if (tab.value === 'moments') void fetchMomentPage(true)
+  if (tab.value === 'favorites') void fetchFavPage(true)
 }
 
 async function toggleFollow(): Promise<void> {
@@ -196,6 +231,17 @@ async function toggleFollow(): Promise<void> {
   }
 }
 
+function goDetail(id: string): void {
+  void uni.navigateTo({ url: `/pages/item/detail?id=${id}` })
+}
+
+/** 价格去掉无意义的 .00：收藏里大多是整数价，带两位小数反而比别处长 */
+function priceText(p: string): string {
+  const n = Number(p)
+  if (!Number.isFinite(n)) return p
+  return Number.isInteger(n) ? String(n) : n.toFixed(2)
+}
+
 function goFollows(tab: 'following' | 'fans'): void {
   void uni.navigateTo({ url: `/pages/follows/index?tab=${tab === 'fans' ? 'fans' : 'following'}&userId=${userId.value}` })
 }
@@ -209,9 +255,9 @@ onLoad((query) => {
   if (q.userId) {
     userId.value = q.userId
   }
-  // ?tab=moments 直接落在动态 Tab（「我的 → 我的动态」这么进）
-  if (q.tab === 'moments') {
-    tab.value = 'moments'
+  // ?tab=moments / favorites 直接落在对应 Tab（「我的」页的快捷入口这么进）
+  if (q.tab === 'moments' || q.tab === 'favorites') {
+    tab.value = q.tab
   }
   myId.value = getSession().userId
 })
@@ -236,8 +282,10 @@ onReachBottom(() => {
     void fetchPage(false)
   } else if (tab.value === 'moments') {
     void fetchMomentPage(false)
-  } else {
+  } else if (tab.value === 'reviews') {
     void fetchReviewPage(false)
+  } else {
+    void fetchFavPage(false)
   }
 })
 </script>
@@ -290,7 +338,7 @@ onReachBottom(() => {
       <!-- Tab：闲置 / 动态 / 评价（后两个懒加载） -->
       <view class="tabs">
         <view class="tab" :class="{ 'tab--on': tab === 'items' }" @click="switchTab('items')">
-          <text class="tab__t">TA 的闲置</text>
+          <text class="tab__t">{{ isSelf ? '我的闲置' : 'TA 的闲置' }}</text>
           <view class="tab__ink" />
         </view>
         <view class="tab" :class="{ 'tab--on': tab === 'moments' }" @click="switchTab('moments')">
@@ -301,12 +349,18 @@ onReachBottom(() => {
           <text class="tab__t">评价{{ reviewSummary?.total ? ` ${reviewSummary.total}` : '' }}</text>
           <view class="tab__ink" />
         </view>
+        <view v-if="isSelf" class="tab" :class="{ 'tab--on': tab === 'favorites' }" @click="switchTab('favorites')">
+          <text class="tab__t">收藏</text>
+          <view class="tab__ink" />
+        </view>
       </view>
 
       <block v-if="tab === 'items'">
         <!-- 在售商品：双列瀑布流，复用首页卡片 -->
         <view v-if="!goods.length && loading" class="state"><text class="state__t">加载中…</text></view>
-        <view v-else-if="!goods.length" class="state"><text class="state__t">TA 还没有在售的闲置</text></view>
+        <view v-else-if="!goods.length" class="state">
+          <text class="state__t">{{ isSelf ? '你还没有在售的闲置' : 'TA 还没有在售的闲置' }}</text>
+        </view>
 
         <view v-else class="falls">
           <view class="col">
@@ -336,7 +390,7 @@ onReachBottom(() => {
       </block>
 
       <!-- 评价：汇总 + 列表（一单一评，仅已完成订单可评） -->
-      <block v-else>
+      <block v-else-if="tab === 'reviews'">
         <view v-if="!reviews.length && reviewLoading" class="state"><text class="state__t">加载中…</text></view>
         <view v-else-if="!reviews.length" class="state"><text class="state__t">还没有人评价 TA</text></view>
 
@@ -380,6 +434,34 @@ onReachBottom(() => {
 
         <view v-if="reviews.length" class="loadmore">
           <text>{{ reviewLoading ? '加载中…' : reviews.length >= reviewTotal ? '没有更多了' : '上拉加载更多' }}</text>
+        </view>
+      </block>
+
+      <!-- 收藏：只在自己的主页出现；已售出/已下架照常展示，用户要知道「那件被买走了」 -->
+      <block v-else>
+        <view v-if="!favItems.length && favLoading" class="state"><text class="state__t">加载中…</text></view>
+        <view v-else-if="!favItems.length" class="state">
+          <text class="state__t">还没有收藏，看到喜欢的点一下收藏</text>
+        </view>
+
+        <view v-else class="favlist">
+          <view v-for="it in favItems" :key="it.id" class="favrow" hover-class="favrow--active" @click="goDetail(it.id)">
+            <image v-if="it.mainImage" class="favrow__img" :src="it.mainImage" mode="aspectFill" />
+            <view v-else class="favrow__img favrow__img--empty"><text>无图</text></view>
+            <view class="favrow__main">
+              <text class="favrow__title">{{ it.title }}</text>
+              <view class="favrow__meta">
+                <text class="favrow__price">¥{{ priceText(it.price) }}</text>
+                <text class="favrow__tag" :class="{ 'favrow__tag--off': it.status !== 'ON_SALE' }">
+                  {{ it.status === 'ON_SALE' ? '在售' : '已下架' }}
+                </text>
+              </view>
+            </view>
+          </view>
+        </view>
+
+        <view v-if="favItems.length" class="loadmore">
+          <text>{{ favLoading ? '加载中…' : favItems.length >= favTotal ? '没有更多了' : '上拉加载更多' }}</text>
         </view>
       </block>
     </template>
@@ -527,8 +609,88 @@ onReachBottom(() => {
   color: $cm-color-text-3;
 }
 
-/* ── Tab 条：闲置 / 动态 ───────────────────────────────── */
+/* ── 收藏 Tab：单列横条，状态一眼可见 ─────────────────── */
 
+.favlist {
+  display: flex;
+  flex-direction: column;
+  gap: $cm-space-2;
+  padding: 0 $cm-space-4;
+}
+
+.favrow {
+  display: flex;
+  gap: $cm-space-3;
+  padding: $cm-space-3;
+  background: $cm-color-surface;
+  border-radius: $cm-radius-2xl;
+}
+
+.favrow--active {
+  opacity: 0.85;
+}
+
+.favrow__img {
+  width: 168rpx;
+  height: 168rpx;
+  flex: none;
+  border-radius: $cm-radius-sm;
+  background: $cm-color-bg;
+}
+
+.favrow__img--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.favrow__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4rpx 0;
+}
+
+.favrow__title {
+  font-size: $cm-font-size-base;
+  color: $cm-color-text-1;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.favrow__meta {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+}
+
+.favrow__price {
+  font-size: $cm-font-size-md;
+  font-weight: $cm-font-weight-bold;
+  color: $cm-color-price;
+}
+
+.favrow__tag {
+  padding: 2rpx 12rpx;
+  border-radius: $cm-radius-pill;
+  font-size: $cm-font-size-xs;
+  color: $cm-color-ok;
+  background: $cm-color-ok-bg;
+}
+
+.favrow__tag--off {
+  color: $cm-color-text-3;
+  background: $cm-color-bg;
+}
+
+/* ── Tab 条：闲置 / 动态 ───────────────────────────────── */
 .tabs {
   display: flex;
   gap: $cm-space-8;

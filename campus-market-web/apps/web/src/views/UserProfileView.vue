@@ -20,6 +20,7 @@ import { formatRelativeTime, type GoodsItem } from '@campus/shared'
 import { toGoodsItem } from '@/utils/item-map'
 import ProductCard from '@/components/ProductCard.vue'
 import MomentCard from '@/components/MomentCard.vue'
+import FavoritesPanel from '@/components/FavoritesPanel.vue'
 import ProfileEditDialog from '@/components/ProfileEditDialog.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { useUserStore } from '@/stores/user'
@@ -35,7 +36,15 @@ const userId = computed(() => route.params.id as string)
 const profile = ref<UserProfileVO | null>(null)
 const loading = ref(false)
 
-const tab = ref<'items' | 'moments' | 'reviews'>('items')
+/**
+ * Tab：闲置 / 动态 / 评价 / 收藏。
+ *
+ * <p>收藏是私有数据（`/api/item/favorites` 只返回登录人自己的），所以这个 Tab
+ * **只在自己的主页出现**；靠 `profile.self` 判断，不靠前端拿 id 比对。
+ */
+type ProfileTab = 'items' | 'moments' | 'reviews' | 'favorites'
+
+const tab = ref<ProfileTab>('items')
 
 const items = ref<GoodsItem[]>([])
 const total = ref(0)
@@ -151,11 +160,31 @@ async function loadMoments(reset = false): Promise<void> {
   }
 }
 
-function switchTab(next: 'items' | 'moments' | 'reviews'): void {
+function applyTab(next: ProfileTab): void {
   if (tab.value === next) return
   tab.value = next
   if (next === 'moments' && !momentsLoaded.value) void loadMoments(true)
   if (next === 'reviews' && !reviewsLoaded.value) void loadReviews(true)
+}
+
+/** `?tab=` 是唯一入口约定：旧 `/favorites` 路由重定向过来，链接也能直接落到收藏 */
+function applyQueryTab(): void {
+  const v = route.query.tab
+  const next: ProfileTab = v === 'moments' || v === 'reviews' || v === 'favorites' ? v : 'items'
+  // 别人的主页没有收藏 Tab：URL 里残留下来的参数不能把页面切到一个不存在的内容区
+  if (next === 'favorites' && !isSelf.value) {
+    applyTab('items')
+    return
+  }
+  applyTab(next)
+}
+
+function switchTab(next: ProfileTab): void {
+  if (tab.value === next) return
+  applyTab(next)
+  void router.replace({
+    query: { ...route.query, tab: next === 'items' ? undefined : next }
+  })
 }
 
 /** 点赞：乐观翻转，失败按原值回滚 */
@@ -217,6 +246,8 @@ watch(
   () => {
     if (!userId.value) return
     pageNum.value = 1
+    // 换人不保留上一个主页的 Tab，否则会看到「别人的收藏」
+    tab.value = 'items'
     // 换人：动态与评价全部作废，重新按需拉
     moments.value = []
     momentTotal.value = 0
@@ -227,19 +258,21 @@ watch(
     reviewPage.value = 1
     reviewsLoaded.value = false
     reviewSummary.value = null
-    void loadProfile()
+    // Tab 的应用要等 profile 回来（收藏 Tab 依赖 self）
+    void loadProfile().then(applyQueryTab)
     void loadItems()
-    if (tab.value === 'moments') void loadMoments(true)
-    if (tab.value === 'reviews') void loadReviews(true)
   }
 )
 
-onMounted(() => {
+watch(() => route.query.tab, applyQueryTab)
+
+onMounted(async () => {
   if (!session.isLogin) {
     gotoLogin()
     return
   }
-  void loadProfile()
+  await loadProfile()
+  applyQueryTab()
   void loadItems()
 })
 </script>
@@ -292,10 +325,10 @@ onMounted(() => {
       </button>
     </section>
 
-    <!-- Tab：商品 / 动态 / 评价 -->
+    <!-- Tab：闲置 / 动态 / 评价 / 收藏（收藏仅本人） -->
     <nav class="tabs">
       <button type="button" class="tabs__item" :class="{ on: tab === 'items' }" @click="switchTab('items')">
-        TA 的闲置（{{ profile.onSaleCount }}）
+        {{ isSelf ? '我的闲置' : 'TA 的闲置' }}（{{ profile.onSaleCount }}）
       </button>
       <button type="button" class="tabs__item" :class="{ on: tab === 'moments' }" @click="switchTab('moments')">
         动态
@@ -303,10 +336,21 @@ onMounted(() => {
       <button type="button" class="tabs__item" :class="{ on: tab === 'reviews' }" @click="switchTab('reviews')">
         评价{{ reviewSummary?.total ? `（${reviewSummary.total}）` : '' }}
       </button>
+      <button
+        v-if="isSelf"
+        type="button"
+        class="tabs__item"
+        :class="{ on: tab === 'favorites' }"
+        @click="switchTab('favorites')"
+      >
+        收藏
+      </button>
     </nav>
 
     <template v-if="tab === 'items'">
-      <p v-if="!itemsLoading && !items.length" class="empty">TA 还没有在售的闲置</p>
+      <p v-if="!itemsLoading && !items.length" class="empty">
+        {{ isSelf ? '你还没有在售的闲置，去发布一件吧' : 'TA 还没有在售的闲置' }}
+      </p>
       <div v-loading="itemsLoading" class="grid">
         <ProductCard v-for="it in items" :key="it.id" :item="it" />
       </div>
@@ -339,7 +383,7 @@ onMounted(() => {
     </template>
 
     <!-- 评价：汇总卡 + 列表（一单一评，仅已完成订单可评） -->
-    <template v-else>
+    <template v-else-if="tab === 'reviews'">
       <p v-if="!reviewLoading && !reviews.length" class="empty">还没有人评价 TA</p>
 
       <div v-if="reviewSummary?.total" class="rvsum">
@@ -395,6 +439,9 @@ onMounted(() => {
         </el-button>
       </div>
     </template>
+
+    <!-- 收藏：只在自己的主页出现，内容区自带分页与取消收藏 -->
+    <FavoritesPanel v-else-if="tab === 'favorites'" />
 
     <ProfileEditDialog v-model="editSelfOpen" />
     <ReportDialog v-model="reportOpen" :target-type="REPORT_TARGET.MOMENT" :target-id="reportId" />

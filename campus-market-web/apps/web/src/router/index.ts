@@ -6,6 +6,7 @@
  */
 
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -33,8 +34,22 @@ const routes: RouteRecordRaw[] = [
       { path: 'publish', name: 'publish', component: () => import('@/views/PublishView.vue'), meta: { title: '发布闲置' } },
       // 我的商品：卖家视角全状态（含草稿），操作按状态给出
       { path: 'my-items', name: 'my-items', component: () => import('@/views/MyItemsView.vue'), meta: { title: '我的商品' } },
-      // 我的收藏：收藏时间倒序，已售出照常展示（notes/24）
-      { path: 'favorites', name: 'favorites', component: () => import('@/views/FavoritesView.vue'), meta: { title: '我的收藏' } },
+      // 收藏已并入个人主页 Tab（notes/24）：保留路径做重定向，书签与外部链接不 404
+      {
+        path: 'favorites',
+        name: 'favorites',
+        redirect: () => {
+          try {
+            const uid = useUserStore().userId
+            return uid
+              ? { name: 'user-profile', params: { id: uid }, query: { tab: 'favorites' } }
+              : { name: 'login' }
+          } catch {
+            // pinia 还没装好的极端情况：退回首页，别在导航阶段抛错
+            return { name: 'home' }
+          }
+        }
+      },
       // P5 搜索结果：与 /list 同一组件，关键词走 q（后端 keyword 同时匹配标题与描述）
       { path: 'search', name: 'search', component: () => import('@/views/HomeView.vue'), meta: { title: '搜索结果' } },
       // P12 学号认证：已认证/审核中/未通过三态同页（notes/20 D5）

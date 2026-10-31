@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 我的收藏（notes/24 第一节）
+ * 收藏列表（notes/24）：个人主页「收藏」Tab 的内容，**仅本人可见**。
  *
  * <p>只展示「商品还在」的收藏：已软删与被强制下架的商品后端就不返回，所以这里没有
  * 「失效收藏」这类行——商品没了，收藏指向的东西也不存在。已售出/已下架照常展示并标状态，
@@ -64,17 +64,12 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="cm-shell favs">
-    <header class="head">
-      <h1 class="head__title">我的收藏</h1>
-      <span class="head__count">共 {{ total }} 件</span>
-    </header>
-
-    <p v-if="!loading && list.length === 0" class="empty">
+  <div class="fav">
+    <p v-if="!loading && list.length === 0" class="fav__empty">
       还没有收藏。看到喜欢的点一下「收藏」，过几天再回来比价。
     </p>
 
-    <div v-loading="loading" class="grid">
+    <div v-loading="loading" class="fav__grid">
       <article v-for="item in list" :key="item.id" class="card">
         <button type="button" class="card__body" @click="goDetail(item.id)">
           <div class="card__ph">
@@ -85,7 +80,7 @@ onMounted(load)
           <p class="card__price">{{ formatPrice(Number(item.price)) }}</p>
           <p class="card__meta">
             <span class="tag" :class="statusClass(item.status)">{{ ITEM_STATUS_LABELS[item.status] }}</span>
-            <span class="card__campus">{{ item.campusName ?? '' }}</span>
+            <span>{{ item.campusName ?? '' }}</span>
           </p>
           <p class="card__time">收藏于 {{ formatTime(item.favoritedAt) }}</p>
         </button>
@@ -95,7 +90,7 @@ onMounted(load)
 
     <el-pagination
       v-if="total > pageSize"
-      class="pager"
+      class="fav__pager"
       layout="prev, pager, next"
       :current-page="pageNum"
       :page-size="pageSize"
@@ -106,52 +101,31 @@ onMounted(load)
 </template>
 
 <style scoped>
-.favs {
-  padding-bottom: 40px;
-}
-
-.head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin: 8px 0 18px;
-}
-
-.head__title {
-  margin: 0;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.head__count {
-  font-size: 13px;
-  color: var(--text-3, #8a8a92);
-}
-
-.empty {
-  padding: 80px 0;
+.fav__empty {
+  margin: 64px 0;
   text-align: center;
-  color: var(--text-3, #8a8a92);
-  font-size: 14px;
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-3);
 }
 
-.grid {
+.fav__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 16px;
+  gap: var(--cm-space-4);
+  min-height: 120px;
 }
 
 .card {
   position: relative;
-  background: var(--surface-1, #fff);
-  border: 1px solid var(--line, #ececf0);
-  border-radius: 14px;
   overflow: hidden;
+  background: var(--cm-color-surface);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-lg);
   transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
 
 .card:hover {
-  box-shadow: 0 8px 24px rgba(17, 17, 22, 0.08);
+  box-shadow: var(--cm-shadow-2);
   transform: translateY(-2px);
 }
 
@@ -183,7 +157,7 @@ onMounted(load)
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  color: var(--text-3, #8a8a92);
+  color: var(--cm-color-text-3);
 }
 
 .card__title {
@@ -210,7 +184,7 @@ onMounted(load)
   gap: 8px;
   margin: 6px 12px 0;
   font-size: 12px;
-  color: var(--text-3, #8a8a92);
+  color: var(--cm-color-text-3);
 }
 
 .tag {
@@ -232,7 +206,7 @@ onMounted(load)
 .card__time {
   margin: 6px 12px 0;
   font-size: 11px;
-  color: var(--text-3, #a0a0a8);
+  color: var(--cm-color-text-3);
 }
 
 .card__out {
@@ -240,11 +214,11 @@ onMounted(load)
   right: 8px;
   bottom: 8px;
   padding: 3px 9px;
-  border: 1px solid var(--line, #ececf0);
+  border: 1px solid var(--cm-color-border);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.94);
   font-size: 11px;
-  color: var(--text-2, #5a5a63);
+  color: var(--cm-color-text-2);
   cursor: pointer;
 }
 
@@ -253,8 +227,8 @@ onMounted(load)
   color: #e8543f;
 }
 
-.pager {
-  margin-top: 24px;
+.fav__pager {
+  margin-top: var(--cm-space-6);
   justify-content: center;
 }
 </style>

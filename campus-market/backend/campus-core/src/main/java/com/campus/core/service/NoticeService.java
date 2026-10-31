@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.campus.common.result.PageResult;
+import com.campus.core.dto.resp.BulletinVO;
 import com.campus.core.dto.resp.NoticeVO;
 import com.campus.core.entity.MsgMessage;
 import com.campus.core.mapper.MsgMessageMapper;
@@ -49,6 +50,8 @@ public class NoticeService {
     private static final ObjectMapper EXTRA_MAPPER = new ObjectMapper();
     private static final int READ_NO = 0;
     private static final int READ_YES = 1;
+    /** 播报条上限：首页顶栏不是公告栏，超过三条给「共 N 条」入口 */
+    private static final int MAX_BULLETIN = 3;
 
     private final MsgMessageMapper msgMapper;
     private final StringRedisTemplate stringRedisTemplate;
@@ -124,8 +127,31 @@ public class NoticeService {
         return PageResult.of(list, p.getTotal(), p.getCurrent(), p.getSize());
     }
 
-    /** 未读条数 */
-    public long unread(long userId) {
+    /**
+     * 首页播报条：最近 N 条公告，**免登录**。
+     *
+     * <p>不复用 {@link #list}：那个按收件人查，未登录没有收件人；而且混排了系统处置与互动，
+     * 活跃用户最近 20 条里可能一条公告都没有。这里直接按批次查公告本身。
+     *
+     * <p>不按校区过滤——未登录没有校区，过滤会让"只发某校区"的公告在匿名态整条消失，
+     * 而公告只是知会，跨校区看到无害。
+     */
+    public List<BulletinVO> bulletins(int limit) {
+        int n = Math.min(Math.max(1, limit), MAX_BULLETIN);
+        List<MsgMessageMapper.BulletinRow> rows = msgMapper.selectBulletins(n);
+        List<BulletinVO> list = new ArrayList<>(rows.size());
+        for (MsgMessageMapper.BulletinRow row : rows) {
+            BulletinVO vo = new BulletinVO();
+            vo.setId(row.getId());
+            vo.setTitle(titleOf(row.getExtra()));
+            vo.setContent(row.getContent());
+            vo.setCreateTime(row.getCreateTime());
+            list.add(vo);
+        }
+        return list;
+    }
+
+    /** 未读条数 */    public long unread(long userId) {
         Long n = msgMapper.selectCount(new LambdaQueryWrapper<MsgMessage>()
                 .eq(MsgMessage::getReceiverId, userId)
                 .eq(MsgMessage::getZone, ZONE_SYSTEM)

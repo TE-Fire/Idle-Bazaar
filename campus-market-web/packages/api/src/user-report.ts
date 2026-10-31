@@ -56,9 +56,20 @@ export interface NoticePageVO {
   pageSize: string
 }
 
+/** 首页播报条的一条公告：无已读态，读过也继续播 */
+export interface BulletinVO {
+  id: string
+  title?: string | null
+  content: string
+  createTime: string
+}
+
 export const userNoticeApi = {
   list: (pageNum = 1, pageSize = 20) =>
     request<NoticePageVO>({ url: '/api/notice/list', params: { pageNum, pageSize } }),
+
+  /** 播报条：免登录，按公告批次去重，最多 3 条 */
+  bulletin: (limit = 3) => request<BulletinVO[]>({ url: '/api/notice/bulletin', params: { limit } }),
 
   /** 未读条数（字符串形式的数字） */
   unread: () => request<string>({ url: '/api/notice/unread' }),

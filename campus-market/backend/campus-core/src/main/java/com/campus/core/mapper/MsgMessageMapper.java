@@ -47,6 +47,18 @@ public interface MsgMessageMapper extends BaseMapper<MsgMessage> {
             + "GROUP BY batch_id ORDER BY MIN(id) DESC LIMIT #{offset}, #{size}")
     List<NoticeBatchRow> selectNoticeBatchPage(@Param("offset") long offset, @Param("size") long size);
 
+    /**
+     * 首页播报条：最近 N 条未撤回的公告，按批次去重。
+     *
+     * <p>必须 `GROUP BY batch_id`——一条公告在每个收件人名下各一行，不去重会把同一条
+     * 公告按人数重复播 N 次。取 `MIN()` 而不是直接选列，是为了过 `ONLY_FULL_GROUP_BY`。
+     */
+    @Select("SELECT MIN(id) AS id, MIN(content) AS content, MIN(extra) AS extra, "
+            + "MIN(create_time) AS createTime FROM msg_message "
+            + "WHERE zone = 2 AND type = 6 AND deleted = 0 AND batch_id IS NOT NULL "
+            + "GROUP BY batch_id ORDER BY MIN(id) DESC LIMIT #{limit}")
+    List<BulletinRow> selectBulletins(@Param("limit") int limit);
+
     /** 按批次撤回：只软删仍活着的收件行，返回影响行数 */
     @Update("UPDATE msg_message SET deleted = #{deleted} "
             + "WHERE batch_id = #{batchId} AND deleted = 0")
@@ -60,6 +72,15 @@ public interface MsgMessageMapper extends BaseMapper<MsgMessage> {
         private Integer receiverCount;
         private Integer aliveCount;
         private Integer readCount;
+        private LocalDateTime createTime;
+    }
+
+    /** 播报条投影：一行 = 一条公告 */
+    @Data
+    class BulletinRow {
+        private Long id;
+        private String content;
+        private String extra;
         private LocalDateTime createTime;
     }
 }
