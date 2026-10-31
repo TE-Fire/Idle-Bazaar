@@ -25,6 +25,7 @@ const mode = ref<number>(USER_LOGIN_TYPE.code)
 const account = ref('')
 const code = ref('')
 const password = ref('')
+const agreed = ref(false)
 
 const { cooldown, counting, send } = useCodeSender(MAIL_CODE_SCENE.login)
 
@@ -34,7 +35,7 @@ const redirect = ref('')
 const kind = computed(() => accountKind(account.value))
 const canGetCode = computed(() => Boolean(kind.value) && !counting.value)
 const canSubmit = computed(() => {
-  if (!kind.value) return false
+  if (!agreed.value || !kind.value) return false
   return mode.value === USER_LOGIN_TYPE.code
     ? /^\d{6}$/.test(code.value)
     : password.value.length >= 8
@@ -80,6 +81,10 @@ function goForgot(): void {
 }
 
 async function submit(): Promise<void> {
+  if (!agreed.value) {
+    uni.showToast({ title: '请先同意用户协议与隐私政策', icon: 'none' })
+    return
+  }
   if (!canSubmit.value) {
     uni.showToast({
       title: mode.value === USER_LOGIN_TYPE.code ? '请填写账号与 6 位验证码' : '请填写账号与至少 8 位密码',
@@ -165,6 +170,13 @@ async function submit(): Promise<void> {
 
       <view class="submit cm-btn cm-btn--primary" hover-class="cm-btn--on" @click="submit">
         <text>登录</text>
+      </view>
+
+      <view class="agree" @click="agreed = !agreed">
+        <view class="agree__box" :class="{ 'agree__box--on': agreed }">
+          <text v-if="agreed" class="agree__tick">✓</text>
+        </view>
+        <text class="agree__t">已阅读并同意《用户协议》与《隐私政策》</text>
       </view>
 
       <view class="links">
@@ -383,6 +395,41 @@ async function submit(): Promise<void> {
   margin-top: $cm-space-5;
   height: 92rpx;
   font-size: $cm-font-size-md;
+}
+
+.agree {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+  margin-top: $cm-space-4;
+}
+
+.agree__box {
+  width: 34rpx;
+  height: 34rpx;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid $cm-color-border-strong;
+  border-radius: 8rpx;
+  background: $cm-color-surface;
+}
+
+.agree__box--on {
+  background: $cm-color-brand;
+  border-color: $cm-color-brand;
+}
+
+.agree__tick {
+  font-size: 22rpx;
+  line-height: 1;
+  color: $cm-color-text-1;
+}
+
+.agree__t {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
 }
 
 .links {
