@@ -21,6 +21,9 @@ import {
   type OfferCardPayload
 } from '@campus/api'
 import { formatPrice, formatRelativeTime, ITEM_STATUS_LABELS } from '@campus/shared'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import OfferDialog from '@/components/OfferDialog.vue'
+import OfferRejectDialog from '@/components/OfferRejectDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -34,6 +37,10 @@ const loadingList = ref(true)
 const item = ref<ApiItemVO | null>(null)
 /** 议价操作中：防连点 */
 const offerBusy = ref(false)
+/** 出价弹窗 */
+const offerOpen = ref(false)
+/** 拒绝目标：非空即弹理由框 */
+const rejectTarget = ref<OfferCardPayload | null>(null)
 
 const isBuyer = computed(() => !!item.value && item.value.sellerId !== userStore.userId)
 
@@ -218,36 +225,30 @@ function deadlineText(p: OfferCardPayload): string {
   return p.expireTime ? p.expireTime.slice(11, 16) : ''
 }
 
-async function startOffer(): Promise<void> {
+/** 出价：区间校验交给弹窗，这里只挡「便宜到没法议价」的极端商品 */
+function startOffer(): void {
   const it = item.value
   if (!it || offerBusy.value) return
   const price = Number(it.price)
   const floor = Math.max(0.01, Number((price * 0.1).toFixed(2)))
   if (price <= floor) {
-    window.alert('价格过低，暂不支持议价')
+    ElMessage.warning('价格过低，暂不支持议价')
     return
   }
-  const raw = window.prompt(`出价（${floor} ~ ${(price - 0.01).toFixed(2)} 元）`)
-  if (raw === null) return
-  const offer = Number(raw.trim())
-  if (!Number.isFinite(offer) || offer <= 0) {
-    window.alert('请输入正确的金额')
-    return
-  }
-  offerBusy.value = true
-  try {
-    await userOfferApi.create(it.id, Number(offer.toFixed(2)))
-    await pollNew()
-  } catch {
-    // http 层已提示
-  } finally {
-    offerBusy.value = false
-  }
+  offerOpen.value = true
 }
 
 async function agree(p: OfferCardPayload): Promise<void> {
   if (offerBusy.value) return
-  if (!window.confirm(`同意按 ¥${p.offerPrice} 成交？买家需在 10 分钟内付款。`)) return
+  try {
+    await ElMessageBox.confirm(
+      `同意后买家需在 10 分钟内按 ¥${p.offerPrice} 付款，超时议价失效。`,
+      `同意按 ¥${p.offerPrice} 成交？`,
+      { confirmButtonText: '同意', cancelButtonText: '再想想', type: 'info' }
+    )
+  } catch {
+    return
+  }
   offerBusy.value = true
   try {
     await userOfferApi.agree(p.offerId)
@@ -259,19 +260,10 @@ async function agree(p: OfferCardPayload): Promise<void> {
   }
 }
 
-async function reject(p: OfferCardPayload): Promise<void> {
+/** 拒绝：弹理由框，提交在弹窗内完成，回调里只刷新消息 */
+function reject(p: OfferCardPayload): void {
   if (offerBusy.value) return
-  const reason = window.prompt('拒绝理由（可不填）')
-  if (reason === null) return
-  offerBusy.value = true
-  try {
-    await userOfferApi.reject(p.offerId, reason.trim() || undefined)
-    await pollNew()
-  } catch {
-    // http 层已提示
-  } finally {
-    offerBusy.value = false
-  }
+  rejectTarget.value = p
 }
 
 async function cancelOffer(p: OfferCardPayload): Promise<void> {
@@ -441,6 +433,20 @@ async function goPay(p: OfferCardPayload): Promise<void> {
     <section v-else class="chat__main chat__main--empty">
       <p class="chat__empty">选择左侧会话开始沟通</p>
     </section>
+
+    <OfferDialog
+      v-model="offerOpen"
+      :item-id="item?.id ?? ''"
+      :price="item?.price ?? '0'"
+      @done="pollNew"
+    />
+    <OfferRejectDialog
+      :model-value="!!rejectTarget"
+      :offer-id="rejectTarget?.offerId ?? ''"
+      :offer-price="rejectTarget?.offerPrice ?? '0'"
+      @update:model-value="(v: boolean) => { if (!v) rejectTarget = null }"
+      @done="pollNew"
+    />
   </div>
 </template>
 
