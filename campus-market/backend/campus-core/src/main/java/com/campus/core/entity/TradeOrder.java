@@ -24,7 +24,8 @@ import java.time.LocalDateTime;
  * <p><b>五个 `item_*` 快照字段与 `snapshot` 不可回写</b>：它们的存在是为了防止卖家事后改价改描述，
  * 使纠纷取证有可信数据源。卖家后续修改商品时，历史订单的快照必须保持下单时的原样。
  *
- * <p>`version` 服务于订单自身的乐观锁；商品侧的占位并发另有 `item.version` 承担，两者互相独立。
+ * <p><b>无 `version` 字段</b>：订单的并发由状态条件更新（`WHERE status = 待付款`）拦截，
+ * 与商品的 `item.version` 是两套互不相干的机制，不做冗余字段。
  *
  * <p><b>收货地址同样在下单时快照进 `address_contact/phone/detail`</b>：与商品快照同理，防止卖家改提货点、
  * 买家改收货地址后双方对「货去哪了」各执一词。面交订单无地址快照，地址信息由 `meet_point_id` 承载。
@@ -101,8 +102,6 @@ public class TradeOrder {
 
     /** 完整商品信息 JSON，纠纷取证用 */
     private String snapshot;
-
-    private Integer version;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

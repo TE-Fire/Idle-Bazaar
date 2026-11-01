@@ -5,7 +5,6 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
-import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -16,7 +15,7 @@ import java.time.LocalDateTime;
  * 商品（`item`）。
  *
  * <p>无「已预定」状态：拍下只生成待付款订单，付款成功才转已售出，其余待付款自动取消
- * （business/03 §4.1）。`version` 乐观锁供 C 端付款占位用，管理端本期不用。
+ * （business/03 §4.1）。`version` 供 C 端付款占位的条件更新用，管理端本期不用。
  * `mainImage` 是 item_image 中 sort=0 的副本，改图时两处一起改。
  */
 @Data
@@ -70,7 +69,7 @@ public class Item {
     /** 驳回 / 强制下架原因，详情页与申诉复盘要看 */
     private String rejectReason;
 
-    @Version
+    /** 版本号。付款占位在条件更新里显式比对并自增，不挂 @Version，插件不参与 */
     private Integer version;
 
     private Integer viewCount;
