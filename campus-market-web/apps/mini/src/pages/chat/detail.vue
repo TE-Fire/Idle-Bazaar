@@ -24,6 +24,8 @@ import {
   type OfferCardPayload
 } from '@/api/user'
 import { getSession } from '@/utils/session'
+import OfferSheet from '@/components/OfferSheet.vue'
+import OfferRejectSheet from '@/components/OfferRejectSheet.vue'
 
 const myId = getSession().userId
 
@@ -35,6 +37,10 @@ const peerNick = ref('')
 const item = ref<ApiItemVO | null>(null)
 /** 议价操作进行中：防连点，同意与去付款都不能重复提交 */
 const offerBusy = ref(false)
+/** 出价面板 */
+const offerOpen = ref(false)
+/** 拒绝目标：非空即弹理由面板 */
+const rejectTarget = ref<OfferCardPayload | null>(null)
 
 /** 买家视角：卖家自己看自己的商品时没有议价入口 */
 const isBuyer = computed(() => !!item.value && item.value.sellerId !== myId)
@@ -198,7 +204,8 @@ function deadlineText(p: OfferCardPayload): string {
   return p.expireTime ? p.expireTime.slice(11, 16) : ''
 }
 
-async function startOffer(): Promise<void> {
+/** 出价：区间校验在面板内，这里只挡「便宜到没法议价」的极端商品 */
+function startOffer(): void {
   const it = item.value
   if (!it || offerBusy.value) return
   const price = Number(it.price)
@@ -207,30 +214,7 @@ async function startOffer(): Promise<void> {
     uni.showToast({ title: '价格过低，暂不支持议价', icon: 'none' })
     return
   }
-  const res = (await uni.showModal({
-    title: '我要议价',
-    editable: true,
-    placeholderText: `${floor} ~ ${(price - 0.01).toFixed(2)} 元`,
-    content: '',
-    confirmText: '发出'
-  })) as unknown as { confirm: boolean; content?: string }
-  if (!res.confirm) return
-
-  const offer = Number((res.content ?? '').trim())
-  if (!Number.isFinite(offer) || offer <= 0) {
-    uni.showToast({ title: '请输入正确的金额', icon: 'none' })
-    return
-  }
-  offerBusy.value = true
-  try {
-    await userOfferApi.create(it.id, Number(offer.toFixed(2)))
-    uni.showToast({ title: '已发出，等卖家答复', icon: 'none' })
-    await pollNew()
-  } catch {
-    // request 层已提示（如「已有进行中的议价」）
-  } finally {
-    offerBusy.value = false
-  }
+  offerOpen.value = true
 }
 
 async function agree(p: OfferCardPayload): Promise<void> {
@@ -247,25 +231,10 @@ async function agree(p: OfferCardPayload): Promise<void> {
   }
 }
 
-async function reject(p: OfferCardPayload): Promise<void> {
+/** 拒绝：弹理由面板，提交在面板内完成，回调里只刷新消息 */
+function reject(p: OfferCardPayload): void {
   if (offerBusy.value) return
-  const res = (await uni.showModal({
-    title: '拒绝这次议价？',
-    editable: true,
-    placeholderText: '理由（可不填）',
-    content: '',
-    confirmText: '拒绝'
-  })) as unknown as { confirm: boolean; content?: string }
-  if (!res.confirm) return
-  offerBusy.value = true
-  try {
-    await userOfferApi.reject(p.offerId, (res.content ?? '').trim() || undefined)
-    await pollNew()
-  } catch {
-    // request 层已提示
-  } finally {
-    offerBusy.value = false
-  }
+  rejectTarget.value = p
 }
 
 async function cancelOffer(p: OfferCardPayload): Promise<void> {
@@ -393,6 +362,20 @@ async function goPay(p: OfferCardPayload): Promise<void> {
       />
       <button class="bar__send" :disabled="sending || !draft.trim()" @click="send">发送</button>
     </view>
+
+    <OfferSheet
+      v-model="offerOpen"
+      :item-id="item?.id ?? itemId"
+      :price="item?.price ?? '0'"
+      @done="pollNew"
+    />
+    <OfferRejectSheet
+      :model-value="!!rejectTarget"
+      :offer-id="rejectTarget?.offerId ?? ''"
+      :offer-price="rejectTarget?.offerPrice ?? '0'"
+      @update:model-value="(v: boolean) => { if (!v) rejectTarget = null }"
+      @done="pollNew"
+    />
   </view>
 </template>
 
