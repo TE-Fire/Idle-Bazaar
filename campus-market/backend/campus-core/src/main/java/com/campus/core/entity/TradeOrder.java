@@ -18,8 +18,9 @@ import java.time.LocalDateTime;
  * 所有权判定的唯一时刻是付款成功的那一刻（`tech/01` §9.1 的两级校验）。
  * 因此本表没有任何反映「锁定库存」的字段——那是被明确否掉的设计。
  *
- * <p><b>`amount` 一律按标价</b>：议价不是独立业务，只作为商品的展示标签，
- * 口头议价发生在聊天里（`business/01` 第七节已决策）。订单不记录议价过程也不接受自定义金额。
+ * <p><b>`amount` 两条来源</b>：按标价，或按被同意的议价（`offer_id` 非空时）。
+ * 议价价只进本订单，**不回写 `item.price`**——议价成功后买家未付款，其他买家看到的仍是标价
+ * （`business/01` 第七节 2026-11-01 修订）。
  *
  * <p><b>五个 `item_*` 快照字段与 `snapshot` 不可回写</b>：它们的存在是为了防止卖家事后改价改描述，
  * 使纠纷取证有可信数据源。卖家后续修改商品时，历史订单的快照必须保持下单时的原样。
@@ -49,6 +50,9 @@ public class TradeOrder {
 
     /** 成交金额，一律取自下单时的商品标价 */
     private BigDecimal amount;
+
+    /** 成交所依据的议价单（`item_offer.id`）；按标价成交时为空 */
+    private Long offerId;
 
     /** 见 {@link com.campus.core.enums.OrderStatusEnum} */
     private Integer status;

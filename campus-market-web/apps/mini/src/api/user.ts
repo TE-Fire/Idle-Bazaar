@@ -189,7 +189,7 @@ export interface ApiItemVO {
   sellerId: string
   sellerNick?: string
   sellerCredit?: number
-  /** 1 可议价；议价在聊天里进行，不进订单 */
+  /** 1 可议价：买家可在聊天里出价，卖家同意后按议价价成交；不改商品标价 */
   negotiable?: number
   deliveryIncluded?: number
   status: 'DRAFT' | 'PENDING' | 'ON_SALE' | 'SOLD' | 'OFFLINE' | 'REJECTED' | 'FORCED_OFFLINE'
@@ -239,9 +239,69 @@ export interface ChatMessageVO {
   id: string
   senderId: string
   content: string
+  /** 1 文本 / 7 议价卡片；卡片按 extra 渲染成可操作卡片 */
+  type?: number
+  /** 卡片载荷（JSON 串）：offerId / itemId / originPrice / offerPrice / status / expireTime */
+  extra?: string | null
   createdAt: string
   /** 服务端比较发送人与当前登录用户给出，前端不自己判断左右 */
   mine: boolean
+}
+
+/** 议价卡片载荷（服务端已按最新状态回填，不是发送时的快照） */
+export interface OfferCardPayload {
+  offerId: string
+  itemId: string
+  originPrice: string
+  offerPrice: string
+  status: 'PENDING' | 'AGREED' | 'REJECTED' | 'EXPIRED' | 'ORDERED'
+  expireTime?: string
+}
+
+export const OFFER_STATUS_LABELS: Record<OfferCardPayload['status'], string> = {
+  PENDING: '待卖家答复',
+  AGREED: '卖家已同意',
+  REJECTED: '卖家已拒绝',
+  EXPIRED: '已失效',
+  ORDERED: '已成交'
+}
+
+/** 议价单（我的议价列表用；聊天卡片读 extra 即可） */
+export interface OfferVO {
+  id: string
+  itemId: string
+  itemTitle?: string
+  itemMainImage?: string
+  itemPrice?: string
+  originPrice: string
+  offerPrice: string
+  status: OfferCardPayload['status']
+  expireTime?: string
+  peerNick?: string
+  rejectReason?: string
+  createTime: string
+  asSeller: boolean
+}
+
+export const userOfferApi = {
+  /** 发起议价：出价须低于标价且不低于标价的 10% */
+  create: (itemId: string, offerPrice: number) =>
+    request<string>({ url: '/api/offer/create', method: 'POST', data: { itemId, offerPrice } }),
+
+  agree: (id: string) => request<void>({ url: `/api/offer/${id}/agree`, method: 'POST' }),
+
+  reject: (id: string, reason?: string) =>
+    request<void>({ url: `/api/offer/${id}/reject`, method: 'POST', data: reason ? { reason } : {} }),
+
+  cancel: (id: string) => request<void>({ url: `/api/offer/${id}/cancel`, method: 'POST' }),
+
+  list: (role: 'buyer' | 'seller' = 'buyer', pageNum = 1, pageSize = 10) =>
+    request<{ list: OfferVO[]; total: number; pageNum: number; pageSize: number }>({
+      url: '/api/offer/list',
+      data: { role, pageNum, pageSize }
+    }),
+
+  detail: (id: string) => request<OfferVO>({ url: `/api/offer/${id}` })
 }
 
 export const userChatApi = {
@@ -363,8 +423,8 @@ export interface OrderVO {
 }
 
 export const userOrderApi = {
-  /** 下单：只插待付款订单，商品不锁定；金额一律按标价 */
-  create: (req: { itemId: string; meetPointId?: string; meetTime?: string }) =>
+  /** 下单：只插待付款订单，商品不锁定；金额按标价，传 offerId 则按已同意的议价价 */
+  create: (req: { itemId: string; offerId?: string; meetPointId?: string; meetTime?: string }) =>
     request<string>({ url: '/api/order/create', method: 'POST', data: { ...req } }),
 
   /** 模拟支付 → 待面交 */

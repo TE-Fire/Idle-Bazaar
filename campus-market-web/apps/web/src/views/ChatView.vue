@@ -9,14 +9,39 @@
 
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { chatApi, type ChatConversationVO, type ChatMessageVO } from '@campus/api'
+import {
+  chatApi,
+  OFFER_STATUS_LABELS,
+  userItemApi,
+  userOfferApi,
+  userOrderApi,
+  type ApiItemVO,
+  type ChatConversationVO,
+  type ChatMessageVO,
+  type OfferCardPayload
+} from '@campus/api'
 import { formatPrice, formatRelativeTime, ITEM_STATUS_LABELS } from '@campus/shared'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 
 const conversations = ref<ChatConversationVO[]>([])
 const loadingList = ref(true)
+
+/** 当前会话的商品详情：只为拿 sellerId 与 negotiable，决定能否议价 */
+const item = ref<ApiItemVO | null>(null)
+/** 议价操作中：防连点 */
+const offerBusy = ref(false)
+
+const isBuyer = computed(() => !!item.value && item.value.sellerId !== userStore.userId)
+
+/** 议价入口：别人的、在售、卖家勾了可议价 */
+const canOffer = computed(() => {
+  const it = item.value
+  return !!it && it.sellerId !== userStore.userId && it.status === 'ON_SALE' && it.negotiable === 1
+})
 
 const selected = ref<ChatConversationVO | null>(null)
 const messages = ref<ChatMessageVO[]>([])
@@ -57,6 +82,7 @@ onMounted(async () => {
       }
       messages.value = []
       oldestId.value = null
+      void loadItem(itemId)
     }
   } else if (conversations.value.length) {
     await openConversation(conversations.value[0])
@@ -95,10 +121,21 @@ async function openConversation(c: ChatConversationVO): Promise<void> {
   selected.value = c
   messages.value = []
   oldestId.value = null
+  item.value = null
+  void loadItem(c.itemId)
   await pullMessages()
   // 拉完即已读；未读数本地先清零，避免轮询间隙还挂着红点
   c.unread = 0
   void chatApi.read(c.itemId, c.peerUserId).catch(() => undefined)
+}
+
+/** 商品现状：议价入口与「是否已售」提示都靠它，失败不阻断聊天 */
+async function loadItem(itemId: string): Promise<void> {
+  try {
+    item.value = await userItemApi.detail(itemId)
+  } catch {
+    // 商品可能已删除：聊天继续，只是不显示议价入口
+  }
 }
 
 async function pullMessages(): Promise<void> {
@@ -163,6 +200,113 @@ async function send(): Promise<void> {
 
 /** 自己商品的会话排在前面：卖家视角要最快看到新询单 */
 const sortedConversations = computed(() => conversations.value)
+
+/* ── 议价：卡片格式坏掉按普通消息展示，不让一条脏数据卡住整页 ── */
+
+function payloadOf(m: ChatMessageVO): OfferCardPayload | null {
+  if (m.type !== 7 || !m.extra) return null
+  try {
+    const p = JSON.parse(m.extra) as OfferCardPayload
+    return p.offerId ? p : null
+  } catch {
+    return null
+  }
+}
+
+/** 截止时刻取 HH:mm：10 分钟窗口显示倒计时过于催人，给一个可核对的时点即可 */
+function deadlineText(p: OfferCardPayload): string {
+  return p.expireTime ? p.expireTime.slice(11, 16) : ''
+}
+
+async function startOffer(): Promise<void> {
+  const it = item.value
+  if (!it || offerBusy.value) return
+  const price = Number(it.price)
+  const floor = Math.max(0.01, Number((price * 0.1).toFixed(2)))
+  if (price <= floor) {
+    window.alert('价格过低，暂不支持议价')
+    return
+  }
+  const raw = window.prompt(`出价（${floor} ~ ${(price - 0.01).toFixed(2)} 元）`)
+  if (raw === null) return
+  const offer = Number(raw.trim())
+  if (!Number.isFinite(offer) || offer <= 0) {
+    window.alert('请输入正确的金额')
+    return
+  }
+  offerBusy.value = true
+  try {
+    await userOfferApi.create(it.id, Number(offer.toFixed(2)))
+    await pollNew()
+  } catch {
+    // http 层已提示
+  } finally {
+    offerBusy.value = false
+  }
+}
+
+async function agree(p: OfferCardPayload): Promise<void> {
+  if (offerBusy.value) return
+  if (!window.confirm(`同意按 ¥${p.offerPrice} 成交？买家需在 10 分钟内付款。`)) return
+  offerBusy.value = true
+  try {
+    await userOfferApi.agree(p.offerId)
+    await pollNew()
+  } catch {
+    // http 层已提示
+  } finally {
+    offerBusy.value = false
+  }
+}
+
+async function reject(p: OfferCardPayload): Promise<void> {
+  if (offerBusy.value) return
+  const reason = window.prompt('拒绝理由（可不填）')
+  if (reason === null) return
+  offerBusy.value = true
+  try {
+    await userOfferApi.reject(p.offerId, reason.trim() || undefined)
+    await pollNew()
+  } catch {
+    // http 层已提示
+  } finally {
+    offerBusy.value = false
+  }
+}
+
+async function cancelOffer(p: OfferCardPayload): Promise<void> {
+  if (offerBusy.value) return
+  offerBusy.value = true
+  try {
+    await userOfferApi.cancel(p.offerId)
+    await pollNew()
+  } catch {
+    // http 层已提示
+  } finally {
+    offerBusy.value = false
+  }
+}
+
+/**
+ * 去付款：下单（带 offerId）后立刻模拟支付。
+ *
+ * <p>两步连做而不是先下单再跳订单页：议价只有 10 分钟，多跳一页只会增加超时概率。
+ * 支付失败时订单已建（待付款），订单页仍可继续付，所以这里不额外回滚。
+ */
+async function goPay(p: OfferCardPayload): Promise<void> {
+  if (offerBusy.value) return
+  offerBusy.value = true
+  try {
+    const orderId = await userOrderApi.create({ itemId: p.itemId, offerId: p.offerId })
+    await userOrderApi.pay(orderId)
+    await pollNew()
+    void router.push({ name: 'order-detail', params: { id: orderId } })
+  } catch {
+    // http 层已提示（如「议价已过付款时限」）
+  } finally {
+    offerBusy.value = false
+  }
+}
 </script>
 
 <template>
@@ -217,19 +361,62 @@ const sortedConversations = computed(() => conversations.value)
         <button type="button" class="itemcard__close" title="关闭商品卡片" @click="closeCard">×</button>
       </div>
 
+      <!-- 议价入口：别人的、在售的、卖家勾了「可议价」时才出现 -->
+      <div v-if="canOffer" class="offer-entry">
+        <span class="offer-entry__text">卖家支持议价，可以出个价试试</span>
+        <button type="button" class="offer-entry__btn" :disabled="offerBusy" @click="startOffer">
+          我要议价
+        </button>
+      </div>
+
       <div class="chat__msgs">
         <p v-if="!messages.length && !loadingMsg" class="chat__empty">
-          还没有消息。议价请在这里口头沟通，订单一律按标价成交。
+          还没有消息。可以聊商品情况，也可以直接出价议价。
         </p>
-        <div
-          v-for="m in messages"
-          :key="m.id"
-          class="bubble"
-          :class="{ 'bubble--mine': m.mine }"
-        >
-          <span class="bubble__text">{{ m.content }}</span>
-          <span class="bubble__time">{{ formatRelativeTime(m.createdAt) }}</span>
-        </div>
+        <template v-for="m in messages" :key="m.id">
+          <!-- 议价卡片：状态由服务端按最新单据回填，历史消息也反映当前结论 -->
+          <div v-if="payloadOf(m)" class="offer-card" :class="{ 'offer-card--mine': m.mine }">
+            <div class="offer-card__head">
+              <span class="offer-card__label">议价</span>
+              <span class="offer-card__status">{{ OFFER_STATUS_LABELS[payloadOf(m)!.status] }}</span>
+            </div>
+            <div class="offer-card__body">
+              <strong class="offer-card__price">{{ formatPrice(Number(payloadOf(m)!.offerPrice)) }}</strong>
+              <span class="offer-card__origin">标价 {{ formatPrice(Number(payloadOf(m)!.originPrice)) }}</span>
+            </div>
+            <p
+              v-if="payloadOf(m)!.status === 'AGREED' && payloadOf(m)!.expireTime"
+              class="offer-card__hint"
+            >
+              请在 {{ deadlineText(payloadOf(m)!) }} 前付款，过时失效
+            </p>
+            <div class="offer-card__ops">
+              <template v-if="!isBuyer && payloadOf(m)!.status === 'PENDING'">
+                <button type="button" class="offer-card__btn offer-card__btn--primary" :disabled="offerBusy" @click="agree(payloadOf(m)!)">同意</button>
+                <button type="button" class="offer-card__btn" :disabled="offerBusy" @click="reject(payloadOf(m)!)">拒绝</button>
+              </template>
+              <button
+                v-else-if="isBuyer && payloadOf(m)!.status === 'AGREED'"
+                type="button"
+                class="offer-card__btn offer-card__btn--primary"
+                :disabled="offerBusy"
+                @click="goPay(payloadOf(m)!)"
+              >去付款</button>
+              <button
+                v-else-if="isBuyer && m.mine && payloadOf(m)!.status === 'PENDING'"
+                type="button"
+                class="offer-card__btn"
+                :disabled="offerBusy"
+                @click="cancelOffer(payloadOf(m)!)"
+              >撤回</button>
+            </div>
+            <span class="offer-card__time">{{ formatRelativeTime(m.createdAt) }}</span>
+          </div>
+          <div v-else class="bubble" :class="{ 'bubble--mine': m.mine }">
+            <span class="bubble__text">{{ m.content }}</span>
+            <span class="bubble__time">{{ formatRelativeTime(m.createdAt) }}</span>
+          </div>
+        </template>
       </div>
 
       <footer class="chat__input">
@@ -241,7 +428,7 @@ const sortedConversations = computed(() => conversations.value)
             v-model="draft"
             type="text"
             maxlength="500"
-            placeholder="说点什么…（议价口头沟通，订单按标价成交）"
+            placeholder="说点什么…"
             @keyup.enter="send"
           />
           <button type="button" class="chat__send" :disabled="sending || !draft.trim()" @click="send">
@@ -500,6 +687,127 @@ const sortedConversations = computed(() => conversations.value)
 .bubble__time {
   font-size: 11px;
   opacity: 0.6;
+}
+
+/* 议价入口：横条，不挤压消息区 */
+.offer-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cm-space-3);
+  margin: var(--cm-space-2) var(--cm-space-5) 0;
+  padding: var(--cm-space-2) var(--cm-space-3);
+  background: var(--cm-color-bg);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-lg);
+}
+
+.offer-entry__text {
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-2);
+}
+
+.offer-entry__btn {
+  border: none;
+  cursor: pointer;
+  padding: 4px 12px;
+  font-size: var(--cm-font-size-sm);
+  color: #fff;
+  background: var(--cm-color-brand);
+  border-radius: var(--cm-radius-md);
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+/* 议价卡片：不区分左右气泡，靠状态与按钮表达双方待办 */
+.offer-card {
+  align-self: stretch;
+  padding: var(--cm-space-3);
+  background: var(--cm-color-surface);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-lg);
+
+  &--mine {
+    border-left: 3px solid var(--cm-color-brand);
+  }
+}
+
+.offer-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.offer-card__label {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+  letter-spacing: 1px;
+}
+
+.offer-card__status {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-brand);
+}
+
+.offer-card__body {
+  display: flex;
+  align-items: baseline;
+  gap: var(--cm-space-2);
+  margin-top: 2px;
+}
+
+.offer-card__price {
+  font-size: var(--cm-font-size-lg);
+  color: var(--cm-color-price);
+}
+
+.offer-card__origin {
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-text-3);
+  text-decoration: line-through;
+}
+
+.offer-card__hint {
+  margin: var(--cm-space-1) 0 0;
+  font-size: var(--cm-font-size-xs);
+  color: var(--cm-color-err);
+}
+
+.offer-card__ops {
+  display: flex;
+  gap: var(--cm-space-2);
+  margin-top: var(--cm-space-3);
+}
+
+.offer-card__btn {
+  cursor: pointer;
+  padding: 5px 14px;
+  font-size: var(--cm-font-size-sm);
+  color: var(--cm-color-text-1);
+  background: var(--cm-color-bg);
+  border: 1px solid var(--cm-color-border);
+  border-radius: var(--cm-radius-md);
+
+  &--primary {
+    color: #fff;
+    background: var(--cm-color-brand);
+    border-color: var(--cm-color-brand);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
+
+.offer-card__time {
+  display: block;
+  margin-top: var(--cm-space-2);
+  font-size: 11px;
+  color: var(--cm-color-text-3);
 }
 
 .chat__input {

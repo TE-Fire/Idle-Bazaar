@@ -17,6 +17,12 @@ public class ChatMessageVO {
 
     private String content;
 
+    /** 1 文本 / 7 议价卡片；前端按类型决定渲染气泡还是卡片 */
+    private Integer type;
+
+    /** 卡片载荷（议价：offerId / 原价 / 出价 / 状态 / 付款截止），文本消息为空 */
+    private String extra;
+
     private LocalDateTime createdAt;
 
     private boolean mine;

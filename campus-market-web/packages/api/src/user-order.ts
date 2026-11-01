@@ -93,6 +93,8 @@ export interface UserOrderVO {
 
 export interface OrderCreateReq {
   itemId: string
+  /** 议价单 id：从聊天议价卡片点「去付款」时传入，金额按议价价；不传则按商品标价 */
+  offerId?: string
   meetPointId?: string
   /** 送货上门时买家选定的收货地址 id（其余方式不传） */
   addressId?: string
@@ -107,7 +109,7 @@ export interface OrderListParams {
 }
 
 export const userOrderApi = {
-  /** 下单：只插待付款订单，商品不锁定；金额一律按标价，不可自定义 */
+  /** 下单：只插待付款订单，商品不锁定；金额按标价，传 offerId 则按已同意的议价价 */
   create: (req: OrderCreateReq) =>
     request<string>({ url: '/api/order/create', method: 'POST', data: { ...req } }),
 

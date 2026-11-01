@@ -28,9 +28,31 @@ export interface ChatMessageVO {
   id: string
   senderId: string
   content: string
+  /** 1 文本 / 7 议价卡片 */
+  type?: number
+  /** 卡片载荷（JSON 串）：offerId / itemId / originPrice / offerPrice / status / expireTime */
+  extra?: string | null
   createdAt: string
   /** 服务端按发送人与当前登录用户比较给出，前端不自己判断左右 */
   mine: boolean
+}
+
+/** 议价卡片载荷（服务端按最新单据回填，不是发送时的快照） */
+export interface OfferCardPayload {
+  offerId: string
+  itemId: string
+  originPrice: string
+  offerPrice: string
+  status: 'PENDING' | 'AGREED' | 'REJECTED' | 'EXPIRED' | 'ORDERED'
+  expireTime?: string
+}
+
+export const OFFER_STATUS_LABELS: Record<OfferCardPayload['status'], string> = {
+  PENDING: '待卖家答复',
+  AGREED: '卖家已同意',
+  REJECTED: '卖家已拒绝',
+  EXPIRED: '已失效',
+  ORDERED: '已成交'
 }
 
 export interface ChatSendReq {

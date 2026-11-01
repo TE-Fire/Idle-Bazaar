@@ -231,8 +231,33 @@ CREATE TABLE favorite (
 ) ENGINE=InnoDB COMMENT='收藏';
 
 -- ════════════════════════════════════════════════════════════
--- 四、订单
+-- 四、议价与订单
 -- ════════════════════════════════════════════════════════════
+
+-- 议价单：买家对「可议价」商品的出价，卖家同意后买家可按该价付款。
+-- 关键在于价格隔离——议价价只存这张表与被它成交的那笔订单，**从不写回 item.price**，
+-- 所以其他买家看到的仍是标价，议价成功未付款也不会污染商品展示与均价缓存。
+CREATE TABLE item_offer (
+  id            bigint        NOT NULL COMMENT '雪花ID',
+  item_id       bigint        NOT NULL COMMENT '商品',
+  buyer_id      bigint        NOT NULL COMMENT '出价买家',
+  seller_id     bigint        NOT NULL COMMENT '商品卖家（冗余，卖家待办列表免回查商品）',
+  origin_price  decimal(10,2) NOT NULL COMMENT '出价时的商品标价快照（卖家事后改价不影响已发起的议价）',
+  offer_price   decimal(10,2) NOT NULL COMMENT '买家出价，须低于标价且不低于标价的 10%',
+  status        tinyint       NOT NULL DEFAULT 1 COMMENT '1待答复 2已同意 3已拒绝 4已失效 5已下单',
+  expire_time   datetime      DEFAULT NULL COMMENT '付款截止：卖家同意时写 now+10 分钟，仅对 status=2 有意义',
+  handle_time   datetime      DEFAULT NULL COMMENT '卖家处理（同意/拒绝）时间',
+  reject_reason varchar(200)  DEFAULT NULL COMMENT '拒绝理由',
+  alive         tinyint       GENERATED ALWAYS AS (CASE WHEN status IN (1,2) THEN 1 ELSE NULL END) STORED COMMENT '进行中标记：仅 1/2 为 1，其余 NULL',
+  create_time   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  update_time   datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted       bigint        NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_alive (item_id, buyer_id, alive) COMMENT '同买家同商品同时只允许一条进行中；NULL 不参与唯一，历史单据可多条',
+  KEY idx_seller (seller_id, status) COMMENT '卖家待答复',
+  KEY idx_buyer (buyer_id, status) COMMENT '我发起的议价',
+  KEY idx_expire (status, expire_time) COMMENT '同意后超时失效扫描'
+) ENGINE=InnoDB COMMENT='议价单（一对一私密价，不写回 item.price）';
 
 CREATE TABLE trade_order (
   id              bigint        NOT NULL COMMENT '雪花ID',
@@ -240,7 +265,8 @@ CREATE TABLE trade_order (
   item_id         bigint        NOT NULL COMMENT '商品',
   buyer_id        bigint        NOT NULL COMMENT '买家',
   seller_id       bigint        NOT NULL COMMENT '卖家',
-  amount          decimal(10,2) NOT NULL COMMENT '成交金额（一律按标价，议价不进订单）',
+  amount          decimal(10,2) NOT NULL COMMENT '成交金额（议价成交时为议价价，其余为下单时标价）',
+  offer_id        bigint        DEFAULT NULL COMMENT '成交所依据的议价单（非议价成交为空）',
   status          tinyint       NOT NULL DEFAULT 1 COMMENT '1待付款 2待面交 3已验货 4已完成 5已取消 6退款中 7已退款 8纠纷中 9待发货 10已发货 11待自提',
   delivery_type   tinyint       NOT NULL DEFAULT 1 COMMENT '收货方式：1面交 2自提 3送货上门（下单时从商品抄入）',
   address_id      bigint        DEFAULT NULL COMMENT '地址引用：送货上门=买家收货地址；自提=卖家提货地址',

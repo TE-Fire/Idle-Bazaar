@@ -46,6 +46,9 @@ public class OrderVO {
 
     private BigDecimal amount;
 
+    /** 议价单 id：非空表示这笔按议价价成交，前端可据此显示「议价成交」 */
+    private Long offerId;
+
     /** 输出枚举名，前端不必维护 1–11 的映射 */
     private OrderStatusEnum status;
 

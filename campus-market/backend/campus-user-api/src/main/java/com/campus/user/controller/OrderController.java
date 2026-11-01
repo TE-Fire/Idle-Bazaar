@@ -39,12 +39,12 @@ public class OrderController {
 
     private final OrderService orderService;
 
-    @Operation(summary = "下单", description = "只插待付款订单，商品不锁定；金额一律按标价，不可自定义。送货上门须传 addressId（买家收货地址）")
+    @Operation(summary = "下单", description = "只插待付款订单，商品不锁定；金额按标价，传 offerId 则按已同意的议价价。送货上门须传 addressId（买家收货地址）")
     @PostMapping("/create")
     public Result<Long> create(@Valid @RequestBody OrderCreateReq req) {
         long userId = UserContext.getUserId();
         return Result.ok(orderService.create(userId, req.getItemId(), req.getMeetPointId(),
-                req.getAddressId(), req.getMeetTime()));
+                req.getAddressId(), req.getMeetTime(), req.getOfferId()));
     }
 
     @Operation(summary = "模拟支付", description = "两级占位校验后转待面交，并批量取消同商品其余待付款订单")

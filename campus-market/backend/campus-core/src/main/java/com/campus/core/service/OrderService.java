@@ -45,6 +45,7 @@ import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -142,16 +143,24 @@ public class OrderService {
 
     private final ObjectMapper objectMapper;
 
+    /** 下单取价与成交后失效议价（notes/28）：议价价只进这一笔订单，不写回商品 */
+    private final OfferService offerService;
+
     /**
      * 下单：**只插订单，不锁商品**。
      *
      * <p>商品快照在下单这一刻固化进订单，之后即便卖家改价改描述，
      * 历史订单里留存的原样仍是纠纷取证的可信数据源（notes/13 第六节）。
      *
+     * <p><b>金额有两条来源</b>：不传 `offerId` 时按商品标价；传了则按那笔议价的出价，
+     * 且必须是「已同意且未过 10 分钟付款截止」的单据。无论走哪条，金额都只固化进本订单，
+     * 商品标价不动——这是「议价成功未付款不影响其他买家看到的价格」的实现方式。
+     *
      * @return 新订单 id
      */
     @Transactional(rollbackFor = Exception.class)
-    public Long create(Long buyerId, Long itemId, Long meetPointId, Long addressId, LocalDateTime meetTime) {
+    public Long create(Long buyerId, Long itemId, Long meetPointId, Long addressId, LocalDateTime meetTime,
+                       Long offerId) {
         Item item = itemMapper.selectById(itemId);
         BizAssert.notNull(item, CommonErrorCode.NOT_FOUND);
         BizAssert.isTrue(ItemStatusEnum.fromCode(item.getStatus()) == ItemStatusEnum.ON_SALE,
@@ -185,12 +194,18 @@ public class OrderService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        // 成交金额两条来源：议价单（须已同意且未过 10 分钟截止）或商品标价。
+        // itemPrice 快照始终留标价，这样订单详情能同时看到「原价多少、议价成交多少」。
+        BigDecimal amount = offerId == null
+                ? item.getPrice()
+                : offerService.priceForOrder(offerId, buyerId, itemId);
         TradeOrder order = new TradeOrder()
                 .setOrderNo(newOrderNo())
                 .setItemId(itemId)
                 .setBuyerId(buyerId)
                 .setSellerId(item.getSellerId())
-                .setAmount(item.getPrice())
+                .setAmount(amount)
+                .setOfferId(offerId)
                 .setStatus(OrderStatusEnum.WAIT_PAY.getCode())
                 .setDeliveryType(deliveryType.getCode())
                 .setAddressId(orderAddressId)
@@ -233,6 +248,12 @@ public class OrderService {
         String stateKey = ItemRedisKeys.buildStateKey(order.getItemId());
         String holder = String.valueOf(order.getId());
 
+        // 议价单的 10 分钟付款截止要在这里再验一次：下单时校验过，但下单与付款之间可能已经超时。
+        // 放在占位之前——过了时限就该拒绝，不该先占住商品再回滚。
+        if (order.getOfferId() != null) {
+            offerService.assertPayable(order.getOfferId());
+        }
+
         long result = occupy(stateKey, holder);
         BizAssert.isTrue(result != OCCUPY_CONFLICT, OrderErrorCode.ITEM_SOLD_OUT);
 
@@ -255,6 +276,8 @@ public class OrderService {
 
             cancelSiblings(order.getItemId(), orderId, CancelTypeEnum.SYSTEM_TIMEOUT,
                     "商品已被其他买家付款");
+            // 议价成交：本单议价转已下单，同商品其余进行中的议价一并失效（货已卖出）
+            offerService.markOrdered(order.getOfferId(), order.getItemId());
             // 终态：不再设 TTL，商品既已售出，标记就该一直挡住后来的请求
             stringRedisTemplate.opsForValue().set(stateKey, ItemRedisKeys.STATE_SOLD);
             stringRedisTemplate.opsForHash().delete(ItemRedisKeys.HOLDER, stateKey);
@@ -695,6 +718,7 @@ public class OrderService {
         vo.setBuyerId(o.getBuyerId());
         vo.setSellerId(o.getSellerId());
         vo.setAmount(o.getAmount());
+        vo.setOfferId(o.getOfferId());
         vo.setStatus(OrderStatusEnum.fromCode(o.getStatus()));
         vo.setDeliveryType(DeliveryTypeEnum.fromCode(o.getDeliveryType()));
         vo.setAddressId(o.getAddressId());

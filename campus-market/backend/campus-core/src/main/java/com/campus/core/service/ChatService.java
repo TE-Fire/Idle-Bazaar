@@ -9,14 +9,17 @@ import com.campus.core.dto.resp.ChatMessageVO;
 import com.campus.core.entity.AppUser;
 import com.campus.core.entity.ChatSession;
 import com.campus.core.entity.Item;
+import com.campus.core.entity.ItemOffer;
 import com.campus.core.entity.MsgMessage;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.ChatSessionMapper;
 import com.campus.core.mapper.ItemMapper;
+import com.campus.core.mapper.ItemOfferMapper;
 import com.campus.core.mapper.MsgMessageMapper;
 import com.campus.core.service.cache.UnreadCounterCache;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -48,8 +51,11 @@ public class ChatService {
     /** 分区：1 私信（本期恒 1，系统/交易通知不做） */
     private static final int ZONE_PRIVATE = 1;
 
-    /** 消息类型：1 文本（本期恒 1） */
-    private static final int TYPE_TEXT = 1;
+    /** 消息类型：1 文本 */
+    public static final int TYPE_TEXT = 1;
+
+    /** 消息类型：7 议价卡片（extra 存 offerId 与价格，前端渲染成可操作卡片） */
+    public static final int TYPE_OFFER = 7;
 
     private static final int DEFAULT_PAGE_SIZE = 30;
     private static final int MAX_PAGE_SIZE = 50;
@@ -58,7 +64,10 @@ public class ChatService {
     private final MsgMessageMapper msgMapper;
     private final ItemMapper itemMapper;
     private final AppUserMapper appUserMapper;
+    private final ItemOfferMapper itemOfferMapper;
     private final UnreadCounterCache unreadCounterCache;
+
+    private static final ObjectMapper EXTRA_MAPPER = new ObjectMapper();
 
     /**
      * 发送留言，同事务 upsert 会话并插消息。
@@ -91,6 +100,40 @@ public class ChatService {
                 .set(ChatSession::getLastMsgAt, LocalDateTime.now()));
         if (!req.getToUserId().equals(senderId)) {
             unreadCounterCache.incrAfterCommit(req.getToUserId(), session.getId());
+        }
+        return msg.getId();
+    }
+
+    /**
+     * 业务模块往会话里放一张卡片（议价用）。
+     *
+     * <p><b>不做接收方校验</b>：调用方（如 {@code OfferService}）已经在业务上确认过双方关系，
+     * 这里再校验一遍只会让「卖家答复买家」和「买家出价给卖家」两套规则在聊天层重复实现。
+     * 对外接口仍走 {@link #send}，它保留询单通道的防滥用校验。
+     *
+     * <p>卡片与文本共用会话与未读计数：对接收方来说，一条议价提醒和一条留言没有区别，
+     * 分两套计数会让「未读 3」点进去只看到 2 条。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public Long sendCard(Long senderId, Long itemId, Long receiverId, int type, String content, String extra) {
+        ChatSession session = upsertSession(itemId, senderId, receiverId);
+        MsgMessage msg = new MsgMessage()
+                .setZone(ZONE_PRIVATE)
+                .setSessionId(session.getId())
+                .setSenderId(senderId)
+                .setReceiverId(receiverId)
+                .setType(type)
+                .setContent(content)
+                .setExtra(extra)
+                .setReadFlag(0);
+        msgMapper.insert(msg);
+
+        sessionMapper.update(null, new LambdaUpdateWrapper<ChatSession>()
+                .eq(ChatSession::getId, session.getId())
+                .set(ChatSession::getLastMsgId, msg.getId())
+                .set(ChatSession::getLastMsgAt, LocalDateTime.now()));
+        if (!receiverId.equals(senderId)) {
+            unreadCounterCache.incrAfterCommit(receiverId, session.getId());
         }
         return msg.getId();
     }
@@ -177,17 +220,57 @@ public class ChatService {
         if (beforeId != null) {
             q.lt(MsgMessage::getId, beforeId);
         }
-        return msgMapper.selectList(q).stream()
+        List<MsgMessage> rows = msgMapper.selectList(q);
+
+        // 议价卡片里的状态是发送那一刻的快照，卖家后来同意/拒绝都不会改写历史消息。
+        // 这里按 offerId 批量回填最新状态，卡片才能变成「可点付款」或「已失效」——
+        // 一条消息一次回查会把这页打成 N 次库往返，所以先收集再批量取。
+        Map<Long, ItemOffer> offers = new HashMap<>();
+        List<Long> offerIds = rows.stream()
+                .filter(m -> Objects.equals(m.getType(), TYPE_OFFER))
+                .map(m -> offerIdOf(m.getExtra()))
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (!offerIds.isEmpty()) {
+            offers = itemOfferMapper.selectBatchIds(offerIds).stream()
+                    .collect(Collectors.toMap(ItemOffer::getId, Function.identity(), (a, b) -> a));
+        }
+
+        Map<Long, ItemOffer> offerMap = offers;
+        return rows.stream()
                 .map(m -> {
                     ChatMessageVO vo = new ChatMessageVO();
                     vo.setId(m.getId());
                     vo.setSenderId(m.getSenderId());
                     vo.setContent(m.getContent());
+                    vo.setType(m.getType());
+                    vo.setExtra(m.getExtra());
                     vo.setCreatedAt(m.getCreateTime());
                     vo.setMine(userId.equals(m.getSenderId()));
+                    if (Objects.equals(m.getType(), TYPE_OFFER)) {
+                        Long offerId = offerIdOf(m.getExtra());
+                        ItemOffer fresh = offerId == null ? null : offerMap.get(offerId);
+                        if (fresh != null) {
+                            vo.setExtra(OfferService.cardJson(fresh));
+                        }
+                    }
                     return vo;
                 })
                 .toList();
+    }
+
+    /** 从卡片载荷里取 offerId；格式坏掉返回 null，卡片按原样展示，不影响整页消息 */
+    private Long offerIdOf(String extra) {
+        if (extra == null || extra.isBlank()) {
+            return null;
+        }
+        try {
+            return EXTRA_MAPPER.readTree(extra).path("offerId").asLong(0L) == 0L
+                    ? null : EXTRA_MAPPER.readTree(extra).path("offerId").asLong();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /** 标已读：对方发来的未读消息。进会话时调，之后未读数归零 */
