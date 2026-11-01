@@ -126,3 +126,7 @@ dump-*.sql
 *.dump
 docker-data/
 .workbuddy/
+
+# 开题答辩 PPT 工程：过程中截图、导出件与生成的 SVG 体积大且可重建，
+# 只留在本机，不随代码入库
+/campus-market/ppt/
