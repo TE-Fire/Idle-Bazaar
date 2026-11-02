@@ -63,15 +63,29 @@ async function promptReason(title: string, placeholder: string): Promise<string 
   return text || '买家未填写理由'
 }
 
-function run(action: () => Promise<unknown>, ok: string): void {
+/**
+ * 请求期 loading + 结果提示 + 刷新详情。
+ *
+ * <p>只包「用户已经确认过」的请求：loading 带 mask，包在确认弹窗外面会把弹窗盖住，
+ * 用户点不到「确定」，看起来就是一直卡在处理中（2026-11-02 踩）。
+ * 所以动作一律「先弹窗，确认后再 run」，不要把整段流程塞进来。
+ */
+let running = false
+async function run(action: () => Promise<unknown>, ok: string): Promise<void> {
+  if (running) return
+  running = true
   uni.showLoading({ title: '处理中…', mask: true })
-  action()
-    .then(() => {
-      uni.hideLoading()
-      uni.showToast({ title: ok, icon: 'success' })
-      void fetchDetail()
-    })
-    .catch(() => uni.hideLoading())
+  try {
+    await action()
+  } catch {
+    uni.hideLoading()
+    running = false
+    return
+  }
+  uni.hideLoading()
+  running = false
+  uni.showToast({ title: ok, icon: 'success' })
+  await fetchDetail()
 }
 
 async function onPay(): Promise<void> {
@@ -86,35 +100,35 @@ async function onPay(): Promise<void> {
     confirmText: '确认支付'
   })
   if (!ok) return
-  await userOrderApi.pay(id.value)
+  await run(() => userOrderApi.pay(id.value), '支付成功')
 }
 
 async function onCancel(): Promise<void> {
   const reason = await promptReason('取消订单', '请输入取消原因（选填）')
   if (reason === null) return
-  await userOrderApi.cancel(id.value, reason)
+  await run(() => userOrderApi.cancel(id.value, reason), '已取消')
 }
 
 async function onRefund(): Promise<void> {
   const reason = await promptReason('申请退款', '请说明退款原因，例如：商品与描述不符')
   if (reason === null) return
-  await userOrderApi.cancel(id.value, reason)
+  await run(() => userOrderApi.cancel(id.value, reason), '退款申请已提交')
 }
 
 async function onAgree(): Promise<void> {
-  await userOrderApi.refund(id.value, true)
+  await run(() => userOrderApi.refund(id.value, true), '已同意退款')
 }
 
 async function onReject(): Promise<void> {
   const reason = await promptReason('拒绝退款', '请说明拒绝原因，将展示给买家')
   if (reason === null) return
-  await userOrderApi.refund(id.value, false, reason)
+  await run(() => userOrderApi.refund(id.value, false, reason), '已拒绝退款')
 }
 
 async function onDispute(): Promise<void> {
   const reason = await promptReason('发起纠纷', '请说明纠纷原因，平台将介入裁决')
   if (reason === null) return
-  await userOrderApi.dispute(id.value, reason)
+  await run(() => userOrderApi.dispute(id.value, reason), '纠纷已提交')
 }
 
 function onVerify(): void {
@@ -130,12 +144,12 @@ function onVerify(): void {
       uni.showToast({ title: '核销码不能为空', icon: 'none' })
       return
     }
-    run(() => userOrderApi.verify(id.value, code), '核销成功')
+    void run(() => userOrderApi.verify(id.value, code), '核销成功')
   })
 }
 
 async function onReceive(): Promise<void> {
-  await userOrderApi.receive(id.value)
+  await run(() => userOrderApi.receive(id.value), '已确认收货')
 }
 
 /** 评价入口：评价状态由评价页自己拉（能不能评、评没评都在那边判） */
@@ -196,29 +210,29 @@ onShow(() => {
     <!-- 操作区：状态 × 角色 -->
     <view class="actions">
       <template v-if="order.status === 'WAIT_PAY'">
-        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="run(onPay, '支付成功')">立即付款</view>
-        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="run(onCancel, '已取消')">取消订单</view>
+        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="onPay">立即付款</view>
+        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="onCancel">取消订单</view>
         <view v-else class="hint">等待买家付款，超时将自动取消</view>
       </template>
 
       <template v-else-if="order.status === 'WAIT_MEET'">
         <view class="btn btn--main" hover-class="btn--active" @click="onVerify">扫码核销</view>
-        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="run(onRefund, '退款申请已提交')">申请退款</view>
-        <view class="btn btn--ghost" hover-class="btn--active" @click="run(onDispute, '纠纷已提交')">发起纠纷</view>
+        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="onRefund">申请退款</view>
+        <view class="btn btn--ghost" hover-class="btn--active" @click="onDispute">发起纠纷</view>
       </template>
 
       <template v-else-if="order.status === 'VERIFIED'">
-        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="run(onReceive, '已确认收货')">确认收货</view>
+        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="onReceive">确认收货</view>
         <view v-else class="hint">已核销，等待买家确认收货</view>
       </template>
 
       <template v-else-if="order.status === 'REFUNDING'">
         <template v-if="!isBuyer">
-          <view class="btn btn--main" hover-class="btn--active" @click="run(onAgree, '已同意退款')">同意退款</view>
-          <view class="btn btn--ghost" hover-class="btn--active" @click="run(onReject, '已拒绝退款')">拒绝退款</view>
+          <view class="btn btn--main" hover-class="btn--active" @click="onAgree">同意退款</view>
+          <view class="btn btn--ghost" hover-class="btn--active" @click="onReject">拒绝退款</view>
         </template>
         <view v-else class="hint">退款申请已提交，等待卖家处理（24 小时未处理将自动同意）</view>
-        <view class="btn btn--ghost" hover-class="btn--active" @click="run(onDispute, '纠纷已提交')">发起纠纷</view>
+        <view class="btn btn--ghost" hover-class="btn--active" @click="onDispute">发起纠纷</view>
       </template>
 
       <template v-else-if="order.status === 'DISPUTING'">
@@ -289,7 +303,9 @@ onShow(() => {
   background: linear-gradient(135deg, #3b82f6, #2563eb);
 }
 
-.banner--cancelled,
+/* 类名由 status.toLowerCase() 拼出，枚举是 CANCELED（单 L），写成 cancelled 会匹配不到、
+   横幅退化成白底白字（2026-11-02 踩） */
+.banner--canceled,
 .banner--refunded {
   background: linear-gradient(135deg, #94a3b8, #64748b);
 }
