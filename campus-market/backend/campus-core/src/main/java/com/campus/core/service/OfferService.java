@@ -343,15 +343,17 @@ public class OfferService {
         return vo;
     }
 
-    /** 卡片载荷：金额一律字符串（对外口径），状态取枚举名。</p>
+    /** 卡片载荷：金额与 id 一律字符串（对外口径），状态取枚举名。</p>
      *
      * <p>公开给 {@code ChatService} 复用：消息列表要用同一份结构重建最新状态，
      * 两处各写一遍必然在加字段时漏掉一边。
      */
     public static String cardJson(ItemOffer offer) {
         Map<String, Object> map = new LinkedHashMap<>();
-        map.put("offerId", offer.getId());
-        map.put("itemId", offer.getItemId());
+        // 雪花 id 19 位，超出 JS Number.MAX_SAFE_INTEGER；写成数字前端会rounding，
+        // 拿着舍入后的 id 去 agree/cancel 必然 7001。这里必须走字符串。
+        map.put("offerId", String.valueOf(offer.getId()));
+        map.put("itemId", String.valueOf(offer.getItemId()));
         map.put("originPrice", offer.getOriginPrice().toPlainString());
         map.put("offerPrice", offer.getOfferPrice().toPlainString());
         map.put("status", OfferStatusEnum.fromCode(offer.getStatus()).name());
