@@ -13,6 +13,7 @@ import { onLoad, onReachBottom } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { formatRelativeTime } from '@campus/shared'
 import { noticeApi, type NoticeVO } from '@/api/social'
+import CmNav from '@/components/CmNav.vue'
 import { getSession } from '@/utils/session'
 
 const PAGE_SIZE = 20
@@ -120,6 +121,8 @@ function letterClock(iso: string): string {
 
 <template>
   <view class="page">
+    <CmNav title="系统通知" />
+
     <view class="bar">
       <text class="bar__t">{{ unreadCount > 0 ? `${unreadCount} 条未读` : '全部已读' }}</text>
       <view v-if="unreadCount > 0" class="bar__btn" hover-class="bar__btn--on" @click="readAll">

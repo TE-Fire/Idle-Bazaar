@@ -18,6 +18,7 @@ import { getSession, clearSession } from '@/utils/session'
 import { userAuthApi } from '@/api/user'
 import { noticeApi } from '@/api/social'
 import CmIcon from '@/components/CmIcon.vue'
+import CmNav from '@/components/CmNav.vue'
 import TabBar from '@/components/TabBar.vue'
 
 const nick = ref('')
@@ -157,6 +158,9 @@ async function logout(): Promise<void> {
 
 <template>
   <view class="cm-page cm-page--tab">
+    <!-- 原生导航栏已关闭：身份卡直接顶到屏幕最上沿 -->
+    <CmNav variant="pad" />
+
     <!-- ① 渐变身份卡：整块深色底上放白色文字，是全 app 辨识度最高的一块 -->
     <view class="idcard">
       <view class="idcard__glow" />
@@ -239,7 +243,8 @@ async function logout(): Promise<void> {
 /* ── ① 身份卡 ───────────────────────────────────────────── */
 .idcard {
   position: relative;
-  margin: 0 $cm-space-4;
+  /* 上没有导航栏了，留一点边距，卡片的圆角才不被屏幕边缘切掉 */
+  margin: $cm-space-3 $cm-space-4 0;
   padding: $cm-space-5 $cm-space-4 $cm-space-4;
   border-radius: $cm-radius-3xl;
   background-image: linear-gradient(135deg, #FF9248 0%, $cm-color-brand 52%, $cm-color-brand-2 100%);

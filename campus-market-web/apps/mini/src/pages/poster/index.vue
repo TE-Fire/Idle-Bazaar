@@ -14,6 +14,7 @@
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { drawQr, encodeQr } from '@campus/shared'
+import CmNav from '@/components/CmNav.vue'
 
 const CW = 375
 const CH = 560
@@ -191,6 +192,8 @@ function save(): void {
 
 <template>
   <view class="page">
+    <CmNav title="分享海报" />
+
     <view class="stage">
       <view v-if="drawing" class="stage__ph"><text>海报生成中…</text></view>
       <image v-else-if="posterPath" class="stage__img" :src="posterPath" mode="widthFix" show-menu-by-longpress />

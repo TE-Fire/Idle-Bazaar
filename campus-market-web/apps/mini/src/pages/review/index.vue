@@ -14,6 +14,7 @@
 import { onLoad } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userReviewApi, type OrderReviewVO } from '@/api/review'
+import CmNav from '@/components/CmNav.vue'
 import { getSession } from '@/utils/session'
 
 const orderId = ref('')
@@ -95,6 +96,8 @@ function submit(): void {
 
 <template>
   <view class="page">
+    <CmNav title="交易评价" />
+
     <view v-if="loading && !state" class="state"><text class="state__t">加载中…</text></view>
 
     <!-- 已评过：只读展示 -->

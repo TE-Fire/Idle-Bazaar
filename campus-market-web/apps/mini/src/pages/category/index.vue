@@ -15,6 +15,7 @@ import { onShow } from '@dcloudio/uni-app'
 import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
 import { toGoodsItem } from '@/utils/item-map'
 import CmIcon from '@/components/CmIcon.vue'
+import CmNav from '@/components/CmNav.vue'
 import TabBar from '@/components/TabBar.vue'
 import { pendingCategoryId } from '@/utils/nav-intent'
 
@@ -110,6 +111,8 @@ function openItem(id: string): void {
 
 <template>
   <view class="cm-page cm-page--tab">
+    <CmNav variant="pad" />
+
     <view class="wrap">
       <!-- ① 左侧一级分类：透明底，选中项浮起成白卡 -->
       <scroll-view class="tree" scroll-y :show-scrollbar="false">

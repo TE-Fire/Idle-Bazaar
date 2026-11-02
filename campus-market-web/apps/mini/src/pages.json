@@ -149,6 +149,7 @@
     }
   ],
   "globalStyle": {
+    "navigationStyle": "custom",
     "navigationBarTextStyle": "black",
     "navigationBarTitleText": "校园二手",
     "navigationBarBackgroundColor": "#FFFFFF",

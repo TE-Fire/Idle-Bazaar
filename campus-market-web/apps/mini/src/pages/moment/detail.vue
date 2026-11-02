@@ -16,6 +16,7 @@ import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { formatRelativeTime } from '@campus/shared'
 import MomentCard from '@/components/MomentCard.vue'
+import CmNav from '@/components/CmNav.vue'
 import { momentApi, type MomentCommentVO, type MomentVO } from '@/api/moment'
 import { REPORT_TARGET, reportTarget } from '@/utils/report'
 import { getSession } from '@/utils/session'
@@ -118,6 +119,8 @@ onLoad((query) => {
 
 <template>
   <view class="page">
+    <CmNav title="动态详情" />
+
     <template v-if="moment">
       <MomentCard :moment="moment" in-detail @toggle-like="toggleLike" />
 

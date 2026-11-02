@@ -12,6 +12,7 @@
 import { computed, ref } from 'vue'
 import { MAIL_CODE_SCENE, userAuthApi } from '@/api/user'
 import { accountKind, useCodeSender } from '@/utils/verify-code'
+import CmNav from '@/components/CmNav.vue'
 
 const account = ref('')
 const code = ref('')
@@ -76,6 +77,8 @@ function goLogin(): void {
 
 <template>
   <view class="page cm-page">
+    <CmNav />
+
     <view class="hero">
       <text class="hero__t">找回密码</text>
       <text class="hero__s">填注册时的手机号或 QQ 邮箱，收验证码后设新密码</text>

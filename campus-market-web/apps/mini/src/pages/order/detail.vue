@@ -15,6 +15,7 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userOrderApi, type OrderStatus, type OrderVO } from '@/api/user'
+import CmNav from '@/components/CmNav.vue'
 import { confirmPay, clip } from '@/utils/confirm-pay'
 
 const id = ref('')
@@ -166,6 +167,8 @@ onShow(() => {
 
 <template>
   <view v-if="order" class="page">
+    <CmNav title="订单详情" />
+
     <!-- 状态横幅 -->
     <view class="banner" :class="`banner--${order.status.toLowerCase()}`">
       <text class="banner__t">{{ STATUS_TEXT[order.status] }}</text>
@@ -246,6 +249,8 @@ onShow(() => {
   </view>
 
   <view v-else class="state">
+    <!-- 加载中/失败也要有返回，否则是一堵没有出口的白墙 -->
+    <CmNav title="订单详情" />
     <text class="state__t">{{ loading ? '加载中…' : '订单不存在' }}</text>
   </view>
 </template>

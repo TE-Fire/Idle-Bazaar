@@ -12,6 +12,7 @@
 import { onLoad } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { userAuthApi } from '@/api/user'
+import CmNav from '@/components/CmNav.vue'
 import { getSession, saveSession } from '@/utils/session'
 import { uploadImage } from '@/utils/upload'
 
@@ -84,6 +85,8 @@ async function save(): Promise<void> {
 
 <template>
   <view class="page">
+    <CmNav title="编辑资料" />
+
     <view class="sec">
       <text class="sec__t">头像</text>
       <view class="avatar" hover-class="avatar--active" @click="chooseAvatar">

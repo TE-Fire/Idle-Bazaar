@@ -15,6 +15,7 @@ import { onLoad, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import GoodsCard from '@/components/GoodsCard.vue'
 import MomentCard from '@/components/MomentCard.vue'
+import CmNav from '@/components/CmNav.vue'
 import { userItemApi, type ApiItemVO } from '@/api/user'
 import { userSocialApi as socialApi, type UserProfileVO } from '@/api/social'
 import { momentApi, type MomentVO } from '@/api/moment'
@@ -292,6 +293,9 @@ onReachBottom(() => {
 
 <template>
   <view class="page">
+    <!-- 昵称与头像在资料头里，导航栏只留返回，不再重复写标题 -->
+    <CmNav />
+
     <template v-if="profile">
       <!-- 资料头 -->
       <view class="who">

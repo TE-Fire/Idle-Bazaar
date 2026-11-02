@@ -15,6 +15,7 @@ import { computed, ref } from 'vue'
 import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import MomentCard from '@/components/MomentCard.vue'
 import CmIcon from '@/components/CmIcon.vue'
+import CmNav from '@/components/CmNav.vue'
 import { momentApi, type MomentVO } from '@/api/moment'
 import { uploadImage } from '@/utils/upload'
 import { getSession } from '@/utils/session'
@@ -208,6 +209,9 @@ onReachBottom(() => {
 
 <template>
   <view class="cm-page">
+    <!-- 标题在下方头部里，导航栏只负责返回 -->
+    <CmNav />
+
     <view class="inner">
       <!-- 头部：标题 + 发布入口。发布是这一页唯一的重动作，放在首屏可见处 -->
       <view class="hero">

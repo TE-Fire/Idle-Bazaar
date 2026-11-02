@@ -15,6 +15,7 @@
 import { computed, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
+import CmNav from '@/components/CmNav.vue'
 import TabBar from '@/components/TabBar.vue'
 import { uploadImage } from '@/utils/upload'
 
@@ -240,6 +241,8 @@ function toggle(field: 'negotiable' | 'delivery'): void {
 
 <template>
   <view class="page cm-page cm-page--tab">
+    <CmNav title="发布闲置" :back="false" />
+
     <!-- 选图 -->
     <view class="sec">
       <text class="sec__t">图片（{{ shots.length }}/{{ MAX_SHOTS }}，第一张为封面）</text>

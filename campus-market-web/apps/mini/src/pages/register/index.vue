@@ -15,6 +15,7 @@ import { MAIL_CODE_SCENE, userAuthApi } from '@/api/user'
 import { saveSession } from '@/utils/session'
 import { rememberRegisteredUser } from '@/utils/test-accounts'
 import { accountKind, MAIL_RE, PHONE_RE, useCodeSender } from '@/utils/verify-code'
+import CmNav from '@/components/CmNav.vue'
 
 const phone = ref('')
 const email = ref('')
@@ -107,6 +108,9 @@ function goLogin(): void {
 
 <template>
   <view class="page cm-page">
+    <!-- 页内 hero 已有大标题，导航栏只负责返回 -->
+    <CmNav />
+
     <view class="hero">
       <text class="hero__t">注册账号</text>
       <text class="hero__s">用 QQ 邮箱验证，手机号用于登录与联系</text>

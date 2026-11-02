@@ -15,6 +15,7 @@ import { computed, ref } from 'vue'
 import { formatRelativeTime } from '@campus/shared'
 import { userChatApi, type ChatConversationVO } from '@/api/user'
 import CmIcon from '@/components/CmIcon.vue'
+import CmNav from '@/components/CmNav.vue'
 import TabBar from '@/components/TabBar.vue'
 
 const conversations = ref<ChatConversationVO[]>([])
@@ -80,6 +81,8 @@ onPullDownRefresh(() => {
 
 <template>
   <view class="cm-page cm-page--tab">
+    <CmNav variant="pad" />
+
     <!-- 头部：标题 + 未读汇总，给「全是会话列表」加一个明确的层级起点 -->
     <view class="head">
       <view class="head__main">

@@ -14,6 +14,7 @@
 import { onLoad, onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import { ref } from 'vue'
 import { userSocialApi, type FollowListType, type FollowUserVO } from '@/api/social'
+import CmNav from '@/components/CmNav.vue'
 import { getSession } from '@/utils/session'
 
 const PAGE = 20
@@ -135,6 +136,8 @@ onPullDownRefresh(() => {
 
 <template>
   <view class="page">
+    <CmNav title="关注与粉丝" />
+
     <view class="counts">
       <view class="counts__item" :class="{ 'counts__item--on': tab === 'following' }" @click="switchTab('following')">
         <text class="counts__num">{{ followingCount }}</text>

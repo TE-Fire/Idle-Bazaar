@@ -25,6 +25,7 @@ import { getSession } from '@/utils/session'
 import { goTab } from '@/utils/tab-nav'
 import GoodsCard from '@/components/GoodsCard.vue'
 import CmIcon from '@/components/CmIcon.vue'
+import CmNav from '@/components/CmNav.vue'
 import TabBar from '@/components/TabBar.vue'
 import DevLoginSwitcher from '@/components/DevLoginSwitcher.vue'
 import { pendingCategoryId } from '@/utils/nav-intent'
@@ -191,6 +192,9 @@ void fetchCats()
 
 <template>
   <view class="cm-page cm-page--tab">
+    <!-- 原生导航栏已关闭：渐变头部自己顶到屏幕最上沿，只留状态栏占位 -->
+    <CmNav variant="pad" />
+
     <!-- ① 暖色渐变头部：问候 + 搜索，白色搜索框是这一层唯一的高光 -->
     <view class="hero">
       <view class="hero__deco" />

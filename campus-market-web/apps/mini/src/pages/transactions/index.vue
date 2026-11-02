@@ -19,6 +19,7 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userItemApi, userOrderApi, type ApiItemVO, type OrderStatus, type OrderVO } from '@/api/user'
+import CmNav from '@/components/CmNav.vue'
 
 const TABS = ['我发布的', '我买到的', '我卖出的']
 const activeTab = ref(0)
@@ -226,6 +227,8 @@ onShow(() => {
 
 <template>
   <view class="page">
+    <CmNav title="我的交易" />
+
     <!-- 顶部三个 tab：分段滑动控件 + 数量徽标 -->
     <view class="seg">
       <view class="seg__bar" :style="{ transform: `translateX(${activeTab * 100}%)` }" />

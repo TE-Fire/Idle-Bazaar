@@ -27,6 +27,7 @@ import { getSession } from '@/utils/session'
 import { confirmPay, clip } from '@/utils/confirm-pay'
 import OfferSheet from '@/components/OfferSheet.vue'
 import OfferRejectSheet from '@/components/OfferRejectSheet.vue'
+import CmNav from '@/components/CmNav.vue'
 
 const myId = getSession().userId
 
@@ -287,6 +288,9 @@ async function goPay(p: OfferCardPayload): Promise<void> {
 
 <template>
   <view class="page">
+    <!-- 标题就是聊天对象，省掉「询单」这种看不出跟谁说的文案 -->
+    <CmNav :title="peerNick || '询单'" />
+
     <!-- 顶部商品卡片：买家从哪件商品发起询单，面交前可点回详情核对 -->
     <view v-if="card && cardVisible" class="card">
       <image v-if="card.image" class="card__img" :src="card.image" mode="aspectFill" />

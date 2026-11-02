@@ -11,6 +11,7 @@
 import { computed, reactive, ref } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { userAuthApplyApi, userDictApi, type UserAuthApplyVO } from '@/api/user'
+import CmNav from '@/components/CmNav.vue'
 import { getSession } from '@/utils/session'
 import { uploadImage } from '@/utils/upload'
 
@@ -129,6 +130,8 @@ function submit(): void {
 
 <template>
   <view class="verify">
+    <CmNav title="学号认证" />
+
     <!-- 已认证：只展示结果，不再给表单 -->
     <view v-if="passed" class="card card--ok">
       <view class="card__badge">已认证</view>
