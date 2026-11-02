@@ -9,6 +9,7 @@ import com.campus.core.dto.req.UserProfileUpdateReq;
 import com.campus.core.dto.req.UserRegisterReq;
 import com.campus.core.dto.req.UserResetPasswordReq;
 import com.campus.core.dto.req.UserSendCodeReq;
+import com.campus.core.dto.resp.DevAccountVO;
 import com.campus.core.dto.resp.UserLoginVO;
 import com.campus.core.dto.resp.VerifyCodeVO;
 import com.campus.core.enums.MailCodeSceneEnum;
@@ -20,12 +21,15 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 学生端注册、登录与会话（notes/26：注册 / 验证码登录 / 密码登录 / 找回密码）。
@@ -42,6 +46,13 @@ public class UserAuthController {
     private final UserCodeService userCodeService;
     private final UserAuthService userAuthService;
     private final UserAccountService userAccountService;
+
+    /** 与 UserCodeService 同一组开关：回显关掉后联调账号列表一并失效 */
+    @Value("${campus.user.sms.echo:false}")
+    private boolean smsEcho;
+
+    @Value("${campus.user.mail.echo:false}")
+    private boolean mailEcho;
 
     @Operation(summary = "发验证码",
             description = "account 传手机号走短信、传 QQ 邮箱走邮件；scene 1注册 2找回密码 3登录。"
@@ -100,5 +111,16 @@ public class UserAuthController {
     public Result<Void> logout() {
         StpUserUtil.logout();
         return Result.ok();
+    }
+
+    @Operation(summary = "联调账号列表",
+            description = "仅当验证码回显开启时返回最近注册的账号（免登录），供小程序测试账号面板使用；"
+                    + "关掉 echo 后返回空列表")
+    @GetMapping("/dev/accounts")
+    public Result<List<DevAccountVO>> devAccounts() {
+        if (!smsEcho && !mailEcho) {
+            return Result.ok(List.of());
+        }
+        return Result.ok(userAuthService.recentAccounts(50));
     }
 }

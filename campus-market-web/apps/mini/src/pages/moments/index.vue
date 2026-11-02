@@ -16,6 +16,7 @@ import { onPullDownRefresh, onReachBottom, onShow } from '@dcloudio/uni-app'
 import MomentCard from '@/components/MomentCard.vue'
 import CmIcon from '@/components/CmIcon.vue'
 import CmNav from '@/components/CmNav.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 import { momentApi, type MomentVO } from '@/api/moment'
 import { uploadImage } from '@/utils/upload'
 import { getSession } from '@/utils/session'
@@ -303,6 +304,8 @@ onReachBottom(() => {
         </view>
       </view>
     </view>
+
+    <CmDialogHost />
   </view>
 </template>
 

@@ -4,6 +4,7 @@ import com.campus.common.asserts.BizAssert;
 import com.campus.common.exception.CommonErrorCode;
 import com.campus.core.dto.req.UserLoginReq;
 import com.campus.core.dto.req.UserProfileUpdateReq;
+import com.campus.core.dto.resp.DevAccountVO;
 import com.campus.core.dto.resp.UserLoginVO;
 import com.campus.core.entity.AppUser;
 import com.campus.core.enums.MailCodeSceneEnum;
@@ -13,6 +14,7 @@ import com.campus.core.redis.UserRedisKeys;
 import com.campus.core.satoken.MultiAccountConfig;
 import com.campus.core.satoken.StpUserUtil;
 import com.campus.core.service.cache.UserPubCache;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -21,6 +23,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 学生端登录（notes/26）：验证码登录（手机号 / QQ 邮箱）与密码登录（手机号 / QQ 邮箱）。
@@ -167,6 +170,32 @@ public class UserAuthService {
             return;
         }
         BizAssert.isTrue(UserSmsService.isValidPhone(account), UserErrorCode.USER_ACCOUNT_INVALID);
+    }
+
+    /**
+     * 联调用：最近注册的账号（按 id 倒序），供小程序测试账号面板列出本机以外注册的账号。
+     *
+     * <p>开关在调用方（echo 关闭即 404 前的空列表），本方法只管取数；
+     * 上限 50 是面板滚动一屏的量级，避免把整张用户表拖出来。
+     */
+    public List<DevAccountVO> recentAccounts(int limit) {
+        int size = Math.max(1, Math.min(limit, 50));
+        return appUserMapper.selectList(new LambdaQueryWrapper<AppUser>()
+                        .orderByDesc(AppUser::getId)
+                        .last("limit " + size))
+                .stream()
+                .map(u -> {
+                    DevAccountVO vo = new DevAccountVO();
+                    vo.setId(u.getId());
+                    vo.setNickname(u.getNickname());
+                    vo.setPhone(u.getPhone());
+                    vo.setAvatarUrl(u.getAvatarUrl());
+                    vo.setAuthStatus(u.getAuthStatus());
+                    vo.setCreditScore(u.getCreditScore());
+                    vo.setCreateTime(u.getCreateTime());
+                    return vo;
+                })
+                .toList();
     }
 
     private UserLoginVO toLoginVO(AppUser user) {

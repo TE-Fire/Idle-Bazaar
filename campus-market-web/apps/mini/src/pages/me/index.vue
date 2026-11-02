@@ -17,8 +17,10 @@ import { ref } from 'vue'
 import { getSession, clearSession } from '@/utils/session'
 import { userAuthApi } from '@/api/user'
 import { noticeApi } from '@/api/social'
+import { cmConfirm } from '@/utils/dialog'
 import CmIcon from '@/components/CmIcon.vue'
 import CmNav from '@/components/CmNav.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 import TabBar from '@/components/TabBar.vue'
 
 const nick = ref('')
@@ -146,11 +148,20 @@ function goFollows(): void {
 }
 
 async function logout(): Promise<void> {
+  const ok = await cmConfirm({
+    title: '退出登录',
+    content: '退出后需重新登录才能查看订单、消息与收藏，购物车外的本地记录不受影响。',
+    confirmText: '退出',
+    cancelText: '再想想',
+    danger: true
+  })
+  if (!ok) return
   try {
     await userAuthApi.logout()
   } finally {
     clearSession()
     nick.value = ''
+    avatar.value = ''
     uni.showToast({ title: '已退出', icon: 'none' })
   }
 }
@@ -231,6 +242,7 @@ async function logout(): Promise<void> {
     </view>
 
     <TabBar active="me" />
+    <CmDialogHost />
   </view>
 </template>
 

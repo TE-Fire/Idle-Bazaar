@@ -17,6 +17,7 @@ import { onLoad } from '@dcloudio/uni-app'
 import { formatRelativeTime } from '@campus/shared'
 import MomentCard from '@/components/MomentCard.vue'
 import CmNav from '@/components/CmNav.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 import { momentApi, type MomentCommentVO, type MomentVO } from '@/api/moment'
 import { REPORT_TARGET, reportTarget } from '@/utils/report'
 import { getSession } from '@/utils/session'
@@ -188,6 +189,8 @@ onLoad((query) => {
 
     <view v-else-if="loading" class="state"><text class="state__t">加载中…</text></view>
     <view v-else-if="missing" class="state"><text class="state__t">这条动态不存在或已被删除</text></view>
+
+    <CmDialogHost />
   </view>
 </template>
 

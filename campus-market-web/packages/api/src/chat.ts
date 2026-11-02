@@ -19,6 +19,8 @@ export interface ChatConversationVO {
   status?: ItemStatus | null
   peerUserId: string
   peerNick?: string | null
+  /** 对方头像；为空时前端回退昵称首字 */
+  peerAvatar?: string | null
   lastContent?: string | null
   lastAt?: string | null
   unread: number

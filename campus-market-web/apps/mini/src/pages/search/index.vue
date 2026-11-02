@@ -18,9 +18,11 @@ import type { GoodsItem } from '@campus/shared'
 import { userDictApi, userItemApi } from '@/api/user'
 import { toGoodsItem } from '@/utils/item-map'
 import { goTab } from '@/utils/tab-nav'
+import { cmConfirm } from '@/utils/dialog'
 import { pendingCategoryId } from '@/utils/nav-intent'
 import GoodsCard from '@/components/GoodsCard.vue'
 import CmIcon from '@/components/CmIcon.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 
 /** 历史存本地，键名与 notes/24 一致 */
 const HISTORY_KEY = 'searchHistory'
@@ -77,14 +79,15 @@ function removeWord(word: string): void {
 }
 
 function clearHistory(): void {
-  uni.showModal({
+  void cmConfirm({
     title: '清空搜索历史',
-    content: '只清本机记录，不影响搜索结果',
-    success: (res) => {
-      if (!res.confirm) return
-      history.value = []
-      uni.removeStorageSync(HISTORY_KEY)
-    }
+    content: '只清本机记录，不影响搜索结果。',
+    confirmText: '清空',
+    danger: true
+  }).then((ok) => {
+    if (!ok) return
+    history.value = []
+    uni.removeStorageSync(HISTORY_KEY)
   })
 }
 
@@ -208,6 +211,10 @@ onReachBottom(() => {
     <!-- 搜索栏固定：结果很长时也要能改词，它是本页唯一的主控件 -->
     <view class="bar" :style="{ paddingTop: statusBarHeight + 'px' }">
       <view class="bar__in">
+        <!-- 自定义导航后没有原生返回键：搜索是二级页，这里补一个明确的返回入口 -->
+        <view class="bar__back" hover-class="bar__back--on" @click="cancel">
+          <CmIcon name="back" tone="ink" size="sm" />
+        </view>
         <view class="field">
           <CmIcon name="search" size="sm" tone="muted" />
           <input
@@ -224,7 +231,6 @@ onReachBottom(() => {
             <text>×</text>
           </view>
         </view>
-        <text class="bar__cancel" @click="cancel">取消</text>
       </view>
     </view>
     <view class="ghost" :style="{ height: `calc(${statusBarHeight}px + 96rpx)` }" />
@@ -310,6 +316,8 @@ onReachBottom(() => {
         <text v-else class="loadmore__t">{{ hasMore ? '上拉加载更多' : '没有更多了' }}</text>
       </view>
     </view>
+
+    <CmDialogHost />
   </view>
 </template>
 
@@ -338,6 +346,22 @@ onReachBottom(() => {
   height: 96rpx;
   padding: 0 $cm-space-4;
   box-sizing: border-box;
+}
+
+.bar__back {
+  flex: none;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: $cm-color-bg;
+  transition: background 140ms ease-out;
+}
+
+.bar__back--on {
+  background: $cm-color-border;
 }
 
 .field {
@@ -377,12 +401,6 @@ onReachBottom(() => {
   line-height: 1;
   color: #fff;
   background: $cm-color-gray-400;
-}
-
-.bar__cancel {
-  flex: none;
-  font-size: $cm-font-size-sm;
-  color: $cm-color-text-2;
 }
 
 /* ── 未搜索态 ───────────────────────────────────────────── */

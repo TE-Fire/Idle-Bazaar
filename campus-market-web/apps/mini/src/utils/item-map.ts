@@ -23,6 +23,7 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
   return {
     id: String(vo.id),
     title: vo.title,
+    categoryId: vo.categoryId ?? '',
     category: vo.categoryName ?? '',
     price: Number(vo.price),
     originalPrice: vo.originPrice != null ? Number(vo.originPrice) : undefined,

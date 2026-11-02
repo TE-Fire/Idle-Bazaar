@@ -38,6 +38,8 @@ function open(): void {
   <view class="card" hover-class="card--active" @click="open">
     <view class="pic" :style="cover ? { backgroundImage: `url(${cover})` } : { backgroundImage: gradient }">
       <text v-if="item.badge" class="badge" :class="{ 'badge--hot': item.badge === '急出' }">{{ item.badge }}</text>
+      <!-- 可议价压图右上角：列表里要一眼看出「这件能讲价」，而不是点进详情才知道 -->
+      <text v-if="item.negotiable" class="nego">可议价</text>
     </view>
 
     <view class="body">
@@ -112,6 +114,21 @@ function open(): void {
 .badge--hot {
   background-image: linear-gradient(135deg, #FF8A5B, $cm-color-price);
   box-shadow: 0 4rpx 10rpx rgba(255, 85, 0, 0.35);
+}
+
+/* 可议价：品牌色实底，与「急出」的橙红区分开，两者可同时出现（左右各一个） */
+.nego {
+  position: absolute;
+  z-index: 1;
+  right: $cm-space-3;
+  top: $cm-space-3;
+  padding: 4rpx 12rpx;
+  font-size: 20rpx;
+  font-weight: $cm-font-weight-bold;
+  color: #fff;
+  border-radius: $cm-radius-pill;
+  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
+  box-shadow: 0 4rpx 10rpx rgba(255, 106, 0, 0.32);
 }
 
 .body {

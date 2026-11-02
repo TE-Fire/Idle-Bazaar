@@ -16,6 +16,7 @@ import { computed, ref } from 'vue'
 import GoodsCard from '@/components/GoodsCard.vue'
 import MomentCard from '@/components/MomentCard.vue'
 import CmNav from '@/components/CmNav.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 import { userItemApi, type ApiItemVO } from '@/api/user'
 import { userSocialApi as socialApi, type UserProfileVO } from '@/api/social'
 import { momentApi, type MomentVO } from '@/api/moment'
@@ -471,6 +472,8 @@ onReachBottom(() => {
     </template>
 
     <view v-else class="state"><text class="state__t">加载中…</text></view>
+
+    <CmDialogHost />
   </view>
 </template>
 

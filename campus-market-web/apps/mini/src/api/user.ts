@@ -114,7 +114,25 @@ export const userAuthApi = {
   updateProfile: (req: UserProfileUpdateReq) =>
     request<UserLoginVO>({ url: '/api/auth/profile', method: 'PUT', data: { ...req } }),
 
-  logout: () => request<void>({ url: '/api/auth/logout', method: 'POST' })
+  logout: () => request<void>({ url: '/api/auth/logout', method: 'POST' }),
+
+  /**
+   * 联调账号列表（测试账号面板用）。
+   *
+   * <p>本机 storage 只记得「在这台机器上注册过」的账号，Web 端注册的收不到；
+   * 服务端在验证码回显开启时才会返回数据，关掉回显就是空列表。
+   */
+  devAccounts: () => request<DevAccountVO[]>({ url: '/api/auth/dev/accounts', silent: true })
+}
+
+/** 联调账号项；字段与服务端 DevAccountVO 一致 */
+export interface DevAccountVO {
+  id: string
+  nickname?: string
+  phone?: string
+  avatarUrl?: string
+  authStatus?: number
+  creditScore?: number
 }
 
 /* ── 字典 ─────────────────────────────────────────────── */
@@ -230,6 +248,8 @@ export interface ChatConversationVO {
   status?: 'DRAFT' | 'PENDING' | 'ON_SALE' | 'SOLD' | 'OFFLINE' | 'REJECTED' | 'FORCED_OFFLINE'
   peerUserId: string
   peerNick?: string
+  /** 对方头像；为空时前端回退昵称首字 */
+  peerAvatar?: string
   lastContent?: string
   lastAt?: string
   unread: number
@@ -321,9 +341,17 @@ export const userChatApi = {
       data: { itemId, withUserId, beforeId }
     }),
 
-  /** 标已读：进会话时调 */
+  /**
+   * 标已读：进会话时调。
+   *
+   * <p>两个参数走 query 而不是请求体：服务端用 @RequestParam 接，POST 带 JSON body
+   * 时它取不到值（400 被 request 层吞成一条 toast），表现就是「进会话了未读还在」。
+   */
   read: (itemId: string, withUserId: string) =>
-    request<void>({ url: '/api/chat/read', method: 'POST', data: { itemId, withUserId } })
+    request<void>({
+      url: `/api/chat/read?itemId=${encodeURIComponent(itemId)}&withUserId=${encodeURIComponent(withUserId)}`,
+      method: 'POST'
+    })
 }
 
 /* ── 商品 ─────────────────────────────────────────────── */

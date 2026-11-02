@@ -22,6 +22,7 @@ import { REPORT_TARGET, reportTarget, submitReport } from '@/utils/report'
 import { confirmPay, clip } from '@/utils/confirm-pay'
 import { getSession } from '@/utils/session'
 import CmIcon from '@/components/CmIcon.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 import ConditionTag from '@/components/ConditionTag.vue'
 
 const myId = getSession().userId
@@ -165,11 +166,14 @@ async function onBuy(): Promise<void> {
   const ok = await confirmPay({
     title: '确认购买',
     lines: [
-      clip(it.title),
-      `应付 ${formatPrice(Number(it.price))}`,
-      it.meetPointName ? `面交点 ${it.meetPointName}` : '面交点下单后与卖家约定',
-      '仅创建待付款订单，暂不扣款'
+      { label: '商品', value: clip(it.title) },
+      { label: '应付', value: formatPrice(Number(it.price)), strong: true },
+      {
+        label: '面交点',
+        value: it.meetPointName || '下单后与卖家约定'
+      }
     ],
+    note: '仅创建待付款订单，暂不扣款；确认收货后才结算给卖家。',
     confirmText: '确认下单'
   })
   if (!ok) return
@@ -579,6 +583,8 @@ async function send(): Promise<void> {
         </view>
       </template>
     </view>
+
+    <CmDialogHost />
   </view>
 </template>
 
@@ -1222,21 +1228,49 @@ async function send(): Promise<void> {
   box-shadow: 0 -4rpx 20rpx rgba(27, 27, 33, 0.05);
 }
 
-/* 收藏：图标钮不占文字宽度；未收藏压暗，收藏后转红并放大一点 */
+/* 收藏：未收藏是灰心 + 浅灰底，收藏后转正红 + 浅红底并弹一下——
+   只改图标颜色在小屏上几乎看不出来，底色一起变才有「点中了」的反馈 */
 .actionbar__fav {
   flex: 0 0 auto;
-  width: 64rpx;
+  width: 76rpx;
   height: 84rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   color: $cm-color-text-3;
-  transition: color 0.16s ease, transform 0.16s ease;
+  background: $cm-color-bg;
+  border-radius: $cm-radius-xl;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+/* 图标默认自带 text-2 颜色，不跟着父级变；收藏态要它继承按钮色，否则只有底色变、心里还是灰的 */
+.actionbar__fav :deep(.i) {
+  color: inherit;
+  transition: color 0.16s ease;
 }
 
 .actionbar__fav--on {
   color: #e8543f;
-  transform: scale(1.08);
+  background: #ffe7e1;
+  animation: favPop 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes favPop {
+  0% {
+    transform: scale(1);
+  }
+
+  40% {
+    transform: scale(1.16);
+  }
+
+  70% {
+    transform: scale(0.94);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 /* 次要动作：描边胶囊，白底不抢主按钮 */

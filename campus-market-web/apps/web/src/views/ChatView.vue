@@ -226,6 +226,25 @@ function deadlineText(p: OfferCardPayload): string {
   return p.expireTime ? p.expireTime.slice(11, 16) : ''
 }
 
+/* ── 气泡头像：左对方、右自己 ── */
+
+function avatarOf(m: ChatMessageVO): string {
+  return m.mine ? userStore.avatarUrl : selected.value?.peerAvatar || ''
+}
+
+function avatarCharOf(m: ChatMessageVO): string {
+  const nick = m.mine ? userStore.nickname : selected.value?.peerNick
+  return (nick || (m.mine ? '我' : '对方')).slice(0, 1)
+}
+
+/** 底色按发送方固定：同一个人不要在不同消息里换颜色 */
+function avatarTint(m: ChatMessageVO): string {
+  const seed = m.mine ? userStore.userId || 'me' : selected.value?.peerUserId || 'peer'
+  let h = 0
+  for (let i = 0; i < seed.length; i += 1) h = (h * 31 + seed.charCodeAt(i)) % 997
+  return `msg__av--${h % 6}`
+}
+
 /** 出价：区间校验交给弹窗，这里只挡「便宜到没法议价」的极端商品 */
 function startOffer(): void {
   const it = item.value
@@ -379,47 +398,55 @@ async function goPay(p: OfferCardPayload): Promise<void> {
           还没有消息。可以聊商品情况，也可以直接出价议价。
         </p>
         <template v-for="m in messages" :key="m.id">
-          <!-- 议价卡片：状态由服务端按最新单据回填，历史消息也反映当前结论 -->
-          <div v-if="payloadOf(m)" class="offer-card" :class="{ 'offer-card--mine': m.mine }">
-            <div class="offer-card__head">
-              <span class="offer-card__label">议价</span>
-              <span class="offer-card__status">{{ OFFER_STATUS_LABELS[payloadOf(m)!.status] }}</span>
+          <!-- 一条消息一行：头像在外侧，内容是气泡或议价卡；自己的靠右（微信式） -->
+          <div class="msg" :class="{ 'msg--mine': m.mine, 'msg--card': !!payloadOf(m) }">
+            <img v-if="avatarOf(m)" class="msg__av" :src="avatarOf(m)" alt="" />
+            <span v-else class="msg__av msg__av--text" :class="avatarTint(m)">{{ avatarCharOf(m) }}</span>
+
+            <div class="msg__body">
+              <!-- 议价卡片：状态由服务端按最新单据回填，历史消息也反映当前结论 -->
+              <div v-if="payloadOf(m)" class="offer-card">
+                <div class="offer-card__head">
+                  <span class="offer-card__label">议价</span>
+                  <span class="offer-card__status">{{ OFFER_STATUS_LABELS[payloadOf(m)!.status] }}</span>
+                </div>
+                <div class="offer-card__body">
+                  <strong class="offer-card__price">{{ formatPrice(Number(payloadOf(m)!.offerPrice)) }}</strong>
+                  <span class="offer-card__origin">标价 {{ formatPrice(Number(payloadOf(m)!.originPrice)) }}</span>
+                </div>
+                <p
+                  v-if="payloadOf(m)!.status === 'AGREED' && payloadOf(m)!.expireTime"
+                  class="offer-card__hint"
+                >
+                  请在 {{ deadlineText(payloadOf(m)!) }} 前付款，过时失效
+                </p>
+                <div class="offer-card__ops">
+                  <template v-if="!isBuyer && payloadOf(m)!.status === 'PENDING'">
+                    <button type="button" class="offer-card__btn offer-card__btn--primary" :disabled="offerBusy" @click="agree(payloadOf(m)!)">同意</button>
+                    <button type="button" class="offer-card__btn" :disabled="offerBusy" @click="reject(payloadOf(m)!)">拒绝</button>
+                  </template>
+                  <button
+                    v-else-if="isBuyer && payloadOf(m)!.status === 'AGREED'"
+                    type="button"
+                    class="offer-card__btn offer-card__btn--primary"
+                    :disabled="offerBusy"
+                    @click="goPay(payloadOf(m)!)"
+                  >去付款</button>
+                  <button
+                    v-else-if="isBuyer && m.mine && payloadOf(m)!.status === 'PENDING'"
+                    type="button"
+                    class="offer-card__btn"
+                    :disabled="offerBusy"
+                    @click="cancelOffer(payloadOf(m)!)"
+                  >撤回</button>
+                </div>
+                <span class="offer-card__time">{{ formatRelativeTime(m.createdAt) }}</span>
+              </div>
+              <div v-else class="bubble">
+                <span class="bubble__text">{{ m.content }}</span>
+                <span class="bubble__time">{{ formatRelativeTime(m.createdAt) }}</span>
+              </div>
             </div>
-            <div class="offer-card__body">
-              <strong class="offer-card__price">{{ formatPrice(Number(payloadOf(m)!.offerPrice)) }}</strong>
-              <span class="offer-card__origin">标价 {{ formatPrice(Number(payloadOf(m)!.originPrice)) }}</span>
-            </div>
-            <p
-              v-if="payloadOf(m)!.status === 'AGREED' && payloadOf(m)!.expireTime"
-              class="offer-card__hint"
-            >
-              请在 {{ deadlineText(payloadOf(m)!) }} 前付款，过时失效
-            </p>
-            <div class="offer-card__ops">
-              <template v-if="!isBuyer && payloadOf(m)!.status === 'PENDING'">
-                <button type="button" class="offer-card__btn offer-card__btn--primary" :disabled="offerBusy" @click="agree(payloadOf(m)!)">同意</button>
-                <button type="button" class="offer-card__btn" :disabled="offerBusy" @click="reject(payloadOf(m)!)">拒绝</button>
-              </template>
-              <button
-                v-else-if="isBuyer && payloadOf(m)!.status === 'AGREED'"
-                type="button"
-                class="offer-card__btn offer-card__btn--primary"
-                :disabled="offerBusy"
-                @click="goPay(payloadOf(m)!)"
-              >去付款</button>
-              <button
-                v-else-if="isBuyer && m.mine && payloadOf(m)!.status === 'PENDING'"
-                type="button"
-                class="offer-card__btn"
-                :disabled="offerBusy"
-                @click="cancelOffer(payloadOf(m)!)"
-              >撤回</button>
-            </div>
-            <span class="offer-card__time">{{ formatRelativeTime(m.createdAt) }}</span>
-          </div>
-          <div v-else class="bubble" :class="{ 'bubble--mine': m.mine }">
-            <span class="bubble__text">{{ m.content }}</span>
-            <span class="bubble__time">{{ formatRelativeTime(m.createdAt) }}</span>
           </div>
         </template>
       </div>
@@ -680,21 +707,97 @@ async function goPay(p: OfferCardPayload): Promise<void> {
   max-height: 420px;
 }
 
-.bubble {
+/* 消息行：头像在外、内容在内；自己的整行反向（微信式） */
+.msg {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--cm-space-2);
+}
+
+.msg--mine {
+  flex-direction: row-reverse;
+}
+
+.msg__av {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  margin-top: 2px;
+}
+
+/* 没有头像图时用昵称首字 + 渐变底，同一个人的配色固定 */
+.msg__av--text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.msg__av--0 {
+  background-image: linear-gradient(135deg, #ffb673, var(--cm-color-brand));
+}
+
+.msg__av--1 {
+  background-image: linear-gradient(135deg, #a98bff, #7c4dff);
+}
+
+.msg__av--2 {
+  background-image: linear-gradient(135deg, #4fd6a3, #0fa968);
+}
+
+.msg__av--3 {
+  background-image: linear-gradient(135deg, #6fb2ff, #1677ff);
+}
+
+.msg__av--4 {
+  background-image: linear-gradient(135deg, #ffa6be, var(--cm-color-brand-2));
+}
+
+.msg__av--5 {
+  background-image: linear-gradient(135deg, #ffb067, #ff8f1f);
+}
+
+/* 内容列宽度按内容走：短句就是一个小气泡，长句最多 70% 折行 */
+.msg__body {
   max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.msg--mine .msg__body {
+  align-items: flex-end;
+}
+
+/* 议价卡片是固定版式，不随文字宽度伸缩 */
+.msg--card .msg__body {
+  width: 76%;
+  max-width: 76%;
+}
+
+.bubble {
+  max-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: var(--cm-space-2) var(--cm-space-3);
   border-radius: var(--cm-radius-lg);
   background: var(--cm-color-bg);
-  align-self: flex-start;
 
-  &--mine {
-    align-self: flex-end;
-    background: var(--cm-color-brand);
-    color: #fff;
-  }
+  /* 靠头像那一角收窄，形成微信式的小尖角 */
+  border-bottom-left-radius: 4px;
+}
+
+.msg--mine .bubble {
+  background: var(--cm-color-brand);
+  color: #fff;
+  border-bottom-left-radius: var(--cm-radius-lg);
+  border-bottom-right-radius: 4px;
 }
 
 .bubble__text {
@@ -741,17 +844,14 @@ async function goPay(p: OfferCardPayload): Promise<void> {
   }
 }
 
-/* 议价卡片：不区分左右气泡，靠状态与按钮表达双方待办 */
+/* 议价卡片：占满内容列，靠头像所在侧表明是谁发的 */
 .offer-card {
-  align-self: stretch;
+  width: 100%;
+  box-sizing: border-box;
   padding: var(--cm-space-3);
   background: var(--cm-color-surface);
   border: 1px solid var(--cm-color-border);
   border-radius: var(--cm-radius-lg);
-
-  &--mine {
-    border-left: 3px solid var(--cm-color-brand);
-  }
 }
 
 .offer-card__head {

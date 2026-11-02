@@ -20,6 +20,9 @@ export const MAIL_RE = /^[^\s@]+@(qq|foxmail)\.com$/i
 
 export type AccountKind = 'phone' | 'mail'
 
+/** 起表用的默认秒数：与服务端 60 秒节流对齐，响应回来前先按它走 */
+const DEFAULT_RESEND = 60
+
 /** 判定账号形态；两者都不是时返回 null（页面据此禁用发码） */
 export function accountKind(account: string): AccountKind | null {
   const v = (account || '').trim()
@@ -40,9 +43,26 @@ export function useCodeSender(scene: MailCodeScene) {
     }
   }
 
-  /** 发码：成功 true；失败 false（提示已由 request 层按错误码弹出，冷却不启动） */
+  /** 起表：秒数以调用方给的为准，到 0 自停 */
+  function start(seconds: number): void {
+    stop()
+    cooldown.value = seconds
+    timer = setInterval(() => {
+      cooldown.value -= 1
+      if (cooldown.value <= 0) stop()
+    }, 1000) as unknown as number
+  }
+
+  /**
+   * 发码：成功 true；失败 false（提示已由 request 层按错误码弹出，冷却回滚为 0）。
+   *
+   * <p>点击即起表、不等响应：发码要过一次网络，等回来才变「60s 后重发」会有半秒的
+   * 空窗，用户以为没点上就会连点，连点又会被服务端节流挡掉，反而更慢。响应回来后再按
+   * 服务端的 resendAfter 校准一次（前后端各存一个常数迟早对不上）。
+   */
   async function send(account: string): Promise<boolean> {
     if (!accountKind(account) || counting.value) return false
+    start(DEFAULT_RESEND)
     try {
       const vo = await userAuthApi.sendCode(account.trim(), scene)
       uni.showToast({
@@ -50,14 +70,11 @@ export function useCodeSender(scene: MailCodeScene) {
         icon: 'none',
         duration: 2500
       })
-      stop()
-      cooldown.value = vo.resendAfter || 60
-      timer = setInterval(() => {
-        cooldown.value -= 1
-        if (cooldown.value <= 0) stop()
-      }, 1000) as unknown as number
+      start(vo.resendAfter || DEFAULT_RESEND)
       return true
     } catch {
+      stop()
+      cooldown.value = 0
       return false
     }
   }

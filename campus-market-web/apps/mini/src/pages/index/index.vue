@@ -44,36 +44,50 @@ const HUE: Record<string, string> = {
   服饰鞋包: 'rose',
   运动器材: 'orange',
   美妆个护: 'red',
-  票务卡券: 'blue',
+  票务卡券: 'amber',
   其他闲置: 'gray'
 }
 
+/**
+ * 金刚区图标：用 emoji 而不是首字方块。
+ *
+ * <p>首字方块只能区分「教 / 数 / 生」这类同字头的分类，扫视时仍要读一遍字；
+ * 图形是先认形再认字，2×4 的九宫格里一眼就能定位。键是分类名，字典里新增的
+ * 分类回落成标签图形，不至于空一块。
+ */
+const EMOJI: Record<string, string> = {
+  教材教辅: '📚',
+  数码电子: '💻',
+  生活用品: '🧺',
+  服饰鞋包: '👗',
+  运动器材: '🏀',
+  美妆个护: '💄',
+  票务卡券: '🎫',
+  其他闲置: '📦'
+}
+
+const FALLBACK_EMOJI = '🏷️'
+
 interface KkEntry {
-  key: string
+  id: string
   name: string
-  char: string
+  emoji: string
   hue: string
-  kind: 'cat' | 'all' | 'publish'
-  id?: string
 }
 
 const cats = ref<{ id: string; name: string }[]>([])
-/** 字典就绪（含失败）后才渲染金刚区：否则 8 个分类异步到达会和固定入口分两波入场 */
+/** 字典就绪（含失败）后才渲染金刚区：否则 8 个分类异步到达会分两波入场 */
 const catsReady = ref(false)
 
-/** 8 个真实分类 + 全部分类（描边弱化）+ 发布（品牌色强化）= 10 格，2×5 排满 */
-const kkEntries = computed<KkEntry[]>(() => [
-  ...cats.value.map((c) => ({
-    key: `cat-${c.id}`,
+/** 只有真实分类：底部导航已有「分类」入口、「发布」另有中央按钮，金刚区不再放重复入口 */
+const kkEntries = computed<KkEntry[]>(() =>
+  cats.value.map((c) => ({
+    id: c.id,
     name: c.name,
-    char: c.name.slice(0, 1),
-    hue: HUE[c.name] ?? 'gray',
-    kind: 'cat' as const,
-    id: c.id
-  })),
-  { key: 'all', name: '全部分类', char: '类', hue: 'outline', kind: 'all' as const },
-  { key: 'publish', name: '发布', char: '＋', hue: 'brand', kind: 'publish' as const }
-])
+    emoji: EMOJI[c.name] ?? FALLBACK_EMOJI,
+    hue: HUE[c.name] ?? 'gray'
+  }))
+)
 
 async function fetchCats(): Promise<void> {
   try {
@@ -81,19 +95,15 @@ async function fetchCats(): Promise<void> {
     // 后端契约：一级分类 parentId 置 null（库里是 0，Jackson non_null 后键消失）
     cats.value = dict.categories.filter((c) => !c.parentId)
   } catch {
-    // 金刚区加载失败不阻塞信息流：只剩「全部分类 / 发布」两个固定入口
+    // 金刚区加载失败不阻塞信息流：整块隐藏，商品流照常
   } finally {
     catsReady.value = true
   }
 }
 
 function onKk(e: KkEntry): void {
-  if (e.kind === 'publish') {
-    goTab('publish')
-    return
-  }
   // reLaunch 不能带参，意图走模块级引用，分类页 onShow 消费后清空
-  pendingCategoryId.value = e.kind === 'cat' ? (e.id ?? '') : ''
+  pendingCategoryId.value = e.id
   goTab('category')
 }
 
@@ -223,10 +233,10 @@ void fetchCats()
     </view>
 
     <!-- ② 金刚区：白色圆角卡压在渐变上，形成第一层浮起 -->
-    <view v-if="catsReady" class="kk cm-card cm-in">
+    <view v-if="catsReady && kkEntries.length" class="kk cm-card cm-in">
       <view
         v-for="(e, i) in kkEntries"
-        :key="e.key"
+        :key="e.id"
         class="kk__item"
         hover-class="kk__item--press"
         :hover-stay-time="60"
@@ -234,7 +244,7 @@ void fetchCats()
         @click="onKk(e)"
       >
         <view class="kk__tile" :class="'kk__tile--' + e.hue">
-          <text class="kk__char">{{ e.char }}</text>
+          <text class="kk__emoji">{{ e.emoji }}</text>
         </view>
         <text class="kk__label">{{ e.name }}</text>
       </view>
@@ -443,56 +453,43 @@ void fetchCats()
 .kk {
   position: relative;
   margin: -$cm-space-4 $cm-space-4 0;
-  padding: $cm-space-4 $cm-space-2 $cm-space-2;
+  padding: $cm-space-4 $cm-space-1 $cm-space-1;
   display: flex;
   flex-wrap: wrap;
 }
 
+/* 4 列 × 2 行：8 个分类正好排满，不留半行空格 */
 .kk__item {
-  width: 20%;
+  width: 25%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10rpx;
+  gap: 12rpx;
   padding-bottom: $cm-space-3;
   animation: cmInUp 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* 图标块：渐变底 + 顶部高光，避免纯色块太平 */
+/* 图标底：浅色瓦片托住 emoji。emoji 自带颜色，瓦片再上饱和渐变就会互相打架 */
 .kk__tile {
   position: relative;
-  width: 92rpx;
-  height: 92rpx;
+  width: 104rpx;
+  height: 104rpx;
   border-radius: $cm-radius-2xl;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
   transition: transform 140ms ease-out;
-}
-
-.kk__tile::after {
-  content: '';
-  position: absolute;
-  left: -20%;
-  top: -40%;
-  width: 90%;
-  height: 90%;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
 }
 
 .kk__item--press .kk__tile {
   transform: scale(0.88);
 }
 
-.kk__char {
-  position: relative;
-  z-index: 1;
-  font-size: $cm-font-size-md;
-  font-weight: $cm-font-weight-heavy;
-  color: #fff;
+/* emoji 走系统彩色字体，不继承文字色；行高给 1 避免上下抖动 */
+.kk__emoji {
+  font-size: 50rpx;
   line-height: 1;
+  font-family: 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji', sans-serif;
 }
 
 .kk__label {
@@ -504,59 +501,36 @@ void fetchCats()
   text-overflow: ellipsis;
 }
 
-/* 色相：渐变两停 + 同色投影；值全部落在令牌或主色衍生里 */
 .kk__tile--blue {
-  background-image: linear-gradient(135deg, #6FB2FF, $cm-color-blue-500);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(22, 119, 255, 0.6);
+  background: #EAF3FF;
 }
 
 .kk__tile--purple {
-  background-image: linear-gradient(135deg, #A98BFF, $cm-color-purple-500);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(124, 77, 255, 0.6);
+  background: #F2EDFF;
 }
 
 .kk__tile--green {
-  background-image: linear-gradient(135deg, #4FD6A3, $cm-color-green-500);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(15, 169, 104, 0.55);
+  background: #E6F8F0;
 }
 
 .kk__tile--orange {
-  background-image: linear-gradient(135deg, #FFB877, $cm-color-orange-500);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(255, 143, 31, 0.55);
+  background: #FFF1E4;
 }
 
 .kk__tile--red {
-  background-image: linear-gradient(135deg, #FF8F8F, $cm-color-red-500);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(229, 72, 77, 0.5);
+  background: #FFECEC;
 }
 
 .kk__tile--rose {
-  background-image: linear-gradient(135deg, #FFA6BE, $cm-color-brand-2);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(255, 77, 109, 0.5);
+  background: #FFEDF2;
+}
+
+.kk__tile--amber {
+  background: #FFF6E3;
 }
 
 .kk__tile--gray {
-  background-image: linear-gradient(135deg, #C3C5CF, #8A8C99);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(138, 140, 153, 0.5);
-}
-
-.kk__tile--brand {
-  background-image: linear-gradient(135deg, $cm-color-brand-glow, $cm-color-brand);
-  box-shadow: 0 10rpx 18rpx -8rpx rgba(255, 106, 0, 0.6);
-}
-
-/* 全部分类：白底描边，与实色分类拉开层级 */
-.kk__tile--outline {
-  background: $cm-color-bg;
-  border: 1rpx solid $cm-color-gray-200;
-}
-
-.kk__tile--outline::after {
-  background: transparent;
-}
-
-.kk__tile--outline .kk__char {
-  color: $cm-color-text-2;
+  background: #F1F1F5;
 }
 
 /* ── ③ 面交保障位 ───────────────────────────────────────── */

@@ -55,12 +55,16 @@ function timeOf(at: string | undefined): string {
 /**
  * 打开会话：把列表项手里的商品摘要一并带上，详情页顶部商品卡片直接用，
  * 不必再拉一次商品详情（卡片数据两个入口都从跳转参数拿，见 detail.vue onLoad）。
+ *
+ * <p>顺手把本行的未读清零：已读接口是异步的，等 onShow 重新拉列表会先闪一下旧角标。
  */
 function open(c: ChatConversationVO): void {
+  c.unread = 0
   const q = [
     `itemId=${c.itemId}`,
     `peerId=${c.peerUserId}`,
     `nick=${encodeURIComponent(c.peerNick ?? '')}`,
+    `avatar=${c.peerAvatar ? encodeURIComponent(c.peerAvatar) : ''}`,
     `itemTitle=${encodeURIComponent(c.itemTitle ?? '')}`,
     `itemImage=${c.itemMainImage ? encodeURIComponent(c.itemMainImage) : ''}`,
     `itemPrice=${c.price ?? ''}`,
@@ -114,7 +118,8 @@ onPullDownRefresh(() => {
         @click="open(c)"
       >
         <view class="av" :class="avClass(c.peerNick)">
-          <text class="av__t">{{ (c.peerNick || '方')[0] }}</text>
+          <image v-if="c.peerAvatar" class="av__img" :src="c.peerAvatar" mode="aspectFill" />
+          <text v-else class="av__t">{{ (c.peerNick || '方')[0] }}</text>
           <text v-if="c.unread" class="av__badge">{{ c.unread > 99 ? '99+' : c.unread }}</text>
         </view>
 
@@ -211,6 +216,13 @@ onPullDownRefresh(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 头像图自己裁圆：父级不能 overflow:hidden，否则右上角未读角标会被切掉 */
+.av__img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
 
 .av--0 {

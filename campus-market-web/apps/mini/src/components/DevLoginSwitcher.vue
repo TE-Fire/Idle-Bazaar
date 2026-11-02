@@ -7,8 +7,8 @@
  * 方便在多个演示账号间快速切换测登录态相关流程。生产构建不挂载，不影响线上。
  */
 
-import { ref } from 'vue'
-import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi } from '@/api/user'
+import { computed, ref } from 'vue'
+import { MAIL_CODE_SCENE, USER_LOGIN_TYPE, userAuthApi, type DevAccountVO } from '@/api/user'
 import { saveSession, getSession, clearSession } from '@/utils/session'
 import { DEMO_USERS, authLabel, type TestAccount } from '@campus/shared'
 import { forgetTestAccount, listTestAccounts } from '@/utils/test-accounts'
@@ -27,6 +27,38 @@ const currentId = ref(getSession().userId || '')
 /** 刚注册的账号：打开面板时重读，注册完不必重启小程序就能看到 */
 const recent = ref<TestAccount[]>(listTestAccounts())
 
+/**
+ * 服务端账号：本机 storage 只记得「这台手机上注册过」的账号，
+ * Web 端注册的收不到——打开面板时向服务端要一份最新的（验证码回显关闭时为空）。
+ */
+const remote = ref<DevAccountVO[]>([])
+const remoteLoading = ref(false)
+
+const demoPhones = computed(() => new Set(DEMO_USERS.map((u) => u.phone)))
+
+/** 服务端列表剔掉演示账号（下面有独立分组），并只留有手机号的（切换靠验证码登录） */
+const serverAccounts = computed(() =>
+  remote.value.filter((u) => u.phone && !demoPhones.value.has(u.phone))
+)
+
+/** 本机记录里、服务端列表没覆盖到的（例如服务端未开启回显时退回本机记忆） */
+const localOnly = computed(() => {
+  const seen = new Set(remote.value.map((u) => u.id))
+  return recent.value.filter((u) => !seen.has(u.id))
+})
+
+async function loadRemote(): Promise<void> {
+  remoteLoading.value = true
+  try {
+    remote.value = await userAuthApi.devAccounts()
+  } catch {
+    // 老后端没有这个端点：退回本机记录 + 演示账号，不影响切换
+    remote.value = []
+  } finally {
+    remoteLoading.value = false
+  }
+}
+
 function toggle(): void {
   if (open.value) {
     open.value = false
@@ -34,10 +66,12 @@ function toggle(): void {
   }
   recent.value = listTestAccounts()
   open.value = true
+  void loadRemote()
 }
 
 /** 两组的条目形态一致，只取昵称与手机号：演示账号与刚注册账号共用一条切换路径 */
-async function quickLogin(u: { id?: string; nickname: string; phone: string }): Promise<void> {
+/** 三组条目的 id 类型不同（演示账号是数字常量、服务端与本地记录是雪花字符串），这里统一放宽 */
+async function quickLogin(u: { id?: string | number; nickname: string; phone: string }): Promise<void> {
   loadingPhone.value = u.phone
   try {
     const sms = await userAuthApi.sendCode(u.phone, MAIL_CODE_SCENE.login)
@@ -93,10 +127,30 @@ function logout(): void {
       </view>
 
       <scroll-view class="dev-sw__list" scroll-y>
-        <template v-if="recent.length">
-          <view class="dev-sw__group">刚注册 · 本机</view>
+        <view v-if="remoteLoading" class="dev-sw__group">服务端账号加载中…</view>
+
+        <template v-if="serverAccounts.length">
+          <view class="dev-sw__group">服务端账号 · 含 Web 端注册</view>
           <view
-            v-for="u in recent"
+            v-for="u in serverAccounts"
+            :key="u.id"
+            class="dev-sw__item"
+            :class="{ 'is-current': currentId && currentId === u.id }"
+            @click="quickLogin({ id: u.id, nickname: u.nickname || u.phone || '未命名', phone: u.phone! })"
+          >
+            <text class="dev-sw__avatar">{{ (u.nickname || u.phone || '?').slice(0, 1) }}</text>
+            <view class="dev-sw__meta">
+              <text class="dev-sw__name">{{ u.nickname || u.phone }}</text>
+              <text class="dev-sw__sub">{{ u.phone }} · 信用{{ u.creditScore ?? 100 }}</text>
+            </view>
+            <text v-if="loadingPhone === u.phone" class="dev-sw__spin">登录中…</text>
+          </view>
+        </template>
+
+        <template v-if="localOnly.length">
+          <view class="dev-sw__group">本机记录</view>
+          <view
+            v-for="u in localOnly"
             :key="u.id"
             class="dev-sw__item"
             :class="{ 'is-current': currentId && currentId === u.id }"

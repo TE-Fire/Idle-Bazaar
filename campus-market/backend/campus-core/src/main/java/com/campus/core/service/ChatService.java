@@ -193,6 +193,7 @@ public class ChatService {
             vo.setStatus(item == null ? null : ItemStatusEnum.fromCode(item.getStatus()));
             vo.setPeerUserId(peerId);
             vo.setPeerNick(peer == null ? null : peer.getNickname());
+            vo.setPeerAvatar(peer == null ? null : peer.getAvatarUrl());
             vo.setLastContent(last == null ? null : last.getContent());
             vo.setLastAt(s.getLastMsgAt());
             vo.setUnread(unreadMap.getOrDefault(s.getId(), 0));

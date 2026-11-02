@@ -1,13 +1,14 @@
 import { REPORT_REASONS, REPORT_TARGET, reportApi } from '@/api/social'
 import { getSession } from '@/utils/session'
+import { cmActions } from '@/utils/dialog'
 
 /**
  * 举报入口（notes/22 批次 3）。
  *
- * <p>用系统 actionSheet 而不是自绘弹层：举报是低频动作，原生菜单的点击区与收起手势都更稳，
- * 自绘一套还要处理遮罩、键盘、刘海屏三件事。
+ * <p>原因列表走自绘动作菜单（{@link cmActions}）而不是系统 actionSheet：
+ * 系统菜单固定白底黑字，与本项目暖橙主题不搭；调用方页面挂一个 CmDialogHost 即可。
  */
-export function reportTarget(targetType: number, targetId: string): void {
+export async function reportTarget(targetType: number, targetId: string): Promise<void> {
   if (!getSession().tokenValue) {
     uni.showToast({ title: '请先登录', icon: 'none' })
     void uni.navigateTo({ url: '/pages/login/index' })
@@ -15,12 +16,9 @@ export function reportTarget(targetType: number, targetId: string): void {
   }
   if (!targetId) return
 
-  uni.showActionSheet({
-    itemList: [...REPORT_REASONS],
-    success: (res) => {
-      submitReport(targetType, targetId, REPORT_REASONS[res.tapIndex])
-    }
-  })
+  const index = await cmActions('选择举报原因', [...REPORT_REASONS])
+  if (index < 0) return
+  submitReport(targetType, targetId, REPORT_REASONS[index])
 }
 
 /**

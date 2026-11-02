@@ -19,7 +19,9 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userItemApi, userOrderApi, type ApiItemVO, type OrderStatus, type OrderVO } from '@/api/user'
+import { cmConfirm } from '@/utils/dialog'
 import CmNav from '@/components/CmNav.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 
 const TABS = ['我发布的', '我买到的', '我卖出的']
 const activeTab = ref(0)
@@ -135,42 +137,37 @@ function editItem(id: string): void {
   void uni.navigateTo({ url: `/pages/publish/index?edit=${id}` })
 }
 
-function removeItem(item: ApiItemVO): void {
-  uni.showModal({
+async function removeItem(item: ApiItemVO): Promise<void> {
+  const ok = await cmConfirm({
     title: '删除商品',
-    content: `删除后不可恢复，「${item.title}」将不再展示。确定删除？`,
+    content: `删除后不可恢复，「${item.title}」将不再展示。`,
     confirmText: '删除',
-    confirmColor: '#FF6A00',
-    success: async (res) => {
-      if (!res.confirm) return
-      try {
-        await userItemApi.remove(item.id)
-        uni.showToast({ title: '已删除', icon: 'success' })
-        void loadItems()
-      } catch {
-        // request 层已提示（在售 / 已售出不可删）
-      }
-    }
+    danger: true
   })
+  if (!ok) return
+  try {
+    await userItemApi.remove(item.id)
+    uni.showToast({ title: '已删除', icon: 'success' })
+    void loadItems()
+  } catch {
+    // request 层已提示（在售 / 已售出不可删）
+  }
 }
 
-function offlineItem(item: ApiItemVO): void {
-  uni.showModal({
+async function offlineItem(item: ApiItemVO): Promise<void> {
+  const ok = await cmConfirm({
     title: '下架商品',
     content: `下架后停止展示，可重新编辑上架。确定下架「${item.title}」？`,
-    confirmText: '下架',
-    confirmColor: '#FF6A00',
-    success: async (res) => {
-      if (!res.confirm) return
-      try {
-        await userItemApi.offline(item.id)
-        uni.showToast({ title: '已下架', icon: 'success' })
-        void loadItems()
-      } catch {
-        // request 层已提示
-      }
-    }
+    confirmText: '下架'
   })
+  if (!ok) return
+  try {
+    await userItemApi.offline(item.id)
+    uni.showToast({ title: '已下架', icon: 'success' })
+    void loadItems()
+  } catch {
+    // request 层已提示
+  }
 }
 
 async function submitDraft(item: ApiItemVO): Promise<void> {
@@ -334,6 +331,8 @@ onShow(() => {
         </scroll-view>
       </view>
     </view>
+
+    <CmDialogHost />
   </view>
 </template>
 

@@ -29,6 +29,9 @@ public class ChatConversationVO {
 
     private String peerNick;
 
+    /** 对方头像；会话列表与消息气泡都靠它，为空时前端回退昵称首字 */
+    private String peerAvatar;
+
     private String lastContent;
 
     private LocalDateTime lastAt;

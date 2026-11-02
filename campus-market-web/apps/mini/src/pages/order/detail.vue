@@ -15,7 +15,9 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userOrderApi, type OrderStatus, type OrderVO } from '@/api/user'
+import { cmPrompt } from '@/utils/dialog'
 import CmNav from '@/components/CmNav.vue'
+import CmDialogHost from '@/components/CmDialogHost.vue'
 import { confirmPay, clip } from '@/utils/confirm-pay'
 
 const id = ref('')
@@ -54,22 +56,11 @@ async function fetchDetail(): Promise<void> {
   }
 }
 
-/** 带理由的确认弹窗（取消 / 申请退款 / 拒绝退款 / 发起纠纷共用） */
-function promptReason(title: string, placeholder: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    uni.showModal({
-      title,
-      editable: true,
-      placeholderText: placeholder,
-      confirmText: '确定',
-      cancelText: '取消',
-      success: (r) => {
-        if (r.confirm) resolve((r.content ?? '').trim() || '买家未填写理由')
-        else resolve(null)
-      },
-      fail: () => resolve(null)
-    })
-  })
+/** 带理由的确认弹窗（取消 / 申请退款 / 拒绝退款 / 发起纠纷共用）；取消返回 null */
+async function promptReason(title: string, placeholder: string): Promise<string | null> {
+  const text = await cmPrompt({ title, placeholder, maxlength: 120 })
+  if (text === null) return null
+  return text || '买家未填写理由'
 }
 
 function run(action: () => Promise<unknown>, ok: string): void {
@@ -88,11 +79,10 @@ async function onPay(): Promise<void> {
   const ok = await confirmPay({
     title: '确认付款',
     lines: [
-      o?.itemTitle ? clip(o.itemTitle) : '本订单',
-      `应付 ¥${o?.amount ?? '—'}`,
-      '付款后进入待面交',
-      '确认收货后才结算给卖家'
+      { label: '商品', value: o?.itemTitle ? clip(o.itemTitle) : '本订单' },
+      { label: '应付', value: `¥${o?.amount ?? '—'}`, strong: true }
     ],
+    note: '付款后进入待面交；确认收货后才结算给卖家。',
     confirmText: '确认支付'
   })
   if (!ok) return
@@ -128,20 +118,19 @@ async function onDispute(): Promise<void> {
 }
 
 function onVerify(): void {
-  uni.showModal({
+  void cmPrompt({
     title: '扫码核销',
-    editable: true,
-    placeholderText: '输入对方出示的 6 位核销码',
-    confirmText: '核销',
-    success: (r) => {
-      if (!r.confirm) return
-      const code = (r.content ?? '').trim()
-      if (!code) {
-        uni.showToast({ title: '核销码不能为空', icon: 'none' })
-        return
-      }
-      run(() => userOrderApi.verify(id.value, code), '核销成功')
+    content: '输入对方出示的 6 位核销码完成面交。',
+    placeholder: '6 位核销码',
+    maxlength: 6,
+    confirmText: '核销'
+  }).then((code) => {
+    if (code === null) return
+    if (!code) {
+      uni.showToast({ title: '核销码不能为空', icon: 'none' })
+      return
     }
+    run(() => userOrderApi.verify(id.value, code), '核销成功')
   })
 }
 
@@ -253,6 +242,8 @@ onShow(() => {
     <CmNav title="订单详情" />
     <text class="state__t">{{ loading ? '加载中…' : '订单不存在' }}</text>
   </view>
+
+  <CmDialogHost />
 </template>
 
 <style scoped lang="scss">

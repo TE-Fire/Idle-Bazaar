@@ -22,6 +22,8 @@ interface RequestOptions {
   url: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   data?: Record<string, unknown>
+  /** 静默失败：不弹 toast，由调用方自己决定怎么降级（如联调账号列表） */
+  silent?: boolean
 }
 
 /** 1001：清会话并跳登录（带 redirect，登录后回原页） */
@@ -55,11 +57,17 @@ export function request<T>(options: RequestOptions): Promise<T> {
           reject(new Error(body.msg || '请先登录'))
           return
         }
+        if (options.silent) {
+          reject(new Error(body?.msg ?? '请求失败'))
+          return
+        }
         uni.showToast({ title: body?.msg ?? '请求失败', icon: 'none', duration: 2000 })
         reject(new Error(body?.msg ?? '请求失败'))
       },
       fail: () => {
-        uni.showToast({ title: '网络异常，请稍后重试', icon: 'none', duration: 2000 })
+        if (!options.silent) {
+          uni.showToast({ title: '网络异常，请稍后重试', icon: 'none', duration: 2000 })
+        }
         reject(new Error('network error'))
       }
     })
