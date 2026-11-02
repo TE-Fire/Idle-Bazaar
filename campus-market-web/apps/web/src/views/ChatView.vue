@@ -24,6 +24,7 @@ import { formatPrice, formatRelativeTime, ITEM_STATUS_LABELS } from '@campus/sha
 import { ElMessage, ElMessageBox } from 'element-plus'
 import OfferDialog from '@/components/OfferDialog.vue'
 import OfferRejectDialog from '@/components/OfferRejectDialog.vue'
+import { confirmPay } from '@/utils/confirm-pay'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
@@ -287,6 +288,18 @@ async function cancelOffer(p: OfferCardPayload): Promise<void> {
  */
 async function goPay(p: OfferCardPayload): Promise<void> {
   if (offerBusy.value) return
+  const ok = await confirmPay({
+    title: '确认付款',
+    headline: '确认按议价成交价付款？',
+    lines: [
+      { label: '商品', value: item.value?.title ?? '本商品' },
+      { label: '成交价', value: `¥${p.offerPrice}`, strong: true },
+      { label: '原标价', value: `¥${p.originPrice}` }
+    ],
+    note: '付款成功后订单进入待面交；议价价只对这笔订单生效，不影响商品挂牌价。',
+    confirmText: `支付 ¥${p.offerPrice}`
+  })
+  if (!ok) return
   offerBusy.value = true
   try {
     const orderId = await userOrderApi.create({ itemId: p.itemId, offerId: p.offerId })

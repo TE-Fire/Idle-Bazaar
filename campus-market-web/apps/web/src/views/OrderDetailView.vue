@@ -27,6 +27,7 @@ import {
   type UserOrderStatus,
   type UserOrderVO
 } from '@campus/api'
+import { confirmPay } from '@/utils/confirm-pay'
 
 const route = useRoute()
 const router = useRouter()
@@ -201,6 +202,19 @@ async function promptReason(title: string, placeholder: string, required = false
 }
 
 async function onPay(): Promise<void> {
+  const o = order.value
+  const ok = await confirmPay({
+    title: '确认付款',
+    headline: '确认支付这笔订单？',
+    lines: [
+      { label: '商品', value: o?.itemTitle ?? '本商品' },
+      { label: '应付', value: `¥${o?.amount ?? '—'}`, strong: true },
+      ...(o?.meetPointName ? [{ label: '面交点', value: o.meetPointName }] : [])
+    ],
+    note: '付款后订单进入待面交，款项由平台代管；确认收货或核销后才会结算给卖家。',
+    confirmText: o?.amount ? `支付 ¥${o.amount}` : '确认支付'
+  })
+  if (!ok) return
   await run(() => userOrderApi.pay(orderId.value), '支付成功')
 }
 

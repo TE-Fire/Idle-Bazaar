@@ -15,6 +15,7 @@
 import { onLoad, onShow } from '@dcloudio/uni-app'
 import { computed, ref } from 'vue'
 import { userOrderApi, type OrderStatus, type OrderVO } from '@/api/user'
+import { confirmPay, clip } from '@/utils/confirm-pay'
 
 const id = ref('')
 const role = ref<'buyer' | 'seller'>('buyer')
@@ -82,6 +83,18 @@ function run(action: () => Promise<unknown>, ok: string): void {
 }
 
 async function onPay(): Promise<void> {
+  const o = order.value
+  const ok = await confirmPay({
+    title: '确认付款',
+    lines: [
+      o?.itemTitle ? clip(o.itemTitle) : '本订单',
+      `应付 ¥${o?.amount ?? '—'}`,
+      '付款后进入待面交',
+      '确认收货后才结算给卖家'
+    ],
+    confirmText: '确认支付'
+  })
+  if (!ok) return
   await userOrderApi.pay(id.value)
 }
 

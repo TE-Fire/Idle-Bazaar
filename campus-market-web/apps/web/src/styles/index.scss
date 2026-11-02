@@ -29,6 +29,16 @@
   --el-bg-color: var(--cm-color-bg);
 }
 
+/* 确认框图标默认垂直居中：正文一多（下单 / 付款的明细），图标就飘到中间去，
+   像是标错了行。改成顶对齐，与首行文字齐平 */
+.el-message-box__container {
+  align-items: flex-start;
+}
+
+.el-message-box__status {
+  margin-top: 2px;
+}
+
 /* 黄底必须配深色字（design/01 §4.2：#FFD100 配 #1F1F26 ≈ 12:1，禁止黄底白字） */
 .el-button--primary {
   color: var(--cm-color-text-1);

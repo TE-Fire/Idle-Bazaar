@@ -19,6 +19,7 @@ import { userItemApi, userOrderApi, type ApiItemVO } from '@/api/user'
 import { itemCommentApi, momentApi, type ItemCommentVO } from '@/api/moment'
 import { REPORT_REASONS } from '@/api/social'
 import { REPORT_TARGET, reportTarget, submitReport } from '@/utils/report'
+import { confirmPay, clip } from '@/utils/confirm-pay'
 import { getSession } from '@/utils/session'
 import CmIcon from '@/components/CmIcon.vue'
 import ConditionTag from '@/components/ConditionTag.vue'
@@ -147,21 +148,35 @@ function onChat(): void {
   void uni.navigateTo({ url: `/pages/chat/detail?${q}` })
 }
 
-/** 我想要：未登录先跳登录（下单要令牌），已登录直接创建待付款订单进详情 */
-function onBuy(): void {
-  if (!item.value) return
+/** 我想要：未登录先跳登录（下单要令牌），已登录确认后创建待付款订单进详情 */
+async function onBuy(): Promise<void> {
+  const it = item.value
+  if (!it) return
   if (!getSession().tokenValue) {
     uni.showToast({ title: '请先登录', icon: 'none' })
     void uni.navigateTo({ url: '/pages/login/index' })
     return
   }
-  if (item.value.sellerId === getSession().userId) {
+  if (it.sellerId === getSession().userId) {
     uni.showToast({ title: '不能购买自己发布的商品', icon: 'none' })
     return
   }
+  // 「我想要」是拇指最常落的位置，误触一次就多一张待付款单，所以先过一道确认
+  const ok = await confirmPay({
+    title: '确认购买',
+    lines: [
+      clip(it.title),
+      `应付 ${formatPrice(Number(it.price))}`,
+      it.meetPointName ? `面交点 ${it.meetPointName}` : '面交点下单后与卖家约定',
+      '仅创建待付款订单，暂不扣款'
+    ],
+    confirmText: '确认下单'
+  })
+  if (!ok) return
+
   uni.showLoading({ title: '下单中…', mask: true })
   userOrderApi
-    .create({ itemId: item.value.id, meetPointId: item.value.meetPointId ?? undefined })
+    .create({ itemId: it.id, meetPointId: it.meetPointId ?? undefined })
     .then((orderId) => {
       uni.hideLoading()
       uni.showToast({ title: '已创建订单', icon: 'success' })

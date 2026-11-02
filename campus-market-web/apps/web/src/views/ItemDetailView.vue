@@ -31,6 +31,7 @@ import { useCompareStore } from '@/stores/compare'
 import { useUserStore } from '@/stores/user'
 import SharePoster from '@/components/SharePoster.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
+import { confirmPay } from '@/utils/confirm-pay'
 import { ElMessage } from 'element-plus'
 
 const route = useRoute()
@@ -174,7 +175,33 @@ async function onBuy(): Promise<void> {
     await openAddressPicker()
     return
   }
+  if (!(await confirmBuy())) return
   await createOrder()
+}
+
+/**
+ * 下单前的二次确认。
+ *
+ * <p>送货上门不走这里：选地址那一步的按钮本身就是「确认下单」，再加一层
+ * 会变成连点两下才能买，反而让人闭眼点。
+ */
+async function confirmBuy(): Promise<boolean> {
+  const it = item.value
+  if (!it) return false
+  return confirmPay({
+    title: '确认购买',
+    headline: '确认按当前信息下单？',
+    lines: [
+      { label: '商品', value: it.title },
+      { label: '应付', value: formatPrice(Number(it.price)), strong: true },
+      { label: '收货方式', value: deliveryLabel.value },
+      ...(deliveryType.value === DELIVERY.MEET
+        ? [{ label: '面交点', value: it.meetPointName ?? '待定' }]
+        : [])
+    ],
+    note: '这一步只创建待付款订单，不会直接扣款；30 分钟内未付款订单自动关闭。',
+    confirmText: '确认下单'
+  })
 }
 
 async function createOrder(addressId?: string): Promise<void> {
@@ -577,7 +604,9 @@ function goSeller(): void {
     </div>
     <template #footer>
       <el-button @click="addressDialogVisible = false">取消</el-button>
-      <el-button type="primary" :disabled="!selectedAddressId" @click="confirmAddressOrder">确认下单</el-button>
+      <el-button type="primary" :disabled="!selectedAddressId" @click="confirmAddressOrder">
+        确认下单 {{ item ? formatPrice(Number(item.price)) : '' }}
+      </el-button>
     </template>
   </el-dialog>
 

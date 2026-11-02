@@ -24,6 +24,7 @@ import {
   type OfferCardPayload
 } from '@/api/user'
 import { getSession } from '@/utils/session'
+import { confirmPay, clip } from '@/utils/confirm-pay'
 import OfferSheet from '@/components/OfferSheet.vue'
 import OfferRejectSheet from '@/components/OfferRejectSheet.vue'
 
@@ -259,6 +260,17 @@ async function cancelOffer(p: OfferCardPayload): Promise<void> {
  */
 async function goPay(p: OfferCardPayload): Promise<void> {
   if (offerBusy.value) return
+  const ok = await confirmPay({
+    title: '确认付款',
+    lines: [
+      clip(item.value?.title ?? '本商品'),
+      `成交价 ¥${p.offerPrice}`,
+      `原标价 ¥${p.originPrice}`,
+      '付款后进入待面交'
+    ],
+    confirmText: '确认支付'
+  })
+  if (!ok) return
   offerBusy.value = true
   try {
     const orderId = await userOrderApi.create({ itemId: p.itemId, offerId: p.offerId })
