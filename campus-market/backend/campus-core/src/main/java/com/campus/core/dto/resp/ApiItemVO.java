@@ -61,6 +61,9 @@ public class ApiItemVO {
     /** 自提地址 id（deliveryType=2 时有效，引用 user_address.kind=PICKUP） */
     private Long pickupAddressId;
 
+    /** 自提点完整地址文本（省市区+详细，仅详情回填），前端直接展示，不在客户端拼串 */
+    private String pickupAddress;
+
     private String description;
 
     /** 对外只会出现 ON_SALE：搜索列表与个人列表过滤条件不同，但都不会漏出待审核商品 */

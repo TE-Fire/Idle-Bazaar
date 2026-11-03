@@ -209,7 +209,12 @@ export interface ApiItemVO {
   sellerCredit?: number
   /** 1 可议价：买家可在聊天里出价，卖家同意后按议价价成交；不改商品标价 */
   negotiable?: number
-  deliveryIncluded?: number
+  /** 收货方式：1 面交 2 自提 3 送货上门，决定下单时走不走地址 */
+  deliveryType?: number
+  /** 自提地址 id（deliveryType=2 时有值） */
+  pickupAddressId?: string
+  /** 自提点完整地址文本，详情接口回填；列表没有 */
+  pickupAddress?: string
   status: 'DRAFT' | 'PENDING' | 'ON_SALE' | 'SOLD' | 'OFFLINE' | 'REJECTED' | 'FORCED_OFFLINE'
   publishAt: string
   viewCount: number
@@ -231,7 +236,10 @@ export interface ItemPublishReq {
   description?: string
   images?: string[]
   negotiable?: number
-  deliveryIncluded?: number
+  /** 收货方式：1 面交 2 自提 3 送货上门（缺省按面交兜底） */
+  deliveryType?: number
+  /** 自提地址 id：deliveryType=2 必填，引用 user_address(kind=PICKUP) */
+  pickupAddressId?: string
   /** true = 暂存草稿（不进队、豁免图片与描述） */
   draft?: boolean
 }
@@ -434,7 +442,15 @@ export interface OrderVO {
   /** 2 位小数字符串 */
   amount: string
   status: OrderStatus
+  /** 收货方式（枚举名）：MEET 面交 / PICKUP 自提 / DELIVERY 送货上门 */
+  deliveryType?: 'MEET' | 'PICKUP' | 'DELIVERY'
+  /** 地址快照：送货上门=买家收货地址，自提=卖家提货地址，面交为空 */
+  addressContact?: string
+  addressPhone?: string
+  addressDetail?: string
   meetPointId?: string
+  /** 面交点名称（如「一食堂门口」） */
+  meetPointName?: string
   /** 约定面交时间 */
   meetTime?: string
   /** 核销码（付款后生成，面交时出示/扫描） */
@@ -452,7 +468,7 @@ export interface OrderVO {
 
 export const userOrderApi = {
   /** 下单：只插待付款订单，商品不锁定；金额按标价，传 offerId 则按已同意的议价价 */
-  create: (req: { itemId: string; offerId?: string; meetPointId?: string; meetTime?: string }) =>
+  create: (req: { itemId: string; offerId?: string; meetPointId?: string; meetTime?: string; addressId?: string }) =>
     request<string>({ url: '/api/order/create', method: 'POST', data: { ...req } }),
 
   /** 模拟支付 → 待面交 */

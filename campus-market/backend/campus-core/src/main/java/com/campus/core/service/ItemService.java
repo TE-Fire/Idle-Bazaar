@@ -288,6 +288,8 @@ public class ItemService {
                 .map(this::toImageVO)
                 .toList());
         fillSellers(List.of(vo));
+        // 自提点只在详情回填：列表不展示提货地址，逐行查地址会让一页多出十次查询
+        vo.setPickupAddress(pickupAddressText(item.getPickupAddressId()));
         vo.setFavorited(viewerId != null && favoriteMapper.selectCount(new LambdaQueryWrapper<Favorite>()
                 .eq(Favorite::getUserId, viewerId)
                 .eq(Favorite::getItemId, itemId)
@@ -606,6 +608,31 @@ public class ItemService {
 
     private static boolean isBlank(String s) {
         return s == null || s.isBlank();
+    }
+
+    /**
+     * 拼自提点地址文本：省市区 + 详细地址，空段跳过。
+     *
+     * <p>拼串放服务端是为了让 C 端只拿一个可直接展示的字段——地址分四列存，
+     * 前端各自拼会拼出「江西省九江市濂溪区」还是「九江 濂溪」全凭各页面心情。
+     */
+    private String pickupAddressText(Long addressId) {
+        if (addressId == null) {
+            return null;
+        }
+        UserAddress addr = userAddressMapper.selectOne(new LambdaQueryWrapper<UserAddress>()
+                .eq(UserAddress::getId, addressId)
+                .eq(UserAddress::getDeleted, 0));
+        if (addr == null) {
+            return null;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String part : new String[]{addr.getProvince(), addr.getCity(), addr.getDistrict(), addr.getDetail()}) {
+            if (!isBlank(part)) {
+                sb.append(part);
+            }
+        }
+        return sb.toString();
     }
 
     /**

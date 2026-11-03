@@ -13,13 +13,23 @@
  */
 
 import { computed, ref } from 'vue'
-import { onLoad } from '@dcloudio/uni-app'
+import { onLoad, onShow } from '@dcloudio/uni-app'
+import { ADDRESS_KIND, addressApi, addressText, type AddressVO } from '@/api/address'
 import { userDictApi, userItemApi, type CategoryVO } from '@/api/user'
 import CmNav from '@/components/CmNav.vue'
 import TabBar from '@/components/TabBar.vue'
 import { uploadImage } from '@/utils/upload'
 
 const MAX_SHOTS = 9
+
+/** 收货方式，与后端 DeliveryTypeEnum 对齐 */
+const DELIVERY = { MEET: 1, PICKUP: 2, DELIVERY: 3 } as const
+
+const DELIVERY_OPTIONS = [
+  { code: DELIVERY.MEET, label: '面交', hint: '约在校园内' },
+  { code: DELIVERY.PICKUP, label: '自提', hint: '买家上门取' },
+  { code: DELIVERY.DELIVERY, label: '送货上门', hint: '你负责送达' }
+]
 
 /** 选图：先以临时路径占位（uploading），成功后换成 MinIO 公开读 URL */
 const shots = ref<Array<{ path: string; uploading: boolean }>>([])
@@ -31,9 +41,10 @@ const form = ref({
   originalPrice: '',
   campusId: '',
   meetPointId: '',
+  deliveryType: DELIVERY.MEET as number,
+  pickupAddressId: '',
   description: '',
-  negotiable: false,
-  delivery: false
+  negotiable: false
 })
 
 /* ── 字典 ─────────────────────────────────────────────── */
@@ -52,6 +63,50 @@ const meetPointLabels = computed(() =>
 const meetPointIds = computed(() =>
   meetPoints.value.filter((m) => m.campusId === form.value.campusId).map((m) => m.id)
 )
+
+/* ── 自提地址（只有选「自提」时才用得上）───────────────── */
+
+const pickupAddresses = ref<AddressVO[]>([])
+const pickupLabels = computed(() => pickupAddresses.value.map((a) => addressText(a)))
+const pickupIds = computed(() => pickupAddresses.value.map((a) => a.id))
+
+/** 已选地址的展示文本：地址被删后列表里找不到，退回空（提示重选），不留一个假名字 */
+const pickupLabel = computed(() => {
+  const hit = pickupAddresses.value.find((a) => a.id === form.value.pickupAddressId)
+  return hit ? addressText(hit) : ''
+})
+
+/** onShow：从地址簿返回要拿到刚加的提货点，所以每次显示都刷新 */
+onShow(() => {
+  void loadPickupAddresses()
+})
+
+async function loadPickupAddresses(): Promise<void> {
+  try {
+    pickupAddresses.value = await addressApi.list(ADDRESS_KIND.pickup)
+    // 原提货地址被删：清空选择，让用户在提交前重新选，别带着无效 id 去报参错
+    if (form.value.pickupAddressId && !pickupIds.value.includes(form.value.pickupAddressId)) {
+      form.value.pickupAddressId = ''
+    }
+  } catch {
+    // 未登录或网络异常时保持空列表，不影响其他字段填写（request 层已提示）
+  }
+}
+
+function onDeliveryChange(code: number): void {
+  form.value.deliveryType = code
+  // 换方式就把另一种方式的选择清掉：留着会让提交带上无效的地址/面交点
+  if (code !== DELIVERY.PICKUP) form.value.pickupAddressId = ''
+  if (code !== DELIVERY.MEET) form.value.meetPointId = ''
+}
+
+function onPickupChange(e: { detail: { value: number } }): void {
+  form.value.pickupAddressId = pickupIds.value[e.detail.value] ?? ''
+}
+
+function goAddressBook(): void {
+  void uni.navigateTo({ url: `/pages/address/list?kind=${ADDRESS_KIND.pickup}` })
+}
 
 onLoad(async (query) => {
   try {
@@ -111,6 +166,8 @@ async function loadForEdit(id: string): Promise<void> {
     form.value.originalPrice = item.originPrice ?? ''
     form.value.campusId = item.campusId
     form.value.meetPointId = item.meetPointId ?? ''
+    form.value.deliveryType = item.deliveryType ?? DELIVERY.MEET
+    form.value.pickupAddressId = item.pickupAddressId ?? ''
     form.value.description = item.description ?? ''
     existingImages.value = (item.images ?? []).map((i) => i.url)
   } catch {
@@ -177,6 +234,10 @@ async function save(draft: boolean): Promise<void> {
     uni.showToast({ title: '标题 5–50 字，价格、分类、校区都要填', icon: 'none' })
     return
   }
+  if (form.value.deliveryType === DELIVERY.PICKUP && !form.value.pickupAddressId) {
+    uni.showToast({ title: '自提商品要选一个提货地址', icon: 'none' })
+    return
+  }
   if (form.value.grade === 'D' && !form.value.description.trim()) {
     uni.showToast({ title: '成色为 D 时请描述写明具体瑕疵', icon: 'none' })
     return
@@ -193,12 +254,15 @@ async function save(draft: boolean): Promise<void> {
     price: Number(form.value.price),
     originalPrice: form.value.originalPrice ? Number(form.value.originalPrice) : undefined,
     campusId: form.value.campusId,
-    meetPointId: form.value.meetPointId || undefined,
+    // 面交点与提货地址各归其方式：带上另一方式的值会被服务端当作无效引用拒绝
+    meetPointId: form.value.deliveryType === DELIVERY.MEET ? form.value.meetPointId || undefined : undefined,
+    deliveryType: form.value.deliveryType,
+    pickupAddressId:
+      form.value.deliveryType === DELIVERY.PICKUP ? form.value.pickupAddressId || undefined : undefined,
     description: form.value.description.trim() || undefined,
     // 编辑时已有图片原样带回 + 新上传的 accessUrl，整体替换（后端不传差量）
     images: [...existingImages.value, ...shots.value.map((s) => s.path)],
     negotiable: form.value.negotiable ? 1 : 0,
-    deliveryIncluded: form.value.delivery ? 1 : 0,
     draft
   }
   try {
@@ -234,8 +298,8 @@ function onMeetPointChange(e: { detail: { value: number } }): void {
 }
 
 /** 自绘开关的翻转：原生 switch 在 H5 是固定 px（52×32），压不进 72rpx 的行高 */
-function toggle(field: 'negotiable' | 'delivery'): void {
-  form.value[field] = !form.value[field]
+function toggleNegotiable(): void {
+  form.value.negotiable = !form.value.negotiable
 }
 </script>
 
@@ -296,11 +360,46 @@ function toggle(field: 'negotiable' | 'delivery'): void {
     </view>
 
     <view class="sec">
+      <text class="sec__t">收货方式</text>
+      <view class="dts">
+        <view
+          v-for="d in DELIVERY_OPTIONS"
+          :key="d.code"
+          class="dt"
+          :class="{ 'dt--on': form.deliveryType === d.code }"
+          @click="onDeliveryChange(d.code)"
+        >
+          <text class="dt__t">{{ d.label }}</text>
+          <text class="dt__h">{{ d.hint }}</text>
+        </view>
+      </view>
+
+      <!-- 自提：必须指定一个提货点，没有就先去地址簿加 -->
+      <template v-if="form.deliveryType === DELIVERY.PICKUP">
+        <view class="pick">
+          <view class="pick__wrap">
+            <picker :range="pickupLabels" @change="onPickupChange">
+              <view class="picker picker--flex">
+                {{ pickupLabel || (pickupLabels.length ? '选择提货地址' : '还没有提货地址') }} ▾
+              </view>
+            </picker>
+          </view>
+          <text class="pick__m" @click="goAddressBook">管理</text>
+        </view>
+        <text class="sec__hint">买家下单后到你填的提货点自取，地址只有已下单的买家能看到</text>
+      </template>
+      <text v-else-if="form.deliveryType === DELIVERY.DELIVERY" class="sec__hint">
+        买家下单时从自己的收货地址里选一个，你按快照地址送达
+      </text>
+      <text v-else class="sec__hint">买家下单后与你约定面交时间与地点</text>
+    </view>
+
+    <view class="sec">
       <text class="sec__t">校区 / 面交点</text>
       <picker :range="campusLabels" @change="onCampusChange">
         <view class="picker">{{ campusLabels[campusIds.indexOf(form.campusId)] || '选择校区' }} ▾</view>
       </picker>
-      <picker :range="meetPointLabels" @change="onMeetPointChange">
+      <picker v-if="form.deliveryType === DELIVERY.MEET" :range="meetPointLabels" @change="onMeetPointChange">
         <view class="picker">
           {{ meetPointLabels[meetPointIds.indexOf(form.meetPointId)] || (form.campusId ? '选择面交点（选填）' : '先选校区') }} ▾
         </view>
@@ -320,19 +419,7 @@ function toggle(field: 'negotiable' | 'delivery'): void {
           :class="{ 'sw--on': form.negotiable }"
           hover-class="sw--press"
           :hover-stay-time="80"
-          @click="toggle('negotiable')"
-        >
-          <view class="sw__knob" />
-        </view>
-      </view>
-      <view class="switch-row">
-        <text>包校园配送</text>
-        <view
-          class="sw"
-          :class="{ 'sw--on': form.delivery }"
-          hover-class="sw--press"
-          :hover-stay-time="80"
-          @click="toggle('delivery')"
+          @click="toggleNegotiable"
         >
           <view class="sw__knob" />
         </view>
@@ -505,6 +592,83 @@ function toggle(field: 'negotiable' | 'delivery'): void {
   color: $cm-color-brand-text;
   background: $cm-color-brand-bg;
   border-color: $cm-color-brand;
+}
+
+/* ── 收货方式 ─────────────────────────────────────────────
+   三段式横排：标签 + 一行说明。只有自提会展开提货地址，其余只留一句提示，
+   避免「选了面交还在挑地址」这种自相矛盾的界面。 */
+.dts {
+  display: flex;
+  gap: $cm-space-2;
+}
+
+.dt {
+  flex: 1;
+  min-width: 0;
+  height: 96rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4rpx;
+  background: $cm-color-bg;
+  border: 1rpx solid transparent;
+  border-radius: $cm-radius-md;
+  transition: background-color 160ms ease-out;
+}
+
+.dt--on {
+  background: $cm-color-brand-bg;
+  border-color: $cm-color-brand;
+}
+
+.dt__t {
+  font-size: $cm-font-size-base;
+  color: $cm-color-text-2;
+}
+
+.dt--on .dt__t {
+  color: $cm-color-brand-text;
+  font-weight: 600;
+}
+
+.dt__h {
+  font-size: $cm-font-size-xs;
+  color: $cm-color-text-3;
+}
+
+.pick {
+  display: flex;
+  align-items: center;
+  gap: $cm-space-2;
+  margin-top: $cm-space-3;
+}
+
+/* picker 编译成 uni-picker，直接给它 flex 不可靠，套一层容器 */
+.pick__wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.picker--flex {
+  margin-bottom: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pick__m {
+  flex: none;
+  font-size: $cm-font-size-sm;
+  color: $cm-color-brand-text;
+}
+
+.sec__hint {
+  display: block;
+  margin-top: $cm-space-3;
+  font-size: $cm-font-size-xs;
+  line-height: 1.6;
+  color: $cm-color-text-3;
 }
 
 .textarea {

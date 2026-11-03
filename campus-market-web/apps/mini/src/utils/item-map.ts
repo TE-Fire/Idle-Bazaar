@@ -31,7 +31,8 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
     campus: vo.campusName ?? '',
     meetPoint: vo.meetPointName ?? '',
     negotiable: vo.negotiable === 1,
-    delivery: vo.deliveryIncluded === 1,
+    // 与 web 端同口径：delivery 表示「送货上门」，不再有包邮标记
+    delivery: vo.deliveryType === 3,
     status: vo.status,
     wantCount: 0,
     seller: {

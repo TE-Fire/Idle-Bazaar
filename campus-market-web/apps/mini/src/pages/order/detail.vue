@@ -27,6 +27,22 @@ const loading = ref(false)
 
 const isBuyer = computed(() => role.value === 'buyer')
 
+/** 核销码的叫法跟着履约方式走：送货上门时还写「面交核销码」会让人以为要走一趟 */
+const codeLabel = computed(() =>
+  order.value?.deliveryType === 'DELIVERY'
+    ? '收货核销码'
+    : order.value?.deliveryType === 'PICKUP'
+      ? '提货核销码'
+      : '面交核销码'
+)
+const codeHint = computed(() =>
+  order.value?.deliveryType === 'DELIVERY'
+    ? '收到货后出示此码，或输入卖家提供的码完成核销'
+    : order.value?.deliveryType === 'PICKUP'
+      ? '到提货点出示此码，卖家核对后交付'
+      : '面交时向对方出示此码，或输入对方提供的码完成核销'
+)
+
 const STATUS_TEXT: Record<OrderStatus, string> = {
   WAIT_PAY: '等待买家付款',
   WAIT_MEET: '已付款，等待面交核销',
@@ -191,11 +207,11 @@ onShow(() => {
       </view>
     </view>
 
-    <!-- 核销码：付款后生成，面交时一方出示一方扫描 -->
+    <!-- 核销码：付款后生成，交付时一方出示一方扫描 -->
     <view v-if="order.status === 'WAIT_MEET' || order.status === 'VERIFIED'" class="code">
-      <text class="code__label">面交核销码</text>
+      <text class="code__label">{{ codeLabel }}</text>
       <text class="code__value">{{ order.verifyCode }}</text>
-      <text class="code__hint">面交时向对方出示此码，或输入对方提供的码完成核销</text>
+      <text class="code__hint">{{ codeHint }}</text>
     </view>
 
     <!-- 订单信息 -->
@@ -204,6 +220,15 @@ onShow(() => {
       <view class="info__row"><text class="info__k">创建时间</text><text class="info__v">{{ order.createTime }}</text></view>
       <view v-if="order.payTime" class="info__row"><text class="info__k">付款时间</text><text class="info__v">{{ order.payTime }}</text></view>
       <view v-if="order.meetTime" class="info__row"><text class="info__k">约定面交</text><text class="info__v">{{ order.meetTime }}</text></view>
+      <!-- 地址是下单那一刻的快照：之后改地址簿也不会改这里，纠纷取证以它为准 -->
+      <view v-if="order.addressDetail" class="info__row">
+        <text class="info__k">{{ order.deliveryType === 'PICKUP' ? '自提点' : '收货地址' }}</text>
+        <text class="info__v">{{ order.addressContact }} {{ order.addressPhone }} · {{ order.addressDetail }}</text>
+      </view>
+      <view v-else-if="order.meetPointName" class="info__row">
+        <text class="info__k">面交点</text>
+        <text class="info__v">{{ order.meetPointName }}</text>
+      </view>
       <view v-if="order.cancelReason" class="info__row"><text class="info__k">{{ order.status === 'REFUNDED' ? '退款原因' : '取消原因' }}</text><text class="info__v">{{ order.cancelReason }}</text></view>
     </view>
 

@@ -13,8 +13,9 @@
  */
 
 import { computed, ref } from 'vue'
-import { onLoad, onPageScroll } from '@dcloudio/uni-app'
+import { onLoad, onPageScroll, onUnload } from '@dcloudio/uni-app'
 import { formatPrice, formatRelativeTime } from '@campus/shared'
+import { ADDRESS_KIND, addressApi, addressText, type AddressVO } from '@/api/address'
 import { userItemApi, userOrderApi, type ApiItemVO } from '@/api/user'
 import { itemCommentApi, momentApi, type ItemCommentVO } from '@/api/moment'
 import { REPORT_REASONS } from '@/api/social'
@@ -27,8 +28,13 @@ import ConditionTag from '@/components/ConditionTag.vue'
 
 const myId = getSession().userId
 
+/** 收货方式，与后端 DeliveryTypeEnum 对齐 */
+const DELIVERY = { MEET: 1, PICKUP: 2, HOME: 3 } as const
+
 const id = ref('')
 const item = ref<ApiItemVO | null>(null)
+/** 送货上门订单的收货地址：进页面先取默认地址，用户不必每次手动选 */
+const shipAddress = ref<AddressVO | null>(null)
 /** 分享到广场在途：防止连点重复发动态 */
 const sharing = ref(false)
 
@@ -112,16 +118,41 @@ const replyHint = computed(() =>
 
 onLoad((query) => {
   id.value = (query as { id?: string })?.id ?? ''
+  // 地址簿选完地址回来靠全局事件回传：地址 id 拼在 URL 里会被页面栈缓存，
+  // 返回时 query 不变，拿不到新选的那条
+  uni.$on('cm:address-picked', onAddressPicked)
   void userItemApi
     .detail(id.value)
     .then((vo) => {
       item.value = vo
       loadComments()
+      if ((vo.deliveryType ?? DELIVERY.MEET) === DELIVERY.HOME) void loadShipAddress()
     })
     .catch(() => {
       // 不存在 / 已下架：request 层已提示，落空态
     })
 })
+
+onUnload(() => {
+  uni.$off('cm:address-picked', onAddressPicked)
+})
+
+function onAddressPicked(payload: unknown): void {
+  shipAddress.value = payload as AddressVO
+}
+
+async function loadShipAddress(): Promise<void> {
+  try {
+    const list = await addressApi.list(ADDRESS_KIND.ship)
+    shipAddress.value = list.find((a) => a.isDefault === 1) ?? list[0] ?? null
+  } catch {
+    // 未登录或网络异常：下单前还会再拦一次，这里不打扰
+  }
+}
+
+function pickShipAddress(): void {
+  void uni.navigateTo({ url: `/pages/address/list?kind=${ADDRESS_KIND.ship}&pick=1` })
+}
 
 /** 图集：有真实图片用图片，否则一张渐变占位 */
 const shots = computed(() => {
@@ -149,6 +180,22 @@ function onChat(): void {
   void uni.navigateTo({ url: `/pages/chat/detail?${q}` })
 }
 
+/** 当前商品的收货方式与展示文案（面交看面交点、自提看提货点、送货看收货地址） */
+const deliveryType = computed(() => item.value?.deliveryType ?? DELIVERY.MEET)
+const deliveryLabel = computed(() =>
+  deliveryType.value === DELIVERY.PICKUP ? '自提' : deliveryType.value === DELIVERY.HOME ? '送货上门' : '面交'
+)
+const specKey = computed(() =>
+  deliveryType.value === DELIVERY.PICKUP ? '自提点' : deliveryType.value === DELIVERY.HOME ? '收货地址' : '面交点'
+)
+const specValue = computed(() => {
+  if (deliveryType.value === DELIVERY.PICKUP) return item.value?.pickupAddress || '卖家未填提货点'
+  if (deliveryType.value === DELIVERY.HOME) {
+    return shipAddress.value ? addressText(shipAddress.value) : '点击选择收货地址'
+  }
+  return item.value?.meetPointName ?? '待定'
+})
+
 /** 我想要：未登录先跳登录（下单要令牌），已登录确认后创建待付款订单进详情 */
 async function onBuy(): Promise<void> {
   const it = item.value
@@ -162,25 +209,49 @@ async function onBuy(): Promise<void> {
     uni.showToast({ title: '不能购买自己发布的商品', icon: 'none' })
     return
   }
+  // 送货上门必须落到一个地址：没有就先去选，别把订单创建出来却没有收货地
+  if (deliveryType.value === DELIVERY.HOME && !shipAddress.value) {
+    uni.showToast({ title: '请先选择收货地址', icon: 'none' })
+    pickShipAddress()
+    return
+  }
+
+  const lines: Array<{ label: string; value: string; strong?: boolean }> = [
+    { label: '商品', value: clip(it.title) },
+    { label: '应付', value: formatPrice(Number(it.price)), strong: true }
+  ]
+  if (deliveryType.value === DELIVERY.HOME && shipAddress.value) {
+    lines.push({
+      label: '收货',
+      // 地址比商品名更长，放宽到 24 字才能留下门牌号
+      value: clip(`${shipAddress.value.contactName} ${addressText(shipAddress.value)}`, 24)
+    })
+  } else if (deliveryType.value === DELIVERY.PICKUP) {
+    lines.push({ label: '自提点', value: clip(it.pickupAddress || '下单后与卖家确认', 24) })
+  } else {
+    lines.push({ label: '面交点', value: clip(it.meetPointName || '下单后与卖家约定') })
+  }
+
   // 「我想要」是拇指最常落的位置，误触一次就多一张待付款单，所以先过一道确认
   const ok = await confirmPay({
     title: '确认购买',
-    lines: [
-      { label: '商品', value: clip(it.title) },
-      { label: '应付', value: formatPrice(Number(it.price)), strong: true },
-      {
-        label: '面交点',
-        value: it.meetPointName || '下单后与卖家约定'
-      }
-    ],
+    lines,
     note: '仅创建待付款订单，暂不扣款；确认收货后才结算给卖家。',
     confirmText: '确认下单'
   })
   if (!ok) return
 
+  const req =
+    deliveryType.value === DELIVERY.HOME
+      ? { itemId: it.id, addressId: shipAddress.value?.id }
+      : {
+          itemId: it.id,
+          meetPointId: deliveryType.value === DELIVERY.MEET ? it.meetPointId ?? undefined : undefined
+        }
+
   uni.showLoading({ title: '下单中…', mask: true })
   userOrderApi
-    .create({ itemId: it.id, meetPointId: it.meetPointId ?? undefined })
+    .create(req)
     .then((orderId) => {
       uni.hideLoading()
       uni.showToast({ title: '已创建订单', icon: 'success' })
@@ -436,16 +507,20 @@ async function send(): Promise<void> {
         <view class="spec__tags">
           <ConditionTag :grade="item.grade as 'A'" />
           <text class="spec__tag">{{ item.negotiable ? '可议价' : '一口价' }}</text>
-          <text class="spec__tag">{{ item.deliveryIncluded ? '包配送' : '自提' }}</text>
+          <text class="spec__tag">{{ deliveryLabel }}</text>
         </view>
         <view class="spec__grid">
           <view class="spec__cell">
             <text class="spec__k">校区</text>
             <text class="spec__v">{{ item.campusName }}</text>
           </view>
-          <view class="spec__cell">
-            <text class="spec__k">面交点</text>
-            <text class="spec__v">{{ item.meetPointName ?? '待定' }}</text>
+          <view
+            class="spec__cell"
+            :class="{ 'spec__cell--tap': deliveryType === DELIVERY.HOME }"
+            @click="deliveryType === DELIVERY.HOME && pickShipAddress()"
+          >
+            <text class="spec__k">{{ specKey }}</text>
+            <text class="spec__v spec__v--wrap">{{ specValue }}</text>
           </view>
         </view>
       </view>
@@ -826,6 +901,30 @@ async function send(): Promise<void> {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+/* 收货地址可能长过一格，允许折两行；面交点 / 自提点仍走单行省略。
+   字号降一档，否则两行只放得下十几个字，门牌号必被截掉。 */
+.spec__v--wrap {
+  font-size: $cm-font-size-sm;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.4;
+}
+
+/* 可点的格子给一点按压反馈：送货上门的「收货地址」要能换 */
+.spec__cell--tap {
+  transition: opacity 140ms ease-out;
+}
+
+.spec__cell--tap:active {
+  opacity: 0.6;
+}
+
+.spec__cell--tap .spec__v {
+  color: $cm-color-brand-text;
 }
 
 .seller {

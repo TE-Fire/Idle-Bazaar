@@ -54,6 +54,7 @@ const serviceEntries: ServiceEntry[] = [
   { key: 'plaza', label: '逛广场', icon: 'grid', tint: 'violet' },
   { key: 'notice', label: '系统通知', icon: 'bell', tint: 'blue' },
   { key: 'fav', label: '我的收藏', icon: 'heart', tint: 'pink' },
+  { key: 'address', label: '地址簿', icon: 'location', tint: 'blue' },
   { key: 'verify', label: '学号认证', icon: 'shield', tint: 'teal' }
 ]
 
@@ -116,6 +117,14 @@ function open(e: { key: string; label: string }): void {
       return
     }
     void uni.navigateTo({ url: `/pages/user/index?userId=${me}&tab=favorites` })
+    return
+  }
+  if (e.key === 'address') {
+    if (!getSession().tokenValue) {
+      goLogin()
+      return
+    }
+    void uni.navigateTo({ url: '/pages/address/list' })
     return
   }
   if (e.key === 'verify') {
