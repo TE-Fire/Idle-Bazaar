@@ -227,6 +227,20 @@ const specValue = computed(() => {
   return item.value?.meetPointName ?? '待定'
 })
 
+/** 卖家信用分低于 60：购买前弹风险提醒，用户可取消。返回 false 即中止下单 */
+async function warnLowCreditSeller(): Promise<boolean> {
+  const score = item.value?.sellerCredit ?? 100
+  return new Promise<boolean>((resolve) => {
+    uni.showModal({
+      title: '信用提示',
+      content: `该卖家信用分为 ${score} 分（低于 60 分），交易存在一定风险，是否仍要购买？`,
+      confirmText: '仍要购买',
+      cancelText: '再想想',
+      success: (res) => resolve(res.confirm === true)
+    })
+  })
+}
+
 /** 我想要：未登录先跳登录（下单要令牌），已登录确认后创建待付款订单进详情 */
 async function onBuy(): Promise<void> {
   const it = item.value
@@ -240,6 +254,8 @@ async function onBuy(): Promise<void> {
     uni.showToast({ title: '不能购买自己发布的商品', icon: 'none' })
     return
   }
+  // 卖家信用分低于 60：购买前弹风险提醒，用户可取消
+  if ((it.sellerCredit ?? 100) < 60 && !(await warnLowCreditSeller())) return
   // 送货上门必须落到一个地址：没有就先去选，别把订单创建出来却没有收货地
   if (deliveryType.value === DELIVERY.HOME && !shipAddress.value) {
     uni.showToast({ title: '请先选择收货地址', icon: 'none' })

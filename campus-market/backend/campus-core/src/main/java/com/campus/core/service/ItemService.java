@@ -17,22 +17,18 @@ import com.campus.core.dto.resp.UserPubVO;
 import com.campus.core.entity.AppUser;
 import com.campus.core.entity.Favorite;
 import com.campus.core.entity.Item;
-import com.campus.core.entity.ItemAudit;
 import com.campus.core.entity.ItemImage;
 import com.campus.core.entity.UserAddress;
 import com.campus.core.enums.AddressKindEnum;
-import com.campus.core.enums.AuditStatusEnum;
 import com.campus.core.enums.DeliveryTypeEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.ItemErrorCode;
+import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AppUserMapper;
 import com.campus.core.mapper.FavoriteMapper;
-import com.campus.core.mapper.ItemAuditMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
-import com.campus.core.mapper.ReportMapper;
 import com.campus.core.mapper.UserAddressMapper;
-import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.campus.core.service.cache.UserPubCache;
 import com.campus.core.service.cache.ViewCounterCache;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +36,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,26 +63,20 @@ public class ItemService {
     /** 关键词长度上限：用户粘贴整段长句是常态，截断而不报错 */
     private static final int MAX_KEYWORD = 50;
 
-    /** 价格异常判定：标价超过同类目成交均价 3 倍（`item_audit.price_abnormal` 的口径） */
-    private static final BigDecimal PRICE_ABNORMAL_TIMES = BigDecimal.valueOf(3);
-
     private final ItemMapper itemMapper;
 
     private final ItemImageMapper itemImageMapper;
 
-    private final ItemAuditMapper itemAuditMapper;
+    /** 信用分门槛：低于此值禁止发布 / 改价（低分拦截），达到则可免审直接上架 */
+    private static final int CREDIT_REVIEW_THRESHOLD = 60;
 
     private final AppUserMapper appUserMapper;
 
     private final DictService dictService;
 
-    private final CategoryAvgPriceCache categoryAvgPriceCache;
-
     private final UserPubCache userPubCache;
 
     private final ViewCounterCache viewCounterCache;
-
-    private final ReportMapper reportMapper;
 
     private final UserAddressMapper userAddressMapper;
 
@@ -96,9 +85,9 @@ public class ItemService {
     private final FavoriteMapper favoriteMapper;
 
     /**
-     * 发布商品。提交即送审：落 PENDING 并插 `item_audit` 进队（先审后发，business/01 F-W3）；
-     * `draft = true` 暂存草稿：落 DRAFT、不进队、豁免图片与描述（含 D 档描述必填），
-     * 必填字段仍要齐全——`item` 表这些列 NOT NULL，草稿同样要落库。
+     * 发布商品。信用分 < 60 禁止正式发布（低分拦截，USER_CREDIT_TOO_LOW）；
+     * 信用分 >= 60 免审直接上架（落 ON_SALE + publishedAt，与审核通过口径一致）；
+     * `draft = true` 暂存草稿：落 DRAFT、不进队、不受信用分拦截（仅「正式提交」才卡）。
      */
     @Transactional(rollbackFor = Exception.class)
     public Long publish(Long sellerId, ItemPublishReq req) {
@@ -110,6 +99,10 @@ public class ItemService {
         if (!draft) {
             requireGradeFlawDescribed(req);
         }
+
+        // 低分拦截：信用分 < 60 禁止正式发布（草稿豁免，可继续编辑后等分数恢复再提交）
+        BizAssert.isTrue(draft || nvl(seller.getCreditScore(), 100) >= CREDIT_REVIEW_THRESHOLD,
+                UserErrorCode.USER_CREDIT_TOO_LOW);
 
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
         Item item = new Item()
@@ -125,16 +118,14 @@ public class ItemService {
                 .setNegotiable(nvl(req.getNegotiable()))
                 .setDeliveryType(validateDelivery(sellerId, req.getDeliveryType(), req.getPickupAddressId()))
                 .setPickupAddressId(req.getPickupAddressId())
-                .setStatus((draft ? ItemStatusEnum.DRAFT : ItemStatusEnum.PENDING).getCode());
+                .setStatus((draft ? ItemStatusEnum.DRAFT : ItemStatusEnum.ON_SALE).getCode())
+                .setPublishedAt(draft ? null : LocalDateTime.now());
         if (!images.isEmpty()) {
             // 首张即主图，列表页免查图表
             item.setMainImage(images.get(0));
         }
         itemMapper.insert(item);
         saveImages(item.getId(), images);
-        if (!draft) {
-            enqueueAudit(item, seller);
-        }
         return item.getId();
     }
 
@@ -345,15 +336,25 @@ public class ItemService {
             requireGradeFlawDescribed(req);
         }
 
-        // 草稿送审：草稿态 + 未勾「存草稿」——首次离开草稿态，此前从没进过队，必须进
+        // 草稿送审：草稿态 + 未勾「存草稿」——首次离开草稿态
         boolean submitDraft = status == ItemStatusEnum.DRAFT && !draftSave;
-        // 审核未过：修改后重提——不论改什么，保存即回待审核重新进队（business/01 商品状态机）
+        // 审核未过：修改后重提
         boolean resubmit = status == ItemStatusEnum.REJECTED;
-        // 核心字段变更：价格或成色变化——已发布商品只改这两项才回审，改其余字段照常免审
+        // 核心字段变更：价格或成色变化——已发布商品只改这两项才触发重新上架判定
         boolean coreChanged = !Objects.equals(item.getPrice(), req.getPrice())
                 || !item.getGrade().equalsIgnoreCase(req.getGrade());
-        // 回待审核判定：草稿送审、驳回重提必进队；已发布商品（在售 / 已下架）看核心字段是否变更
-        boolean reaudit = submitDraft || resubmit || (status != ItemStatusEnum.DRAFT && coreChanged);
+        // 任何会重新上架的动作（首发布 / 驳回重提 / 改价改样）
+        boolean wouldReaudit = submitDraft || resubmit || (status != ItemStatusEnum.DRAFT && coreChanged);
+
+        // 低分拦截：信用分 < 60 禁止任何「重新上架」动作（发布 / 改价 / 重提一律卡住）；
+        // 非核心字段的普通编辑（如改描述）不受限，照常保存。
+        // 高信用（>= 60）免审核：重新上架直接上架，跳过人工审核队列。
+        AppUser seller = requireUser(sellerId);
+        int credit = nvl(seller.getCreditScore(), 100);
+        BizAssert.isTrue(!wouldReaudit || credit >= CREDIT_REVIEW_THRESHOLD,
+                UserErrorCode.USER_CREDIT_TOO_LOW);
+        boolean autoPublish = wouldReaudit && credit >= CREDIT_REVIEW_THRESHOLD;
+
         List<String> images = req.getImages() == null ? List.of() : req.getImages();
 
         LambdaUpdateWrapper<Item> u = new LambdaUpdateWrapper<Item>()
@@ -371,15 +372,14 @@ public class ItemService {
                 .set(Item::getDeliveryType, validateDelivery(sellerId, req.getDeliveryType(), req.getPickupAddressId()))
                 .set(Item::getPickupAddressId, req.getPickupAddressId())
                 .set(Item::getMainImage, images.isEmpty() ? null : images.get(0));
-        if (reaudit) {
-            u.set(Item::getStatus, ItemStatusEnum.PENDING.getCode());
+        // 高信用重新上架：首发布 / 驳回重提直接置在售；改价改样保持原状态（已是从草稿外）
+        if (autoPublish && (submitDraft || resubmit)) {
+            u.set(Item::getStatus, ItemStatusEnum.ON_SALE.getCode());
+            u.set(Item::getPublishedAt, LocalDateTime.now());
         }
         itemMapper.update(null, u);
         replaceImages(itemId, images);
-
-        if (reaudit) {
-            enqueueAudit(itemMapper.selectById(itemId), requireUser(sellerId));
-        }
+        // 注：低分重提已被上方 BizAssert 拦截；高信用免审核直接上架，不再进 item_audit 队列
     }
 
     private void saveImages(Long itemId, List<String> images) {
@@ -389,50 +389,6 @@ public class ItemService {
                     .setUrl(images.get(i))
                     .setSort(i));
         }
-    }
-
-    /**
-     * 插审核单据并算好四项权重快照。快照而非实时值：实时算会让队列中的单子因后续
-     * 数据变化跳位置；等待补偿是时间函数，由 ReviewAdminService 查询时实算。
-     */
-    private void enqueueAudit(Item item, AppUser seller) {
-        // 预留分量：本期没有图片检测源，恒 0（db/01 §5.6 同口径：一期占位，二期接识别服务）
-        int imageRisk = 0;
-        int priceAbnormal = isPriceAbnormal(item) ? 1 : 0;
-        int creditDeduct = (100 - nvl(seller.getCreditScore(), 100)) / 10;
-        int reportCount = currentReportCount(item.getId());
-
-        itemAuditMapper.insert(new ItemAudit()
-                .setItemId(item.getId())
-                .setStatus(AuditStatusEnum.PENDING.getCode())
-                .setEnterQueueAt(LocalDateTime.now())
-                .setReportCount(reportCount)
-                .setImageRisk(imageRisk)
-                .setCreditDeduct(creditDeduct)
-                .setPriceAbnormal(priceAbnormal)
-                .setPriorityScore(reportCount * 3 + Math.round(imageRisk / 10.0f)
-                        + creditDeduct + priceAbnormal * 5));
-    }
-
-    /** 进队时的实时未结举报数（notes/13 O1 规则 3.1）；没被举报的商品查不到行，按 0 计 */
-    private int currentReportCount(Long itemId) {
-        List<ReportMapper.ItemReportCountRow> rows = reportMapper.countByItem(List.of(itemId));
-        return rows.isEmpty() ? 0 : Math.toIntExact(rows.get(0).getCnt());
-    }
-
-    /**
-     * 价格异常：标价高于同类目成交均价 3 倍。均价走共享缓存（CategoryAvgPriceCache），
-     * 滞后 ≤5 分钟不改变判定。新品无成交时没有均价可比，判为不异常。
-     */
-    private boolean isPriceAbnormal(Item item) {
-        if (item.getCategoryId() == null || item.getPrice() == null) {
-            return false;
-        }
-        BigDecimal avg = categoryAvgPriceCache.categoryAvgPrices().get(item.getCategoryId());
-        if (avg == null || avg.signum() <= 0) {
-            return false;
-        }
-        return item.getPrice().compareTo(avg.multiply(PRICE_ABNORMAL_TIMES)) > 0;
     }
 
     private Item requireOwned(Long sellerId, Long itemId) {

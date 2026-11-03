@@ -19,6 +19,7 @@ import com.campus.core.enums.AddressKindEnum;
 import com.campus.core.enums.AppealBizTypeEnum;
 import com.campus.core.enums.AppealStatusEnum;
 import com.campus.core.enums.CancelTypeEnum;
+import com.campus.core.enums.CreditReasonEnum;
 import com.campus.core.enums.DeliveryTypeEnum;
 import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.enums.OrderStatusEnum;
@@ -32,6 +33,7 @@ import com.campus.core.mapper.TradeOrderMapper;
 import com.campus.core.mapper.UserAddressMapper;
 import com.campus.core.redis.ItemRedisKeys;
 import com.campus.core.redis.LuaScripts;
+import com.campus.core.service.CreditService;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -145,6 +147,9 @@ public class OrderService {
 
     /** 下单取价与成交后失效议价（notes/28）：议价价只进这一笔订单，不写回商品 */
     private final OfferService offerService;
+
+    /** 确认收货后给买卖双方各加 1 信用分（TRADE_DONE） */
+    private final CreditService creditService;
 
     /**
      * 下单：**只插订单，不锁商品**。
@@ -467,6 +472,9 @@ public class OrderService {
         BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "当前状态不能确认收货");
         // 成交成立：status=4 正是 avgPriceByCategory 的统计口径，均价缓存立即失效
         categoryAvgPriceCache.evict();
+        // 完成交易信用分 +1：买卖双方各加一次（分值固定写死在 CreditReasonEnum.TRADE_DONE）
+        creditService.change(order.getBuyerId(), CreditReasonEnum.TRADE_DONE, orderId, "完成交易");
+        creditService.change(order.getSellerId(), CreditReasonEnum.TRADE_DONE, orderId, "完成交易");
     }
 
     /* ══ 五、逆向：取消 / 退款 / 纠纷 ══════════════════════════ */

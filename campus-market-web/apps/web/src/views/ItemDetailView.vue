@@ -32,7 +32,7 @@ import { useUserStore } from '@/stores/user'
 import SharePoster from '@/components/SharePoster.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import { confirmPay } from '@/utils/confirm-pay'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -202,6 +202,8 @@ async function onBuy(): Promise<void> {
     void router.push({ name: 'login', query: { redirect: route.fullPath } })
     return
   }
+  // 卖家信用分低于 60：购买前弹风险提醒，用户可取消
+  if ((item.value.sellerCredit ?? 100) < 60 && !(await warnLowCreditSeller())) return
   if (deliveryType.value === DELIVERY.DELIVERY) {
     await openAddressPicker()
     return
@@ -233,6 +235,23 @@ async function confirmBuy(): Promise<boolean> {
     note: '这一步只创建待付款订单，不会直接扣款；30 分钟内未付款订单自动关闭。',
     confirmText: '确认下单'
   })
+}
+
+/**
+ * 卖家信用分低于 60：购买前弹风险提醒，用户可取消。返回 false 即中止下单。
+ */
+async function warnLowCreditSeller(): Promise<boolean> {
+  const score = item.value?.sellerCredit ?? 100
+  try {
+    await ElMessageBox.confirm(
+      `该卖家信用分为 ${score} 分（低于 60 分），交易存在一定风险，请确认后再下单。`,
+      '信用提示',
+      { type: 'warning', confirmButtonText: '仍要购买', cancelButtonText: '再想想' }
+    )
+    return true
+  } catch {
+    return false
+  }
 }
 
 async function createOrder(addressId?: string): Promise<void> {
