@@ -38,6 +38,36 @@ const shipAddress = ref<AddressVO | null>(null)
 /** 分享到广场在途：防止连点重复发动态 */
 const sharing = ref(false)
 
+/** 我对该商品的未完成订单：存在时把购买入口改为「查看我的订单」，避免重复下单（notes/13） */
+const myOpenOrder = ref<{ orderId: string; status: string } | null>(null)
+const MY_ORDER_LABEL: Record<string, string> = {
+  WAIT_PAY: '待付款',
+  WAIT_MEET: '待面交',
+  VERIFIED: '待确认收货',
+  WAIT_SHIP: '待发货',
+  SHIPPED: '待收货',
+  WAIT_PICKUP: '待自提',
+  REFUNDING: '退款中',
+  DISPUTING: '纠纷中'
+}
+const myOrderLabel = computed(() =>
+  myOpenOrder.value ? MY_ORDER_LABEL[myOpenOrder.value.status] ?? '处理中' : ''
+)
+function goMyOrder(): void {
+  if (myOpenOrder.value) {
+    void uni.redirectTo({ url: `/pages/order/detail?id=${myOpenOrder.value.orderId}&role=buyer` })
+  }
+}
+/** 查我对该商品是否有未完成订单；未登录或被拦截时静默，不影响浏览与下单 */
+async function loadMyOpen(): Promise<void> {
+  if (!item.value || !getSession().tokenValue) return
+  try {
+    myOpenOrder.value = await userOrderApi.myOpen(item.value.id)
+  } catch {
+    // 未登录 / 被拦截：静默
+  }
+}
+
 /** 状态栏高度：H5 为 0，小程序端要留出系统栏，否则按钮压在时间下面 */
 const statusBarHeight = uni.getSystemInfoSync().statusBarHeight ?? 0
 const sysInfo = uni.getSystemInfoSync()
@@ -126,6 +156,7 @@ onLoad((query) => {
     .then((vo) => {
       item.value = vo
       loadComments()
+      void loadMyOpen()
       if ((vo.deliveryType ?? DELIVERY.MEET) === DELIVERY.HOME) void loadShipAddress()
     })
     .catch(() => {
@@ -612,7 +643,10 @@ async function send(): Promise<void> {
           <CmIcon name="heart" size="md" />
         </view>
         <view class="actionbar__minor" @click="onChat">聊一聊</view>
-        <view class="actionbar__main" hover-class="actionbar__main--active" @click="onBuy">我想要</view>
+        <view v-if="myOpenOrder" class="actionbar__main" hover-class="actionbar__main--active" @click="goMyOrder">
+          查看我的订单（{{ myOrderLabel }}）
+        </view>
+        <view v-else class="actionbar__main" hover-class="actionbar__main--active" @click="onBuy">我想要</view>
       </view>
     </template>
 

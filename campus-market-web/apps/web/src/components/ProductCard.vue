@@ -118,6 +118,7 @@ function onCompare(e: MouseEvent): void {
     <div class="card__body">
       <h3 class="card__title">
         <span v-if="item.delivery" class="cm-tag cm-tag--red">包邮</span>
+        <span v-if="item.deliveryType === 2" class="cm-tag cm-tag--blue">自提</span>
         <span v-if="item.negotiable" class="cm-tag cm-tag--yellow">可议价</span>
         <span class="card__title-text cm-clamp-2">{{ item.title }}</span>
       </h3>

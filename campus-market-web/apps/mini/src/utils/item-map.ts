@@ -33,6 +33,7 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
     negotiable: vo.negotiable === 1,
     // 与 web 端同口径：delivery 表示「送货上门」，不再有包邮标记
     delivery: vo.deliveryType === 3,
+    deliveryType: vo.deliveryType ?? 1,
     status: vo.status,
     wantCount: 0,
     seller: {

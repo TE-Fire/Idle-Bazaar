@@ -52,6 +52,7 @@ function open(): void {
       </view>
       <view class="meta">
         <ConditionTag :grade="item.condition" />
+        <text v-if="item.deliveryType === 2" class="cm-tag cm-tag--pickup">自提</text>
         <text class="campus">{{ item.campus }}</text>
       </view>
       <view class="seller">

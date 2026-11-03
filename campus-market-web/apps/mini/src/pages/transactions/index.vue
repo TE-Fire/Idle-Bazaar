@@ -56,6 +56,8 @@ const ORDER_FILTERS: Array<{ label: string; match: (s: OrderStatus) => boolean }
   { label: '全部', match: () => true },
   { label: '待付款', match: (s) => s === 'WAIT_PAY' },
   { label: '待面交', match: (s) => s === 'WAIT_MEET' || s === 'VERIFIED' },
+  { label: '待自提', match: (s) => s === 'WAIT_PICKUP' },
+  { label: '待发货', match: (s) => s === 'WAIT_SHIP' || s === 'SHIPPED' },
   { label: '退款中', match: (s) => s === 'REFUNDING' },
   { label: '纠纷中', match: (s) => s === 'DISPUTING' },
   { label: '已完成', match: (s) => s === 'COMPLETED' || s === 'REFUNDED' || s === 'CANCELED' }
@@ -68,7 +70,10 @@ const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   CANCELED: '已取消',
   REFUNDING: '退款中',
   REFUNDED: '已退款',
-  DISPUTING: '纠纷中'
+  DISPUTING: '纠纷中',
+  WAIT_SHIP: '待发货',
+  SHIPPED: '待收货',
+  WAIT_PICKUP: '待自提'
 }
 const orderFilterIdx = ref(0)
 

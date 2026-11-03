@@ -22,6 +22,12 @@ interface RequestOptions {
   url: string
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
   data?: Record<string, unknown>
+  /**
+   * query 参数。**后端 `@RequestParam` 收的入参必须走这里，不能塞 data**——
+   * data 走的是 body，参数位置不对后端会 400，异常又被全局兜成 code:5000，
+   * 表现为「点了没反应」（核销码传 body 就踩过这个坑）。
+   */
+  params?: Record<string, unknown>
   /** 静默失败：不弹 toast，由调用方自己决定怎么降级（如联调账号列表） */
   silent?: boolean
 }
@@ -37,12 +43,25 @@ function goLogin(): void {
   uni.reLaunch({ url: `/pages/login/index${redirect}` })
 }
 
+/** query 序列化：跳过 undefined / null，其余统一 encodeURIComponent */
+function toQueryString(params: Record<string, unknown>): string {
+  return Object.entries(params)
+    .filter(([, v]) => v !== undefined && v !== null)
+    .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(String(v))}`)
+    .join('&')
+}
+
 export function request<T>(options: RequestOptions): Promise<T> {
   const tokenName = getTokenName()
   const tokenValue = getTokenValue()
+  // GET 的 uni.request 会把 data 拼到 query 上，但 POST 不会——POST 的 data 是 body。
+  // 所以 query 一律由 params 显式拼进 url，避免「同一个接口换 method 就丢参数」。
+  const url = options.params
+    ? `${options.url}${options.url.includes('?') ? '&' : '?'}${toQueryString(options.params)}`
+    : options.url
   return new Promise<T>((resolve, reject) => {
     uni.request({
-      url: options.url,
+      url,
       method: options.method ?? 'GET',
       data: options.data,
       header: tokenName && tokenValue ? { [tokenName]: tokenValue } : {},

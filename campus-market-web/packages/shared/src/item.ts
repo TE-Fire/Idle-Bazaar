@@ -85,6 +85,11 @@ export interface GoodsItem {
   meetPoint: string
   negotiable: boolean
   delivery: boolean
+  /**
+   * 收货方式：1 面交 / 2 自提 / 3 送货上门。
+   * 卡片要在「自提」时亮标签，所以不能只保留 `delivery` 这个布尔（它只表示含配送）。
+   */
+  deliveryType?: number
   status: ItemStatus
   /** 「N 人想要」 */
   wantCount: number

@@ -148,5 +148,15 @@ export const userOrderApi = {
   list: (params: OrderListParams = {}) =>
     request<PageResult<UserOrderVO>>({ url: '/api/order/list', params: { ...params } }),
 
-  detail: (id: string) => request<UserOrderVO>({ url: `/api/order/${id}` })
+  detail: (id: string) => request<UserOrderVO>({ url: `/api/order/${id}` }),
+
+  /**
+   * 查当前用户对该商品是否有未完成订单：有则返回 { orderId, status }，否则 null。
+   * GET 入参走 params（axios 的 GET data 会被静默丢弃）。
+   */
+  myOpen: (itemId: string) =>
+    request<{ orderId: string; status: string } | null>({
+      url: '/api/order/my-open',
+      params: { itemId }
+    })
 }

@@ -432,6 +432,12 @@ export type OrderStatus =
   | 'REFUNDING'
   | 'REFUNDED'
   | 'DISPUTING'
+  /** 送货上门：待卖家发货 */
+  | 'WAIT_SHIP'
+  /** 送货上门：卖家已发货，待买家确认收货 */
+  | 'SHIPPED'
+  /** 自提：待买家到提货地址自取 */
+  | 'WAIT_PICKUP'
 
 export interface OrderVO {
   id: string
@@ -486,11 +492,14 @@ export const userOrderApi = {
   dispute: (id: string, reason: string) =>
     request<void>({ url: `/api/order/${id}/dispute`, method: 'POST', data: { reason } }),
 
-  /** 扫码核销：待面交 → 已验货 */
+  /** 扫码核销：待面交 / 待自提 → 已验货。核销码走 query（后端 @RequestParam） */
   verify: (id: string, code: string) =>
-    request<void>({ url: `/api/order/${id}/verify`, method: 'POST', data: { code } }),
+    request<void>({ url: `/api/order/${id}/verify`, method: 'POST', params: { code } }),
 
-  /** 确认收货：已验货 → 已完成 */
+  /** 卖家标记已发货：待发货 → 已发货（仅送货上门） */
+  ship: (id: string) => request<void>({ url: `/api/order/${id}/ship`, method: 'POST' }),
+
+  /** 确认收货：已验货 / 已发货 → 已完成 */
   receive: (id: string) => request<void>({ url: `/api/order/${id}/receive`, method: 'POST' }),
 
   /** role：buyer 我买到的（默认）/ seller 我卖出的 */
@@ -500,5 +509,12 @@ export const userOrderApi = {
       data: { role, pageNum, pageSize }
     }),
 
-  detail: (id: string) => request<OrderVO>({ url: `/api/order/${id}` })
+  detail: (id: string) => request<OrderVO>({ url: `/api/order/${id}` }),
+
+  /** 查当前用户对该商品是否有未完成订单：有则返回 { orderId, status }，否则 null（GET 入参走 params） */
+  myOpen: (itemId: string) =>
+    request<{ orderId: string; status: string } | null>({
+      url: '/api/order/my-open',
+      params: { itemId }
+    })
 }

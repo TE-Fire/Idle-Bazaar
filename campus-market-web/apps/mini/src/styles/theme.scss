@@ -206,6 +206,12 @@ page {
   box-shadow: inset 0 0 0 1rpx rgba(255, 106, 0, 0.28);
 }
 
+/* 自提：蓝色实底，与「可议价」的橙描边区分开——两者可能同时出现 */
+.cm-tag--pickup {
+  color: #ffffff;
+  background: $cm-color-blue-500;
+}
+
 /* 未读红点：白描边 + 弹性放大，避免和头像糊在一起 */
 .cm-dot {
   min-width: 30rpx;

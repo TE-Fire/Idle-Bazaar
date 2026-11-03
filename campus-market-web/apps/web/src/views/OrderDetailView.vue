@@ -91,6 +91,19 @@ const deliveryText = computed(() => DELIVERY_TEXT[order.value?.deliveryType ?? '
 /** 有地址快照才展示地址块（面交无地址，只有面交点） */
 const hasAddress = computed(() => !!order.value?.addressDetail)
 
+/**
+ * 需要出示/录入核销码的状态：面交（WAIT_MEET）与自提（WAIT_PICKUP）都要双方到场交接，
+ * 送货上门由物流承担交接，不需要核销码。
+ */
+const needCode = computed(() => {
+  const s = order.value?.status
+  return s === 'WAIT_MEET' || s === 'WAIT_PICKUP'
+})
+/** 核销卡标题跟着收货方式走：自提时写「面交核销」会让人以为要去面交点见面 */
+const verifyTitle = computed(() =>
+  order.value?.deliveryType === 'PICKUP' ? '自提核销' : '面交核销'
+)
+
 /** 待付款剩余分钟数；负数表示已被超时任务扫掉 */
 const expireLeft = computed(() => {
   const o = order.value
@@ -259,7 +272,7 @@ async function onDispute(): Promise<void> {
 async function onVerify(): Promise<void> {
   const code = verifyCode.value.trim()
   if (!code) {
-    ElMessage.warning({ message: '请输入对方出示的 6 位核销码', duration: 2000 })
+    ElMessage.warning({ message: '请输入对方出示的核销码', duration: 2000 })
     return
   }
   await run(() => userOrderApi.verify(orderId.value, code), '核销成功')
@@ -381,15 +394,15 @@ onMounted(load)
                 </p>
               </div>
             </div>
-            <p class="tip">面交现场请核对对方身份，确认无误再出示核销码。</p>
+            <p class="tip">{{ order.deliveryType === 'PICKUP' ? '提货点请核对对方身份，确认无误再出示核销码。' : '面交现场请核对对方身份，确认无误再出示核销码。' }}</p>
           </section>
 
-          <!-- 核销：卖家持码出示 / 买家输入核销（防单方核销） -->
-          <section v-if="order.status === 'WAIT_MEET' || order.status === 'VERIFIED'" class="card">
-            <h2 class="card__h">面交核销</h2>
+          <!-- 核销：卖家持码出示 / 买家输入核销（防单方核销）。面交与自提都要双方到场交接 -->
+          <section v-if="needCode || order.status === 'VERIFIED'" class="card">
+            <h2 class="card__h">{{ verifyTitle }}</h2>
 
             <!-- 卖家：持有核销码，向买家出示 -->
-            <template v-if="!isBuyer && order.status === 'WAIT_MEET'">
+            <template v-if="!isBuyer && needCode">
               <div class="code">
                 <span class="code__v">{{ order.verifyCode || '——' }}</span>
                 <el-button size="small" @click="copy(order.verifyCode, '核销码')">复制</el-button>
@@ -398,7 +411,7 @@ onMounted(load)
             </template>
 
             <!-- 买家：输入卖家出示的码 -->
-            <template v-else-if="isBuyer && order.status === 'WAIT_MEET'">
+            <template v-else-if="isBuyer && needCode">
               <div class="verify">
                 <el-input
                   v-model="verifyCode"
@@ -409,7 +422,7 @@ onMounted(load)
                 />
                 <el-button type="primary" :loading="acting" @click="onVerify">核销</el-button>
               </div>
-              <p class="tip">请当面核对卖家身份，输入卖家出示的核销码完成核销。</p>
+              <p class="tip">{{ order.deliveryType === 'PICKUP' ? '到提货点后，请当面核对卖家身份，输入卖家出示的核销码完成交接。' : '请当面核对卖家身份，输入卖家出示的核销码完成核销。' }}</p>
             </template>
 
             <p v-else class="tip">本单已核销，等待买家确认收货。</p>
@@ -484,7 +497,7 @@ onMounted(load)
             <template v-else-if="order.status === 'VERIFIED'">
               <template v-if="isBuyer">
                 <el-button type="primary" class="act" :loading="acting" @click="onReceive">确认收货</el-button>
-                <p class="tip">必须先面交核销才能确认收货，不能跳过这一步。</p>
+                <p class="tip">必须先完成{{ verifyTitle }}才能确认收货，不能跳过这一步。</p>
               </template>
               <p v-else class="tip">已核销，等待买家确认收货。</p>
             </template>
@@ -512,14 +525,14 @@ onMounted(load)
               <p v-else class="tip">已发货，等待买家确认收货。</p>
             </template>
 
-            <!-- 自提·待自提：买家到店取货后确认 -->
+            <!-- 自提·待自提：双方到场交接，卖家出示码、买家核销后才能确认收货 -->
             <template v-else-if="order.status === 'WAIT_PICKUP'">
               <template v-if="isBuyer">
-                <el-button type="primary" class="act" :loading="acting" @click="onReceive">确认已自提</el-button>
                 <el-button class="act" :loading="acting" @click="onRefund">申请退款</el-button>
-                <p class="tip">到提货地址取货后点确认，交易完成。</p>
+                <el-button class="act" :loading="acting" @click="onDispute">发起纠纷</el-button>
+                <p class="tip">请在上方「{{ verifyTitle }}」卡片输入卖家出示的核销码，核销通过后再确认收货。</p>
               </template>
-              <p v-else class="tip">等待买家到提货地址自取。</p>
+              <p v-else class="tip">等待买家到提货地址自取。请向买家出示上方核销码，由买家录入完成核销。</p>
             </template>
 
             <!-- 卖家处理退款：这一条就是卖家侧的退款入口 -->

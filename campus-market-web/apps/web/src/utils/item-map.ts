@@ -45,6 +45,7 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
     negotiable: vo.negotiable === 1,
     // 只有「送货上门(3)」算含配送；自提(2)与面交(1)都需买家到场，卡片不亮「包邮」标
     delivery: vo.deliveryType === 3,
+    deliveryType: vo.deliveryType ?? 1,
     status: vo.status,
     wantCount: 0,
     seller: {

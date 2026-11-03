@@ -7,8 +7,10 @@ import com.campus.core.dto.req.OrderCancelReq;
 import com.campus.core.dto.req.OrderCreateReq;
 import com.campus.core.dto.req.OrderDisputeReq;
 import com.campus.core.dto.req.RefundHandleReq;
+import com.campus.core.dto.resp.MyOpenOrderVO;
 import com.campus.core.dto.resp.OrderVO;
 import com.campus.core.enums.OrderStatusEnum;
+import com.campus.core.entity.TradeOrder;
 import com.campus.core.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -110,6 +112,19 @@ public class OrderController {
     @GetMapping("/{id}")
     public Result<OrderVO> detail(@PathVariable Long id) {
         return Result.ok(orderService.detail(id, UserContext.getUserId()));
+    }
+
+    @Operation(summary = "我的未完成订单", description = "查当前用户对该商品是否有未完成订单；有则返回订单 id 与状态，用于商品详情引导买家「查看我的订单」而非重复下单")
+    @GetMapping("/my-open")
+    public Result<MyOpenOrderVO> myOpen(@RequestParam Long itemId) {
+        TradeOrder open = orderService.findOpenOrder(UserContext.getUserId(), itemId);
+        if (open == null) {
+            return Result.ok(null);
+        }
+        MyOpenOrderVO vo = new MyOpenOrderVO();
+        vo.setOrderId(open.getId());
+        vo.setStatus(OrderStatusEnum.fromCode(open.getStatus()).name());
+        return Result.ok(vo);
     }
 
     /** 非法状态名当「不筛选」处理：这里是列表筛选项，给它报参错会挡住整页刷新 */

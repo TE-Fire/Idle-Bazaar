@@ -27,21 +27,34 @@ const loading = ref(false)
 
 const isBuyer = computed(() => role.value === 'buyer')
 
-/** 核销码的叫法跟着履约方式走：送货上门时还写「面交核销码」会让人以为要走一趟 */
+/**
+ * 核销码的叫法跟着履约方式走：自提时还写「面交核销码」会让人以为要去面交点见面。
+ * 送货上门走「发货 → 确认收货」，不经过核销，因此没有这一档。
+ */
 const codeLabel = computed(() =>
-  order.value?.deliveryType === 'DELIVERY'
-    ? '收货核销码'
-    : order.value?.deliveryType === 'PICKUP'
-      ? '提货核销码'
-      : '面交核销码'
+  order.value?.deliveryType === 'PICKUP' ? '提货核销码' : '面交核销码'
 )
 const codeHint = computed(() =>
-  order.value?.deliveryType === 'DELIVERY'
-    ? '收到货后出示此码，或输入卖家提供的码完成核销'
-    : order.value?.deliveryType === 'PICKUP'
-      ? '到提货点出示此码，卖家核对后交付'
-      : '面交时向对方出示此码，或输入对方提供的码完成核销'
+  order.value?.deliveryType === 'PICKUP'
+    ? '到提货点后，输入卖家出示的核销码完成交接'
+    : '面交时输入对方出示的核销码完成交接'
 )
+
+/**
+ * 需要出示 / 输入核销码的状态。
+ *
+ * <p>自提与面交都要双方到场交接，付款后停在「待自提 / 待面交」等对方；
+ * 已验货说明码已经用过，不必再出示。送货上门走「发货 → 确认收货」，不经过核销。
+ */
+const needCode = computed(
+  () => order.value?.status === 'WAIT_MEET' || order.value?.status === 'WAIT_PICKUP'
+)
+
+/**
+ * 码只向卖家暴露（后端只对卖家回填 verifyCode），买家侧拿到的是空。
+ * 买家据此只显示输入入口，卖家才看到码本身。
+ */
+const isSeller = computed(() => !isBuyer.value)
 
 const STATUS_TEXT: Record<OrderStatus, string> = {
   WAIT_PAY: '等待买家付款',
@@ -51,7 +64,10 @@ const STATUS_TEXT: Record<OrderStatus, string> = {
   CANCELED: '订单已取消',
   REFUNDING: '退款申请处理中',
   REFUNDED: '已退款',
-  DISPUTING: '纠纷处理中，平台将介入裁决'
+  DISPUTING: '纠纷处理中，平台将介入裁决',
+  WAIT_SHIP: '已付款，等待卖家发货',
+  SHIPPED: '卖家已发货，等待买家确认收货',
+  WAIT_PICKUP: '已付款，等待到提货点自提'
 }
 
 /** 待付款剩余时间（分钟）：expire_time - now，负数表示已被超时取消任务扫掉 */
@@ -148,9 +164,12 @@ async function onDispute(): Promise<void> {
 }
 
 function onVerify(): void {
+  const pickup = order.value?.deliveryType === 'PICKUP'
   void cmPrompt({
-    title: '扫码核销',
-    content: '输入对方出示的 6 位核销码完成面交。',
+    title: pickup ? '提货核销' : '扫码核销',
+    content: pickup
+      ? '输入卖家在提货点出示的 6 位核销码，完成提货交接。'
+      : '输入对方出示的 6 位核销码完成面交。',
     placeholder: '6 位核销码',
     maxlength: 6,
     confirmText: '核销'
@@ -162,6 +181,11 @@ function onVerify(): void {
     }
     void run(() => userOrderApi.verify(id.value, code), '核销成功')
   })
+}
+
+/** 卖家标记已发货（仅送货上门） */
+async function onShip(): Promise<void> {
+  await run(() => userOrderApi.ship(id.value), '已标记发货')
 }
 
 async function onReceive(): Promise<void> {
@@ -208,10 +232,16 @@ onShow(() => {
     </view>
 
     <!-- 核销码：付款后生成，交付时一方出示一方扫描 -->
-    <view v-if="order.status === 'WAIT_MEET' || order.status === 'VERIFIED'" class="code">
+    <view v-if="needCode" class="code">
       <text class="code__label">{{ codeLabel }}</text>
-      <text class="code__value">{{ order.verifyCode }}</text>
-      <text class="code__hint">{{ codeHint }}</text>
+      <!-- 码只回填给卖家：卖家看到码本身，买家看到的是「去输对方给的码」 -->
+      <template v-if="isSeller">
+        <text class="code__value">{{ order.verifyCode || '——' }}</text>
+        <text class="code__hint">向买家出示此码，买家输入后即完成核销。码仅你可见。</text>
+      </template>
+      <template v-else>
+        <text class="code__hint">{{ codeHint }}</text>
+      </template>
     </view>
 
     <!-- 订单信息 -->
@@ -241,9 +271,32 @@ onShow(() => {
       </template>
 
       <template v-else-if="order.status === 'WAIT_MEET'">
-        <view class="btn btn--main" hover-class="btn--active" @click="onVerify">扫码核销</view>
+        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="onVerify">扫码核销</view>
         <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="onRefund">申请退款</view>
         <view class="btn btn--ghost" hover-class="btn--active" @click="onDispute">发起纠纷</view>
+      </template>
+
+      <!-- 自提·待自提：买家到提货点，卖家出示核销码，买家输入后 → 已验货 -->
+      <template v-else-if="order.status === 'WAIT_PICKUP'">
+        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="onVerify">输入核销码</view>
+        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="onRefund">申请退款</view>
+        <view v-else class="hint">等待买家到提货点自取，请出示上方核销码</view>
+        <view class="btn btn--ghost" hover-class="btn--active" @click="onDispute">发起纠纷</view>
+      </template>
+
+      <!-- 送货上门·待发货：卖家发货；买家可退款或纠纷 -->
+      <template v-else-if="order.status === 'WAIT_SHIP'">
+        <view v-if="!isBuyer" class="btn btn--main" hover-class="btn--active" @click="onShip">标记已发货</view>
+        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="onRefund">申请退款</view>
+        <view v-else class="hint">买家已付款并发货地址，请尽快发货</view>
+        <view class="btn btn--ghost" hover-class="btn--active" @click="onDispute">发起纠纷</view>
+      </template>
+
+      <!-- 送货上门·已发货：买家确认收货 -->
+      <template v-else-if="order.status === 'SHIPPED'">
+        <view v-if="isBuyer" class="btn btn--main" hover-class="btn--active" @click="onReceive">确认收货</view>
+        <view v-if="isBuyer" class="btn btn--ghost" hover-class="btn--active" @click="onRefund">申请退款</view>
+        <view v-else class="hint">已发货，等待买家确认收货</view>
       </template>
 
       <template v-else-if="order.status === 'VERIFIED'">
@@ -315,8 +368,14 @@ onShow(() => {
 }
 
 .banner--wait_meet,
-.banner--verified {
+.banner--verified,
+.banner--wait_pickup {
   background: linear-gradient(135deg, #34a853, #1e8e3e);
+}
+
+.banner--wait_ship,
+.banner--shipped {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
 }
 
 .banner--refunding,

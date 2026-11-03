@@ -36,6 +36,7 @@ import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,9 +49,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
-import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -167,6 +167,11 @@ public class OrderService {
                 OrderErrorCode.ITEM_NOT_ON_SALE);
         BizAssert.isTrue(!buyerId.equals(item.getSellerId()), OrderErrorCode.BUY_SELF);
 
+        // 下单去重：买家对该商品已存在未完成订单（付款→履约→核销→退款处理→纠纷中任一态），
+        // 不允许再开一单。未完成 = 非 已完成(4)/已取消(5)/已退款(7)。前端商品详情会据此把
+        // 「立即购买」切换成「查看我的订单」，这里做最后一道硬拦截，避免并发或 stale UI 重复落库。
+        BizAssert.isTrue(findOpenOrder(buyerId, itemId) == null, OrderErrorCode.ORDER_DUPLICATE);
+
         // 收货方式决定后续的地址交互与付款后状态：面交走面交点、自提用卖家提货地址、送货上门用买家收货地址。
         // deliveryType 在创建时从商品抄入订单并固化，之后不再随商品改动。
         DeliveryTypeEnum deliveryType = DeliveryTypeEnum.fromCode(item.getDeliveryType());
@@ -214,7 +219,8 @@ public class OrderService {
                 .setAddressDetail(detail)
                 .setMeetPointId(deliveryType == DeliveryTypeEnum.MEET ? meetPointId : null)
                 .setMeetTime(meetTime)
-                .setVerifyCode(newVerifyCode())
+                // 核销码不在这里生成：它是「成交之后才存在」的交付凭证，
+                // 未付款的单不该有码可核销。改由 pay() 在占位成功后写入。
                 .setExpireTime(now.plusMinutes(PAY_TIMEOUT_MINUTES))
                 .setItemTitle(item.getTitle())
                 .setItemPrice(item.getPrice())
@@ -273,6 +279,10 @@ public class OrderService {
                     .set(TradeOrder::getStatus, afterPay.getCode())
                     .set(TradeOrder::getPayTime, now));
             BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID);
+
+            // 核销码在付款这一刻才生成：它是「成交后交给双方对接」的凭证，
+            // 未付款的单不该有码可核销。放在状态更新之后，失败不影响前面已完成的占位。
+            writeVerifyCode(orderId);
 
             cancelSiblings(order.getItemId(), orderId, CancelTypeEnum.SYSTEM_TIMEOUT,
                     "商品已被其他买家付款");
@@ -382,11 +392,14 @@ public class OrderService {
     /* ══ 四、履约：核销与确认收货 ══════════════════════════════ */
 
     /**
-     * 扫码核销：待面交 → 已验货。
+     * 扫码核销：待面交 / 待自提 → 已验货。
      *
      * <p><b>防单方核销</b>：核销码由卖家持有（仅卖家侧的 {@link OrderVO} 携带，买家侧永远拿不到），
      * 执行核销的却只能是买家——`verify_by` 恒为买家。于是任一方都无法单独完成：
      * 卖家握着码但本接口拒绝卖家调用，买家能调本接口却看不到码，必须双方见面、卖家出示码、买家输入。
+     *
+     * <p>面交与自提共用这一步：两者都要双方到场交接，区别只在交接地点——面交在校园面交点，
+     * 自提在卖家预设的提货地址。送货上门没有这一步（卖家发货后买家直接确认收货）。
      *
      * <p>核销码一单一张（`uk_verify_code` 唯一约束），码对得上才放行。
      */
@@ -400,11 +413,12 @@ public class OrderService {
 
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
                 .eq(TradeOrder::getId, orderId)
-                .eq(TradeOrder::getStatus, OrderStatusEnum.WAIT_MEET.getCode())
+                .in(TradeOrder::getStatus, OrderStatusEnum.WAIT_MEET.getCode(),
+                        OrderStatusEnum.WAIT_PICKUP.getCode())
                 .set(TradeOrder::getStatus, OrderStatusEnum.VERIFIED.getCode())
                 .set(TradeOrder::getVerifyTime, LocalDateTime.now())
                 .set(TradeOrder::getVerifyBy, userId));
-        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有待面交的订单可以核销");
+        BizAssert.isTrue(rows == 1, OrderErrorCode.ORDER_STATUS_INVALID, "只有待面交或待自提的订单可以核销");
     }
 
     /**
@@ -427,11 +441,13 @@ public class OrderService {
     }
 
     /**
-     * 买家确认收货：已验货 / 已发货 / 待自提 → 已完成。
+     * 买家确认收货：已验货 / 已发货 → 已完成。
      *
      * <p>三种收货方式共用同一个「确认收货」终态入口，区别只是进入它的前置态不同：
-     * 面交要先验货（VERIFIED）、送货上门要先发货（SHIPPED）、自提则付款后直接待自提（WAIT_PICKUP）。
-     * 无论哪种，确认收货都统一置 {@code verify_time}（评价窗口起算点）并让均价缓存失效。
+     * 面交与自提都要先核销（VERIFIED）——双方到场交接，卖家出示码、买家输入；
+     * 送货上门没有交接这一步，卖家发货后买家直接确认（SHIPPED）。
+     *
+     * <p>无论哪种，确认收货都统一置 {@code verify_time}（评价窗口起算点）并让均价缓存失效。
      */
     @Transactional(rollbackFor = Exception.class)
     public void receive(Long orderId, Long buyerId) {
@@ -439,8 +455,8 @@ public class OrderService {
         BizAssert.isTrue(buyerId.equals(order.getBuyerId()), OrderErrorCode.ORDER_NOT_OWNER);
 
         OrderStatusEnum status = OrderStatusEnum.fromCode(order.getStatus());
-        BizAssert.isTrue(status == OrderStatusEnum.VERIFIED || status == OrderStatusEnum.SHIPPED
-                || status == OrderStatusEnum.WAIT_PICKUP, OrderErrorCode.ORDER_STATUS_INVALID,
+        BizAssert.isTrue(status == OrderStatusEnum.VERIFIED || status == OrderStatusEnum.SHIPPED,
+                OrderErrorCode.ORDER_STATUS_INVALID,
                 "当前状态不能确认收货");
 
         int rows = orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
@@ -893,8 +909,60 @@ public class OrderService {
                 + ThreadLocalRandom.current().nextInt(100000, 999999);
     }
 
+    /**
+     * 查买家对该商品是否有未完成订单（付款→履约→核销→退款处理→纠纷中任一态）。
+     *
+     * <p>用于下单去重与商品详情「查看我的订单」引导——避免同一买家对同一商品开出多张单。
+     * 终态（已完成/已取消/已退款）不算，因为它们已结束，可以重新发起交易。
+     */
+    public TradeOrder findOpenOrder(Long buyerId, Long itemId) {
+        List<Integer> openStatus = Arrays.asList(
+                OrderStatusEnum.WAIT_PAY.getCode(),
+                OrderStatusEnum.WAIT_MEET.getCode(),
+                OrderStatusEnum.VERIFIED.getCode(),
+                OrderStatusEnum.REFUNDING.getCode(),
+                OrderStatusEnum.DISPUTING.getCode(),
+                OrderStatusEnum.WAIT_SHIP.getCode(),
+                OrderStatusEnum.SHIPPED.getCode(),
+                OrderStatusEnum.WAIT_PICKUP.getCode());
+        return orderMapper.selectOne(new LambdaQueryWrapper<TradeOrder>()
+                .eq(TradeOrder::getBuyerId, buyerId)
+                .eq(TradeOrder::getItemId, itemId)
+                .in(TradeOrder::getStatus, openStatus)
+                .orderByDesc(TradeOrder::getId)
+                .last("limit 1"));
+    }
+
+    /**
+     * 生成 6 位数字核销码。
+     *
+     * <p>面对面交接场景，卖家念一遍买家就能输对；纯数字比 8 位 hex 更易口头传达，
+     * 且前端输入上限统一为 6（两端都不必区分字母大小写）。
+     *
+     * <p>{@code uk_verify_code} 是唯一索引，两单撞码会让写入直接失败，
+     * 所以调用方必须重试（见 {@link #writeVerifyCode}）。
+     */
     private String newVerifyCode() {
-        return UUID.randomUUID().toString().replace("-", "")
-                .substring(0, 8).toUpperCase(Locale.ROOT);
+        return String.format("%06d", ThreadLocalRandom.current().nextInt(0, 1_000_000));
+    }
+
+    /**
+     * 写入核销码，撞码则重试。
+     *
+     * <p>百万级空间下单量级远小于此，冲突概率极低，但唯一索引是硬约束——
+     * 撞上就是写入失败，必须重试而不是让整个支付事务回滚。
+     */
+    private void writeVerifyCode(Long orderId) {
+        for (int i = 0; i < 5; i++) {
+            try {
+                orderMapper.update(null, new LambdaUpdateWrapper<TradeOrder>()
+                        .eq(TradeOrder::getId, orderId)
+                        .set(TradeOrder::getVerifyCode, newVerifyCode()));
+                return;
+            } catch (DuplicateKeyException e) {
+                log.warn("[order] 核销码撞码，重试第 {} 次：orderId={}", i + 1, orderId);
+            }
+        }
+        BizAssert.isTrue(false, CommonErrorCode.SYSTEM_ERROR, "核销码生成失败，请重试");
     }
 }

@@ -48,6 +48,36 @@ const favoriting = ref(false)
 /** 海报弹层：纯前端 canvas，打开时才绘制 */
 const posterOpen = ref(false)
 
+/** 我对该商品的未完成订单：存在时把购买入口改为「查看我的订单」，避免重复下单（notes/13） */
+const myOpenOrder = ref<{ orderId: string; status: string } | null>(null)
+const MY_ORDER_LABEL: Record<string, string> = {
+  WAIT_PAY: '待付款',
+  WAIT_MEET: '待面交',
+  VERIFIED: '待确认收货',
+  WAIT_SHIP: '待发货',
+  SHIPPED: '待收货',
+  WAIT_PICKUP: '待自提',
+  REFUNDING: '退款中',
+  DISPUTING: '纠纷中'
+}
+const myOrderLabel = computed(() =>
+  myOpenOrder.value ? MY_ORDER_LABEL[myOpenOrder.value.status] ?? '处理中' : ''
+)
+function goMyOrder(): void {
+  if (myOpenOrder.value) {
+    void router.push({ name: 'order-detail', params: { id: myOpenOrder.value.orderId } })
+  }
+}
+/** 查我对该商品是否有未完成订单；未登录或被拦截时静默，不影响浏览与下单 */
+async function loadMyOpen(): Promise<void> {
+  if (!item.value || !userStore.userId) return
+  try {
+    myOpenOrder.value = await userOrderApi.myOpen(item.value.id)
+  } catch {
+    // 未登录 / 被拦截：静默
+  }
+}
+
 /** 评论举报弹层 */
 const reportOpen = ref(false)
 const reportId = ref('')
@@ -86,6 +116,7 @@ onMounted(async () => {
   try {
     item.value = await userItemApi.detail(String(route.params.id ?? ''))
     void loadComments()
+    void loadMyOpen()
   } catch {
     // 不存在 / 已下架：http 层已提示，这里落空态
   } finally {
@@ -461,7 +492,10 @@ function goSeller(): void {
             <el-button type="primary" size="large" @click="onEdit">编辑商品</el-button>
           </template>
           <template v-else>
-            <el-button type="primary" size="large" @click="onBuy" :disabled="!onSale">
+            <el-button v-if="myOpenOrder" type="warning" size="large" @click="goMyOrder">
+              查看我的订单（{{ myOrderLabel }}）
+            </el-button>
+            <el-button v-else type="primary" size="large" @click="onBuy" :disabled="!onSale">
               {{ onSale ? '立即购买' : '已下架' }}
             </el-button>
             <el-button size="large" @click="onChat">聊一聊</el-button>

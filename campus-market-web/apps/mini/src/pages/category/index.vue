@@ -182,6 +182,7 @@ function openItem(id: string): void {
               <text class="row__title cm-ell2">{{ it.title }}</text>
               <view class="row__tags">
                 <text v-if="it.negotiable" class="cm-tag cm-tag--nego">可议价</text>
+                <text v-if="it.deliveryType === 2" class="cm-tag cm-tag--pickup">自提</text>
                 <text class="cm-tag cm-tag--muted">{{ it.condition }}</text>
                 <text class="cm-tag cm-tag--brand">{{ it.campus }}</text>
               </view>
