@@ -52,6 +52,9 @@ public class ApiItemVO {
     /** 卖家认证态（app_user.auth_status：0未认证 1审核中 2已认证 3未通过），首页「仅看已认证」筛选用 */
     private Integer sellerAuthStatus;
 
+    /** 卖家头像 URL（来自 app_user.avatar_url，经 UserPubCache 读穿）；空时前端回退占位色块 */
+    private String sellerAvatar;
+
     /** 1 可议价；议价在聊天里进行，不进订单 */
     private Integer negotiable;
 

@@ -1,5 +1,11 @@
 package com.campus.core.redis;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
+
+import java.time.Duration;
+
 /**
  * 商品模块缓存 key。
  *
@@ -10,6 +16,8 @@ package com.campus.core.redis;
  * （见 notes/10）；Hash 由 field 承担 Long→String 的转换，没有这个问题。
  */
 public final class ItemRedisKeys {
+
+    private static final Logger log = LoggerFactory.getLogger(ItemRedisKeys.class);
 
     private static final String MODULE = RedisKeys.PREFIX + "item:";
 
@@ -43,6 +51,35 @@ public final class ItemRedisKeys {
 
     public static String buildStateKey(Long itemId) {
         return STATE_PREFIX + itemId;
+    }
+
+    /**
+     * 商品变为在售时在 Redis 落占位标记（ON_SALE）。使并发首单也能经 occupy.lua 的
+     * WON→LOCKED 前置拦截，而不必全靠 DB 的 CAS 兜底（后者对并发输家提示更糟、且多打一次 DB）。
+     * 带 TTL：过期后 key 消失，occupy 降级为 MISS 放行、DB 仍保证唯一赢家，不影响正确性。
+     * Redis 不可用时静默失败——占位标记只是前置优化，缺失只让首单走 DB 兜底。
+     */
+    public static void markOnSale(StringRedisTemplate rt, Long itemId) {
+        try {
+            rt.opsForValue().set(buildStateKey(itemId), STATE_ON_SALE, Duration.ofSeconds(STATE_TTL_SECONDS));
+        } catch (Exception e) {
+            log.warn("[item] 上架占位标记写入失败，首单将走 DB 兜底，itemId={}", itemId, e);
+        }
+    }
+
+    /**
+     * 读时回填：详情读到在售且 Redis 无占位时才补写 ON_SALE（SET NX）。
+     *
+     * <p>不覆盖已有值——已有的 LOCKED / SOLD 比「读到在售」更权威，覆盖会破坏正在进行的占位。
+     * 只补缺失，用来把快速通道的有效期从「发布后 60s」延长到「每次被打开详情后的 60s」。
+     * 失败仅降级为 DB 兜底，故用 debug，避免读路径刷日志。
+     */
+    public static void armOnSaleIfAbsent(StringRedisTemplate rt, Long itemId) {
+        try {
+            rt.opsForValue().setIfAbsent(buildStateKey(itemId), STATE_ON_SALE, Duration.ofSeconds(STATE_TTL_SECONDS));
+        } catch (Exception e) {
+            log.debug("[item] 读时回填占位失败（可忽略），itemId={}", itemId, e);
+        }
     }
 
     private ItemRedisKeys() {

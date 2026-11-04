@@ -35,6 +35,8 @@ export interface ApiItemVO {
   sellerCredit?: number | null
   /** 卖家认证态（app_user.auth_status：0未认证 1审核中 2已认证 3未通过）；旧后端不返回时为 undefined */
   sellerAuthStatus?: number | null
+  /** 卖家头像 URL（app_user.avatar_url）；空时前端回退占位色块 */
+  sellerAvatar?: string | null
   /** 1 可议价；议价在聊天里进行，不进订单 */
   negotiable?: number | null
   /** 收货方式：1面交 2自提 3送货上门 */

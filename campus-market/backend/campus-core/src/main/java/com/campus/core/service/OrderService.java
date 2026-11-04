@@ -95,8 +95,11 @@ public class OrderService {
     /** Lua 返回值：同一订单重入，按幂等处理 */
     private static final int OCCUPY_REENTRY = 2;
 
-    /** Lua 返回值：冲突（他人已锁定或已售出） */
-    private static final int OCCUPY_CONFLICT = 0;
+    /** Lua 返回值：商品已售出，终态，无恢复路径 */
+    private static final int OCCUPY_SOLD = 0;
+
+    /** Lua 返回值：他人付款中（占位锁未释放），锁有 TTL 自愈，稍后重试即可 */
+    private static final int OCCUPY_BUSY = -2;
 
     /** Lua 返回值：缓存缺失，放行交给 DB 裁决 */
     private static final int OCCUPY_MISS = -1;
@@ -266,7 +269,10 @@ public class OrderService {
         }
 
         long result = occupy(stateKey, holder);
-        BizAssert.isTrue(result != OCCUPY_CONFLICT, OrderErrorCode.ITEM_SOLD_OUT);
+        // 「别人正在付款」与「已经卖掉」必须分开报：前者锁有 TTL、对方也可能付款失败回滚，
+        // 提示「稍后重试」才是真话；一律回「已被买走」会让用户以为商品没了而放弃。
+        BizAssert.isTrue(result != OCCUPY_SOLD, OrderErrorCode.ITEM_SOLD_OUT);
+        BizAssert.isTrue(result != OCCUPY_BUSY, OrderErrorCode.ITEM_BUSY);
 
         boolean done = false;
         try {

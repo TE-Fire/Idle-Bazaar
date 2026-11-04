@@ -12,11 +12,14 @@
  * <p>触屏没有 hover（design/02 §二），所以按压反馈用 `:active` 缩放 0.97，120ms。
  */
 
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { formatRelativeTime, type GoodsItem } from '@campus/shared'
 import ConditionTag from './ConditionTag.vue'
 
 const props = defineProps<{ item: GoodsItem }>()
+
+/** 头像加载失败标记：置 true 后回落渐变圆点，避免裂图 */
+const avatarErr = ref(false)
 
 const gradient = computed(() => `linear-gradient(135deg, ${props.item.tints[0]}, ${props.item.tints[1]})`)
 const cover = computed(() => props.item.images?.[0] ?? '')
@@ -56,7 +59,18 @@ function open(): void {
         <text class="campus">{{ item.campus }}</text>
       </view>
       <view class="seller">
-        <view class="dot" :style="{ backgroundImage: `linear-gradient(135deg, ${item.seller.tints[0]}, ${item.seller.tints[1]})` }" />
+        <image
+          v-if="item.seller.avatar && !avatarErr"
+          class="dot dot--img"
+          :src="item.seller.avatar"
+          mode="aspectFill"
+          @error="avatarErr = true"
+        />
+        <view
+          v-else
+          class="dot"
+          :style="{ backgroundImage: `linear-gradient(135deg, ${item.seller.tints[0]}, ${item.seller.tints[1]})` }"
+        />
         <text class="nick">{{ item.seller.nick }}</text>
         <text v-if="item.seller.verified" class="verified">已认证</text>
         <text class="time">{{ timeText }}</text>
@@ -214,6 +228,10 @@ function open(): void {
   height: 28rpx;
   border-radius: 50%;
   flex: none;
+}
+
+.dot--img {
+  display: block;
 }
 
 .nick {

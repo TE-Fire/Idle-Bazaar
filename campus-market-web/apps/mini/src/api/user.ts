@@ -207,6 +207,10 @@ export interface ApiItemVO {
   sellerId: string
   sellerNick?: string
   sellerCredit?: number
+  /** 卖家认证态（app_user.auth_status）；旧后端不返回时为 undefined */
+  sellerAuthStatus?: number
+  /** 卖家头像 URL（app_user.avatar_url）；空时前端回退占位色块 */
+  sellerAvatar?: string
   /** 1 可议价：买家可在聊天里出价，卖家同意后按议价价成交；不改商品标价 */
   negotiable?: number
   /** 收货方式：1 面交 2 自提 3 送货上门，决定下单时走不走地址 */

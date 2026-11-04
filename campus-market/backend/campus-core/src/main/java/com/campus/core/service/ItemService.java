@@ -25,6 +25,7 @@ import com.campus.core.enums.ItemStatusEnum;
 import com.campus.core.errcode.ItemErrorCode;
 import com.campus.core.errcode.UserErrorCode;
 import com.campus.core.mapper.AppUserMapper;
+import com.campus.core.redis.ItemRedisKeys;
 import com.campus.core.mapper.FavoriteMapper;
 import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
@@ -33,6 +34,7 @@ import com.campus.core.service.cache.UserPubCache;
 import com.campus.core.service.cache.ViewCounterCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -84,6 +86,8 @@ public class ItemService {
 
     private final FavoriteMapper favoriteMapper;
 
+    private final StringRedisTemplate stringRedisTemplate;
+
     /**
      * 发布商品。信用分 < 60 禁止正式发布（低分拦截，USER_CREDIT_TOO_LOW）；
      * 信用分 >= 60 免审直接上架（落 ON_SALE + publishedAt，与审核通过口径一致）；
@@ -126,6 +130,10 @@ public class ItemService {
         }
         itemMapper.insert(item);
         saveImages(item.getId(), images);
+        // 免审直接上架：落占位标记，使首单也能走 Redis 前置拦截（草稿不标记）
+        if (!draft) {
+            ItemRedisKeys.markOnSale(stringRedisTemplate, item.getId());
+        }
         return item.getId();
     }
 
@@ -279,6 +287,11 @@ public class ItemService {
                 .map(this::toImageVO)
                 .toList());
         fillSellers(List.of(vo));
+        // 读时回填：买家打开详情即离付款最近，这里补一次 ON_SALE 占位，
+        // 让 occupy.lua 的快速通道在发布后 60s 过期后仍覆盖真实购买路径（SET NX，不覆盖 LOCKED/SOLD）。
+        if (vo.getStatus() == ItemStatusEnum.ON_SALE) {
+            ItemRedisKeys.armOnSaleIfAbsent(stringRedisTemplate, itemId);
+        }
         // 自提点只在详情回填：列表不展示提货地址，逐行查地址会让一页多出十次查询
         vo.setPickupAddress(pickupAddressText(item.getPickupAddressId()));
         vo.setFavorited(viewerId != null && favoriteMapper.selectCount(new LambdaQueryWrapper<Favorite>()
@@ -379,7 +392,10 @@ public class ItemService {
         }
         itemMapper.update(null, u);
         replaceImages(itemId, images);
-        // 注：低分重提已被上方 BizAssert 拦截；高信用免审核直接上架，不再进 item_audit 队列
+        // 高信用重新上架：补占位标记，使首单能走 Redis 前置拦截（低分重提已被上方 BizAssert 拦截）
+        if (autoPublish && (submitDraft || resubmit)) {
+            ItemRedisKeys.markOnSale(stringRedisTemplate, itemId);
+        }
     }
 
     private void saveImages(Long itemId, List<String> images) {
@@ -504,6 +520,7 @@ public class ItemService {
                 vo.setSellerNick(u.getNickname());
                 vo.setSellerCredit(u.getCreditScore());
                 vo.setSellerAuthStatus(u.getAuthStatus());
+                vo.setSellerAvatar(u.getAvatarUrl());
             }
         });
     }

@@ -113,4 +113,6 @@ export interface SellerBrief {
   credit: string
   /** 头像占位渐变（两色） */
   tints: [string, string]
+  /** 真实头像 URL（app_user.avatar_url）；空时前端用 tints 占位 */
+  avatar?: string
 }

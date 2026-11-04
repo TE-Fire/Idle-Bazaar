@@ -39,9 +39,10 @@ export function toGoodsItem(vo: ApiItemVO): GoodsItem {
     seller: {
       id: String(vo.sellerId),
       nick: vo.sellerNick ?? '校园用户',
-      verified: (vo as { sellerAuthStatus?: number }).sellerAuthStatus === 2,
+      verified: vo.sellerAuthStatus === 2,
       credit: (vo.sellerCredit ?? 100) >= 105 ? '极好' : (vo.sellerCredit ?? 100) >= 90 ? '良好' : '一般',
-      tints: tintsOf(String(vo.sellerId))
+      tints: tintsOf(String(vo.sellerId)),
+      avatar: vo.sellerAvatar ?? undefined
     },
     publishedAt: vo.publishAt,
     description: vo.description ?? '',

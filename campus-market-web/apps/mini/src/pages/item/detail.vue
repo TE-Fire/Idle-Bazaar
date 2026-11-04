@@ -33,6 +33,8 @@ const DELIVERY = { MEET: 1, PICKUP: 2, HOME: 3 } as const
 
 const id = ref('')
 const item = ref<ApiItemVO | null>(null)
+/** 卖家头像加载失败标记：置 true 后回落渐变占位 */
+const sellerAvatarErr = ref(false)
 /** 送货上门订单的收货地址：进页面先取默认地址，用户不必每次手动选 */
 const shipAddress = ref<AddressVO | null>(null)
 /** 分享到广场在途：防止连点重复发动态 */
@@ -155,6 +157,7 @@ onLoad((query) => {
     .detail(id.value)
     .then((vo) => {
       item.value = vo
+      sellerAvatarErr.value = false
       loadComments()
       void loadMyOpen()
       if ((vo.deliveryType ?? DELIVERY.MEET) === DELIVERY.HOME) void loadShipAddress()
@@ -573,7 +576,14 @@ async function send(): Promise<void> {
       </view>
 
       <view class="box seller" hover-class="seller--active" @click="goSeller">
-        <view class="avatar" :style="{ backgroundImage: shotGradient() }" />
+        <image
+          v-if="item.sellerAvatar && !sellerAvatarErr"
+          class="avatar"
+          :src="item.sellerAvatar"
+          mode="aspectFill"
+          @error="sellerAvatarErr = true"
+        />
+        <view v-else class="avatar" :style="{ backgroundImage: shotGradient() }" />
         <view class="seller__meta">
           <text class="seller__nick">{{ item.sellerNick ?? '卖家' }}</text>
           <view class="seller__row">

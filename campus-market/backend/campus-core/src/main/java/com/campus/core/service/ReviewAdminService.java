@@ -42,10 +42,12 @@ import com.campus.core.mapper.ItemImageMapper;
 import com.campus.core.mapper.ItemMapper;
 import com.campus.core.mapper.ReportMapper;
 import com.campus.core.mapper.TradeOrderMapper;
+import com.campus.core.redis.ItemRedisKeys;
 import com.campus.core.service.cache.CategoryAvgPriceCache;
 import com.campus.core.service.cache.UserPubCache;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -102,6 +104,8 @@ public class ReviewAdminService {
     private final UserPubCache userPubCache;
     private final CreditService creditService;
     private final SysConfigService sysConfigService;
+
+    private final StringRedisTemplate stringRedisTemplate;
 
     /* ══ 一、队列 ═══════════════════════════════════════════ */
 
@@ -202,6 +206,8 @@ public class ReviewAdminService {
                 .eq(Item::getDeleted, 0)
                 .set(Item::getStatus, ItemStatusEnum.ON_SALE.getCode())
                 .set(Item::getPublishedAt, now));
+        // 审核通过上架：落占位标记，使首单能走 Redis 前置拦截
+        ItemRedisKeys.markOnSale(stringRedisTemplate, audit.getItemId());
 
         updateAudit(auditId, AuditStatusEnum.PASSED, adminId, now, begin, null, null);
     }
@@ -700,6 +706,8 @@ public class ReviewAdminService {
                 u.set(Item::getPublishedAt, LocalDateTime.now());
             }
             itemMapper.update(null, u);
+            // 申诉恢复上架：补占位标记，使首单能走 Redis 前置拦截
+            ItemRedisKeys.markOnSale(stringRedisTemplate, itemId);
             // 举报成立时扣过分，误判纠正要还回去；按报单 id 记流水，便于与扣分对账
             if (AppealBizTypeEnum.REPORT.getCode().equals(appeal.getBizType())
                     && item.getSellerId() != null) {

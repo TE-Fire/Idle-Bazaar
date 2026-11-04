@@ -9,7 +9,7 @@
  * 自己的商品显示编辑入口。无主图时保留渐变占位（骨架期视觉方案）。
  */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { CONDITION_LABELS, formatPrice, formatRelativeTime, type GoodsItem } from '@campus/shared'
 import {
@@ -145,8 +145,15 @@ const DELIVERY = { MEET: 1, PICKUP: 2, DELIVERY: 3 } as const
 const deliveryType = computed(() => item.value?.deliveryType ?? DELIVERY.MEET)
 const DELIVERY_LABELS: Record<number, string> = { 1: '面交', 2: '自提', 3: '送货上门' }
 const deliveryLabel = computed(() => DELIVERY_LABELS[deliveryType.value] ?? '面交')
-/** 卖家头像：按种子约定从 sellerId 派生 demo 头像（后端暂未下发 sellerAvatar） */
-const sellerAvatarUrl = computed(() => `/api/file/demo/avatar/${item.value?.sellerId}.png`)
+/** 卖家头像：后端已下发 sellerAvatar（app_user.avatar_url），空时回退渐变占位 */
+const sellerAvatarUrl = computed(() => item.value?.sellerAvatar ?? '')
+const sellerAvatarOk = ref(true)
+watch(
+  () => item.value?.sellerAvatar,
+  () => {
+    sellerAvatarOk.value = true
+  }
+)
 
 function onCompare(): void {
   if (!item.value) return
@@ -323,11 +330,9 @@ async function onShare(): Promise<void> {
   }
 }
 
-/** 评论头像加载失败（如 MinIO 离线）退回 demo 渐变占位，保证头像区始终有图 */
-function avatarFallback(e: Event, userId: string): void {
-  const img = e.target as HTMLImageElement
-  img.onerror = null
-  img.src = `/api/file/demo/avatar/${userId}.png`
+/** 评论头像加载失败（MinIO 离线 / URL 失效）隐藏破图，避免裂图图标 */
+function avatarFallback(e: Event, _userId: string): void {
+  ;(e.target as HTMLImageElement).style.display = 'none'
 }
 
 /** 拉评论：一次取 50 条，商品评论量小不分页 */
@@ -535,7 +540,7 @@ function goSeller(): void {
 
         <!-- 卖家卡：点击进 TA 的主页（资料 + 在售闲置） -->
         <div class="seller seller--link" @click="goSeller">
-          <img v-if="sellerAvatarUrl" class="avatar" :src="sellerAvatarUrl" :alt="item.sellerNick ?? '卖家'" />
+          <img v-if="sellerAvatarUrl && sellerAvatarOk" class="avatar" :src="sellerAvatarUrl" :alt="item.sellerNick ?? '卖家'" @error="sellerAvatarOk = false" />
           <span v-else class="avatar" :style="{ background: bg(false) }" />
           <div class="seller__meta">
             <span class="nick">{{ item.sellerNick ?? '卖家' }}</span>

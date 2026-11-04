@@ -47,6 +47,11 @@ const secondImg = computed(() => props.item.images?.[1] || '')
 /** 占位图渐变：真实数据没有图时（骨架期 / 外链失效）兜一个成色色块 */
 const bg = (tints: [string, string]): string => `linear-gradient(135deg, ${tints[0]}, ${tints[1]})`
 
+/** 头像加载失败（MinIO 离线 / URL 失效）隐藏 img，露出底层 tints 渐变占位 */
+function onAvatarError(e: Event): void {
+  ;(e.target as HTMLImageElement).style.display = 'none'
+}
+
 const selected = computed(() => compare.has(props.item.id))
 
 /** 对比篮已有别的分类时，本卡禁用「＋对比」——引导用户只挑同类 */
@@ -139,7 +144,9 @@ function onCompare(e: MouseEvent): void {
       </div>
 
       <footer class="card__seller">
-        <span class="avatar" :style="{ background: bg(item.seller.tints) }" />
+        <span class="avatar" :style="{ background: bg(item.seller.tints) }">
+          <img v-if="item.seller.avatar" class="avatar__img" :src="item.seller.avatar" :alt="item.seller.nick" @error="onAvatarError" />
+        </span>
         <span class="nick">{{ item.seller.nick }}</span>
         <span v-if="item.seller.credit === '极好'" class="cm-tag cm-tag--yellow credit">信用极好</span>
         <span v-else-if="item.seller.verified" class="cm-tag cm-tag--green credit">学号已认证</span>
@@ -346,6 +353,14 @@ function onCompare(e: MouseEvent): void {
   height: 18px;
   border-radius: 50%;
   flex: none;
+}
+
+.avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
 }
 
 .nick {
